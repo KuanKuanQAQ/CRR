@@ -3043,6 +3043,13 @@ config HAVE_ATOMIC_IOMAP
 	def_bool y
 	depends on X86_32
 
+config CKASLR
+	bool "continuous kernel address space layout randomization"
+
+config CKASLR_DEBUG
+	bool "debugging for CKASLR"
+	depends on CKASLR
+
 source "arch/x86/kvm/Kconfig"
 
 source "arch/x86/Kconfig.assembler"

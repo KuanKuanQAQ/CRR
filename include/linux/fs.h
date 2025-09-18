@@ -2093,7 +2093,9 @@ static inline int call_mmap(struct file *file, struct vm_area_struct *vma)
 }
 
 extern ssize_t vfs_read(struct file *, char __user *, size_t, loff_t *);
+extern ssize_t vfs_read_real(struct file *, char __user *, size_t, loff_t *);
 extern ssize_t vfs_write(struct file *, const char __user *, size_t, loff_t *);
+extern ssize_t vfs_write_real(struct file *, const char __user *, size_t, loff_t *);
 extern ssize_t vfs_copy_file_range(struct file *, loff_t , struct file *,
 				   loff_t, size_t, unsigned int);
 int __generic_remap_file_range_prep(struct file *file_in, loff_t pos_in,

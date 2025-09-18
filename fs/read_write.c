@@ -20,6 +20,7 @@
 #include <linux/compat.h>
 #include <linux/mount.h>
 #include <linux/fs.h>
+#include <linux/rerand.h>
 #include "internal.h"
 
 #include <linux/uaccess.h>
@@ -453,7 +454,18 @@ ssize_t kernel_read(struct file *file, void *buf, size_t count, loff_t *pos)
 }
 EXPORT_SYMBOL(kernel_read);
 
+#ifdef CONFIG_CKASLR
+
+TRAMP_FN(ssize_t, vfs_read,
+         struct file *file, char __user *buf, size_t count, loff_t *pos)
+{
+    return vfs_read_real(file, buf, count, pos);
+}
+
+RAND_FN(ssize_t, vfs_read, struct file *file, char __user *buf, size_t count, loff_t *pos)
+#else
 ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
+#endif
 {
 	ssize_t ret;
 
@@ -567,7 +579,19 @@ ssize_t kernel_write(struct file *file, const void *buf, size_t count,
 }
 EXPORT_SYMBOL(kernel_write);
 
+
+#ifdef CONFIG_CKASLR
+
+TRAMP_FN(ssize_t, vfs_write,
+         struct file *file, const char __user *buf, size_t count, loff_t *pos)
+{
+    return vfs_write_real(file, buf, count, pos);
+}
+
+RAND_FN(ssize_t, vfs_write, struct file *file, const char __user *buf, size_t count, loff_t *pos)
+#else
 ssize_t vfs_write(struct file *file, const char __user *buf, size_t count, loff_t *pos)
+#endif
 {
 	ssize_t ret;
 
@@ -605,7 +629,36 @@ static inline loff_t *file_ppos(struct file *file)
 	return file->f_mode & FMODE_STREAM ? NULL : &file->f_pos;
 }
 
+#ifdef CONFIG_CKASLR
+
+__tramp_ptr(ksys_read);
+ssize_t __tramp(ksys_read) ksys_read(unsigned int fd, char __user *buf, size_t count)
+{
+#ifdef CONFIG_CKASLR_DEBUG
+    // unsigned long func_addr = (unsigned long)ksys_read;
+    // unsigned long start = (unsigned long)__trampoline_text_start;
+    // unsigned long end   = (unsigned long)__trampoline_text_end;
+
+    // pr_info("ksys_read address: %p\n", ksys_read);
+    // pr_info("__trampoline_text_start	address: %p\n", __trampoline_text_start);
+    // pr_info("__trampoline_text_end		address: %p\n", __trampoline_text_end);
+	// pr_info(".text address:%p\n", _text);
+
+    // if (func_addr >= start && func_addr < end) {
+	// 	pr_info("ksys_read is in .trampoline.text section\n");
+	// }
+    // else {
+	// 	pr_info("ksys_read is NOT in .trampoline.text section\n");
+	// }
+#endif
+    return ksys_read_real(fd, buf, count);
+}
+
+__rand_ptr(ksys_read_real);
+ssize_t __rand(ksys_read_real) ksys_read_real(unsigned int fd, char __user *buf, size_t count)
+#else
 ssize_t ksys_read(unsigned int fd, char __user *buf, size_t count)
+#endif
 {
 	struct fd f = fdget_pos(fd);
 	ssize_t ret = -EBADF;
@@ -629,7 +682,36 @@ SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
 	return ksys_read(fd, buf, count);
 }
 
+#ifdef CONFIG_CKASLR
+
+__tramp_ptr(ksys_write);
+ssize_t __tramp(ksys_write) ksys_write(unsigned int fd, const char *buf, size_t count)
+{
+#ifdef CONFIG_CKASLR_DEBUG
+	// unsigned long func_addr = (unsigned long)ksys_write;
+    // unsigned long start = (unsigned long)__trampoline_text_start;
+    // unsigned long end   = (unsigned long)__trampoline_text_end;
+
+    // pr_info("ksys_read address: %p\n", ksys_read);
+    // pr_info("__trampoline_text_start	address: %p\n", __trampoline_text_start);
+    // pr_info("__trampoline_text_end		address: %p\n", __trampoline_text_end);
+
+    // if (func_addr >= start && func_addr < end) {
+	// 	pr_info("ksys_read is in .trampoline.text section\n");
+	// }
+    // else {
+	// 	pr_info("ksys_read is NOT in .trampoline.text section\n");
+	// }
+#endif
+
+	return ksys_write_real(fd, buf, count);
+}
+
+__rand_ptr(ksys_write_real);
+ssize_t __rand(ksys_write_real) ksys_write_real(unsigned int fd, const char __user *buf, size_t count)
+#else
 ssize_t ksys_write(unsigned int fd, const char __user *buf, size_t count)
+#endif
 {
 	struct fd f = fdget_pos(fd);
 	ssize_t ret = -EBADF;

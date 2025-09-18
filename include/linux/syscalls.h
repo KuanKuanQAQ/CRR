@@ -1194,8 +1194,10 @@ asmlinkage long sys_ni_posix_timers(void);
  * the ksys_xyzyyz() functions prototyped below.
  */
 ssize_t ksys_write(unsigned int fd, const char __user *buf, size_t count);
+ssize_t ksys_write_real(unsigned int fd, const char __user *buf, size_t count);
 int ksys_fchown(unsigned int fd, uid_t user, gid_t group);
 ssize_t ksys_read(unsigned int fd, char __user *buf, size_t count);
+ssize_t ksys_read_real(unsigned int fd, char __user *buf, size_t count);
 void ksys_sync(void);
 int ksys_unshare(unsigned long unshare_flags);
 int ksys_setsid(void);
