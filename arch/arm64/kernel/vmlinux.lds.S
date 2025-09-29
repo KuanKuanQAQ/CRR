@@ -180,6 +180,7 @@ SECTIONS
 			LOCK_TEXT
 			KPROBES_TEXT
 			HYPERVISOR_TEXT
+			_e_real_text = .;
 			*(.gnu.warning)
 	}
 
