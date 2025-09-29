@@ -1,5 +1,7 @@
-!.gitkeep
 /bullseye/
 /bullseye.id_rsa
 /bullseye.id_rsa.pub
 /bullseye.img
+
+mnt_path/*
+!mnt_path/.gitkeep
