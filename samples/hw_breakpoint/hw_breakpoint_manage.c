@@ -176,11 +176,32 @@ static int hw_get_addr_mask(u64 addr, int len)
 static void hw_bp_handler_default(const hw_bp_callback_data *info,
 				  const struct pt_regs *regs)
 {
-	hw_bp_log("bp is triger = 0x%llx, type = %s\n", info->addr,
-		bp_type_str[info->type - 1]);
-	hw_bp_log("times: read=%llu, write=%llu, exec=%llu\n", info->times.read,
-		info->times.write, info->times.exec);
-	// HW_SYMS_FUNC(show_regs)((struct pt_regs *)regs);
+	unsigned long addr;
+	const char *func_name;
+	unsigned long offset;
+
+	u64 lr, sp;
+
+	lr = regs->regs[30];
+	sp = regs->sp;
+
+	if (info->times.read < 10 || info->times.read % 100 == 0) {
+		pr_info("bp is triger = 0x%llx, type = %s\n", info->addr,
+			bp_type_str[info->type - 1]);
+		pr_info("times: read=%llu, write=%llu, exec=%llu\n", info->times.read,
+			info->times.write, info->times.exec);
+		// HW_SYMS_FUNC(show_regs)((struct pt_regs *)regs);
+		pr_info("pc : %pS\n", (void *)regs->pc);
+		pr_info("lr : %pS\n", (void *)ptrauth_strip_kernel_insn_pac(lr));
+
+		// addr = regs->pc;
+		// func_name = HW_SYMS_FUNC(kallsyms_lookup)(addr, &offset, NULL, NULL, NULL);
+		// if (func_name) {
+		// 	pr_info("Triggered in function: %s + 0x%lx\n", func_name, offset);
+		// } else {
+		// 	pr_info("Triggered at unknown kernel address: 0x%lx\n", addr);
+		// }
+	}
 }
 
 /*install bp from addr*/
