@@ -94,6 +94,9 @@ typedef struct hw_kernel_api {
 	struct {
 		unsigned long (*kallsyms_lookup_name)(
 			const char *name); /*search symbols func*/
+		const char *(*kallsyms_lookup)(
+			unsigned long addr, unsigned long *symbolsize,
+			unsigned long *offset, char **modname, char *namebuf);
 		void (*register_step_hook)(struct step_hook *hook);
 		void (*unregister_step_hook)(struct step_hook *hook);
 		void (*enable_debug_monitors)(enum dbg_active_el el);

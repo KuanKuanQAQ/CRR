@@ -10,7 +10,7 @@
 #include "ext_hw_breakpoint.h"
 #include "hw_breakpoint_until.h"
 
-#define PROC_FILE_DEBUG "breakpoint_debug      "
+#define PROC_FILE "breakpoint"
 #define PROC_FILE_LOG "breakpoint_log"
 
 #define LOG_BUF_SIZE 4096
@@ -22,6 +22,15 @@ static spinlock_t log_lock;
 /*proc_file handle*/
 static struct proc_dir_entry *proc_file = NULL;
 static struct proc_dir_entry *proc_log = NULL;
+
+/* 每个 CPU 的日志缓冲区 */
+struct hw_bp_log_cpu {
+	char buf[LOG_BUF_SIZE];
+	unsigned int pos;
+};
+
+static struct proc_dir_entry *proc_log;
+static DEFINE_PER_CPU(struct hw_bp_log_cpu, cpu_logs);
 
 /*help*/
 char *hw_proc_write_usag = {
@@ -39,7 +48,9 @@ char *hw_proc_write_usag = {
 	"\t\t4: echo iophy <ioaddr> > /proc/breakpoint, search all of ioaddr map virt\n"
 };
 /*example
-echo add wp3 16777216 0xffff800080010000 > /proc/breakpoint
+echo add wp1 16711679 0xffff800080010000 > /proc/breakpoint
+echo add wp1 524287 0xffff800081000000 > /proc/breakpoint
+echo add wp1 65535 0xffff800081080000 > /proc/breakpoint
 */
 char *hw_proc_write_example = {
 	"Example:\n"
@@ -339,15 +350,20 @@ cmdErr:
 	return (ssize_t)count;
 }
 
+/* 汇总所有 CPU buffer */
 static int hw_bp_log_show(struct seq_file *m, void *v)
 {
-    unsigned long flags;
+	int cpu;
 
-    spin_lock_irqsave(&log_lock, flags);
-    seq_write(m, log_buf, log_pos);
-    spin_unlock_irqrestore(&log_lock, flags);
-
-    return 0;
+	for_each_online_cpu(cpu) {
+		struct hw_bp_log_cpu *log = per_cpu_ptr(&cpu_logs, cpu);
+		unsigned long flags;
+		local_irq_save(flags);
+		if (log->pos > 0)
+			seq_write(m, log->buf, log->pos);
+		local_irq_restore(flags);
+	}
+	return 0;
 }
 
 static int hw_bp_log_open(struct inode *inode, struct file *file)
@@ -355,23 +371,23 @@ static int hw_bp_log_open(struct inode *inode, struct file *file)
     return single_open(file, hw_bp_log_show, NULL);
 }
 
+/* 写入日志到本 CPU buffer */
 void hw_bp_log(const char *fmt, ...)
 {
-    va_list args;
-    int len;
-    unsigned long flags;
+	va_list args;
+	unsigned long flags;
+	struct hw_bp_log_cpu *log;
 
-    va_start(args, fmt);
-    spin_lock_irqsave(&log_lock, flags);
+	log = this_cpu_ptr(&cpu_logs);
 
-    len = vscnprintf(log_buf + log_pos, LOG_BUF_SIZE - log_pos, fmt, args);
-    log_pos += len;
-    if (log_pos >= LOG_BUF_SIZE - 1) {
-		log_pos = 0; // 覆盖写，避免溢出
-	}
-
-    spin_unlock_irqrestore(&log_lock, flags);
-    va_end(args);
+	va_start(args, fmt);
+	local_irq_save(flags); // 仅保护本 CPU
+	int len = vscnprintf(log->buf + log->pos, LOG_BUF_SIZE - log->pos, fmt, args);
+	log->pos += len;
+	if (log->pos >= LOG_BUF_SIZE - 1)
+		log->pos = 0; // 覆盖写
+	local_irq_restore(flags);
+	va_end(args);
 }
 
 static const struct proc_ops hw_proc_fops = {
@@ -391,19 +407,23 @@ static const struct proc_ops hw_bp_log_fops = {
 
 int hw_proc_init(void)
 {
-	proc_file = proc_create(PROC_FILE_DEBUG, 0666, NULL,
+	int cpu;
+	
+	for_each_online_cpu(cpu) {
+		struct hw_bp_log_cpu *log = per_cpu_ptr(&cpu_logs, cpu);
+		log->pos = 0;
+	}
+	
+	proc_file = proc_create(PROC_FILE, 0666, NULL,
 				&hw_proc_fops);
 	
 	if (NULL == proc_file) {
 		pr_info("hw proc init, Create %s proc file failed!\n",
-			PROC_FILE_DEBUG);
+			PROC_FILE);
 		return -ENOMEM;
 	}
-
-	spin_lock_init(&log_lock);
-	proc_log = proc_create(PROC_FILE_LOG, 0444, NULL,
-				&hw_bp_log_fops);
-
+	
+	proc_log = proc_create(PROC_FILE_LOG, 0444, NULL, &hw_bp_log_fops);
 	if (NULL == proc_log) {
 		pr_info("hw proc init, Create %s proc file failed!\n",
 			PROC_FILE_LOG);
@@ -418,7 +438,7 @@ int hw_proc_init(void)
 void hw_proc_exit(void)
 {
 	if (NULL != proc_file) {
-		remove_proc_entry(PROC_FILE_DEBUG, NULL);
+		remove_proc_entry(PROC_FILE, NULL);
 	}
 	if (NULL != proc_log) {
 		remove_proc_entry(PROC_FILE_LOG, NULL);

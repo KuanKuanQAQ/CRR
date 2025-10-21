@@ -382,6 +382,7 @@ static int hw_arch_build_bp_info(struct hw_bp_info *bp, const hw_bp_attr *attr,
 
 	/* wp addr mask */
 	hw->ctrl.mask = attr->mask;
+	hw->ctrl.len  = hw->ctrl.mask ? ARM_BREAKPOINT_LEN_8 : 0;
 	/* Address */
 	hw->address = attr->start_addr;
 
@@ -810,6 +811,12 @@ static int hw_get_kallsyms_lookup_name(void)
 		(void *)kaddr_lookup_name("kallsyms_lookup_name");
 	if (!HW_SYMS_FUNC(kallsyms_lookup_name)) {
 		printk("get kallsyms_lookup_name fail \n");
+		return -1;
+	}
+	HW_SYMS_FUNC(kallsyms_lookup) = 
+		(void *)HW_SYMS_FUNC(kallsyms_lookup_name)("kallsyms_lookup");
+	if (!HW_SYMS_FUNC(kallsyms_lookup)) {
+		pr_warn("get kallsyms_lookup fail\n");
 		return -1;
 	}
 	return 0;
