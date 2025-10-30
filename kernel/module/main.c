@@ -1946,6 +1946,9 @@ static int copy_module_from_user(const void __user *umod, unsigned long len,
 	int err;
 
 	info->len = len;
+	pr_info("info->len = %lu\n", info->len);
+	pr_info("sizeof(*(info->hdr)) = %d\n", sizeof(*(info->hdr)));
+
 	if (info->len < sizeof(*(info->hdr)))
 		return -ENOEXEC;
 
