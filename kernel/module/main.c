@@ -1616,6 +1616,7 @@ void * __weak module_alloc(unsigned long size)
 			GFP_KERNEL, PAGE_KERNEL_EXEC, VM_FLUSH_RESET_PERMS,
 			NUMA_NO_NODE, __builtin_return_address(0));
 }
+EXPORT_SYMBOL(module_alloc);
 
 bool __weak module_init_section(const char *name)
 {
