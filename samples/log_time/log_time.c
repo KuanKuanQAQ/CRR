@@ -104,8 +104,8 @@ static void *trace_seq_start(struct seq_file *s, loff_t *pos)
 {
     struct loop_state *st = s->private;
     
-    pr_info("trace_seq_start: st->wrapped = %d\n", st->wrapped);
-    pr_info("trace_seq_start: *pos = %d\n", *pos);
+    // pr_info("trace_seq_start: st->wrapped = %d\n", st->wrapped);
+    // pr_info("trace_seq_start: *pos = %d\n", *pos);
     if (st->wrapped && *pos >= st->ed_pos) {
         return NULL;
     }
@@ -121,8 +121,8 @@ static void *trace_seq_start(struct seq_file *s, loff_t *pos)
             st->ed_pos = st->n - 1;
             st->wrapped = true;
         }
-        pr_info("trace_seq_start: st->op_pos = %d\n", st->op_pos);
-        pr_info("trace_seq_start: st->ed_pos = %d\n", st->ed_pos);
+        // pr_info("trace_seq_start: st->op_pos = %d\n", st->op_pos);
+        // pr_info("trace_seq_start: st->ed_pos = %d\n", st->ed_pos);
         *pos = (loff_t)st->op_pos;
     }
     return pos;
