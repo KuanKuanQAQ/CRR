@@ -3147,6 +3147,8 @@ static int init_module_from_file(struct file *f, const char __user * uargs, int 
 			return err;
 		}
 	} else {
+		pr_info("init_module_from_file: sizeof(*info.hdr) = %d\n", sizeof(*info.hdr));
+		pr_info("init_module_from_file: info.len = %lu\n", len);
 		info.hdr = buf;
 		info.len = len;
 	}
