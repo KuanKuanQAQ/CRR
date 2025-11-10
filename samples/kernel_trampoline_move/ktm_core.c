@@ -39,7 +39,7 @@ static ssize_t ktm_write(struct file *file, const char __user *buf, size_t count
     } else {
         pr_info("KTM: unknown command '%s'\n", kbuf);
     }
-
+    
     return count;
 }
 
