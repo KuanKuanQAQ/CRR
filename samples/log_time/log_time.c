@@ -18,6 +18,7 @@ struct trace_entry {
 
 /* 用于标记是否循环完成 */
 struct loop_state {
+    u64 n;              /* trace_index */
     bool initialized;   /* 是否已经初始化完成 */
     u64 op_pos;         /* 输出起点 [ */
     u64 ed_pos;         /* 输出终点 ] */
@@ -101,8 +102,8 @@ static ssize_t trace_write(struct file *file, const char __user *buf,
 
 static void *trace_seq_start(struct seq_file *s, loff_t *pos)
 {
-    u64 n = atomic64_read(&trace_index);
     struct loop_state *st = s->private;
+    
     pr_info("trace_seq_start: st->wrapped = %d\n", st->wrapped);
     pr_info("trace_seq_start: *pos = %d\n", *pos);
     if (st->wrapped && *pos >= st->ed_pos) {
@@ -111,30 +112,31 @@ static void *trace_seq_start(struct seq_file *s, loff_t *pos)
 
     if (!st->initialized) {
         st->initialized = true;
-        if (n >= LOG_ENTRIES) {
-            st->op_pos = (n - 1) % LOG_ENTRIES;
-            st->ed_pos = (n - 2) % LOG_ENTRIES;
+        if (st->n >= LOG_ENTRIES) {
+            st->op_pos = (st->n - 1) % LOG_ENTRIES;
+            st->ed_pos = (st->n - 2) % LOG_ENTRIES;
             st->wrapped = false;
         } else {
             st->op_pos = 0;
-            st->ed_pos = n - 1;
+            st->ed_pos = st->n - 1;
             st->wrapped = true;
         }
         pr_info("trace_seq_start: st->op_pos = %d\n", st->op_pos);
         pr_info("trace_seq_start: st->ed_pos = %d\n", st->ed_pos);
+        *pos = (loff_t)st->op_pos;
     }
-    *pos = (loff_t)st->op_pos;
     return pos;
 }
 
 static void *trace_seq_next(struct seq_file *s, void *v, loff_t *pos)
 {
     struct loop_state *st = s->private;
-    if (*pos == st->ed_pos) {
+    
+    ++*pos;
+    if (*pos > st->ed_pos) {
         return NULL;
     }
 
-    ++*pos;
     if (*pos == LOG_ENTRIES) {
         st->wrapped = true;
     }
@@ -168,8 +170,9 @@ static int trace_open(struct inode *inode, struct file *file)
     int ret;
 
     st = kzalloc(sizeof(*st), GFP_KERNEL);
-    if (!st)
+    if (!st) {
         return -ENOMEM;
+    }
 
     ret = seq_open(file, &trace_seq_ops);
     if (ret) {
@@ -178,6 +181,7 @@ static int trace_open(struct inode *inode, struct file *file)
     }
 
     seq = file->private_data;
+    st->n = atomic64_read(&trace_index);
     seq->private = st;
     return 0;
 }
