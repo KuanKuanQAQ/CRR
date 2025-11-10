@@ -73,10 +73,20 @@ config SAMPLE_KERNEL_TRAMPOLINE_MOVE
 	tristate "Build prototype trampolines + move/test module for ARM64 (Linux 6.8) -- loadable modules only"
 	default m
 	help
-		ARM64 + Linux 6.8 adapted prototype module for testing trampolines that
- 		gate entry into func1/func2, move those functions to new executable
- 		memory during an "exception" period, mark original pages non-executable,
- 		and redirect page-faulting returns to the new copies by adjusting PC.
+	  ARM64 + Linux 6.8 adapted prototype module for testing trampolines that
+ 	  gate entry into func1/func2, move those functions to new executable
+ 	  memory during an "exception" period, mark original pages non-executable,
+ 	  and redirect page-faulting returns to the new copies by adjusting PC.
+
+config SAMPLE_LOG_TIME
+	tristate "Kernel function timing logger (for profiling short code sections)"
+	default m
+	help
+	  This option enables a lightweight kernel module that records precise
+	  timestamps of function entry and return events using the ARM64 CNTVCT_EL0
+	  counter. The collected logs can be used to analyze timing intervals between
+	  function calls (e.g. between entry, call, and return) during benchmark
+	  workloads such as UnixBench.
 
 config SAMPLE_KPROBES
 	tristate "Build kprobes examples -- loadable modules only"
