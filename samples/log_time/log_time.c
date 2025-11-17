@@ -72,6 +72,19 @@ void log_time(const char *func, bool is_exit)
 }
 EXPORT_SYMBOL(log_time);
 
+static int x_cnt = 0;
+void x(char *funcName, bool isExit, char *callsite) 
+{
+    if (!isExit) {
+        x_cnt++;
+        // pr_info("entry %s\n", funcName);
+    } else {
+        x_cnt--;
+        // pr_info("exit %s\n", funcName);
+    }
+}
+EXPORT_SYMBOL(x);
+
 static ssize_t trace_write(struct file *file, const char __user *buf,
                            size_t count, loff_t *ppos)
 {

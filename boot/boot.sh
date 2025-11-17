@@ -3,8 +3,8 @@ DRIVE="./bullseye.img"
 MNTPATH="./mnt_path/"
 
 sudo qemu-system-aarch64 -s \
-    -machine virt -cpu cortex-a76 \
-    -smp 4 -m 16G \
+    -machine virt -cpu host -enable-kvm \
+    -smp 1 -m 16G \
     -kernel "$KERNEL" \
     -drive file="$DRIVE",if=virtio,format=raw \
     -fsdev local,path="$MNTPATH",security_model=mapped,id=dev-1 \

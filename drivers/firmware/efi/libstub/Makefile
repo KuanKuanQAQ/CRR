@@ -33,7 +33,8 @@ cflags-$(CONFIG_LOONGARCH)	+= -fpie
 
 cflags-$(CONFIG_EFI_PARAMS_FROM_FDT)	+= -I$(srctree)/scripts/dtc/libfdt
 
-ccflags-remove-y += -fpass-plugin=/home/lrk/llvm-tutor/build/lib/libFuncTimer.so
+ccflags-remove-y += -fpass-plugin=/home/lirk/llvm-tutor/build/lib/libFuncTimer.so
+ccflags-remove-y += -fpass-plugin=/home/lirk/llvm-tutor/build/lib/libInjectTrampoline.so
 
 KBUILD_CFLAGS			:= $(subst $(CC_FLAGS_FTRACE),,$(cflags-y)) \
 				   -Os -DDISABLE_BRANCH_PROFILING \

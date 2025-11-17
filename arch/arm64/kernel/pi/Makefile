@@ -11,7 +11,8 @@ KBUILD_CFLAGS	:= $(subst $(CC_FLAGS_FTRACE),,$(KBUILD_CFLAGS)) -fpie \
 		   -fno-asynchronous-unwind-tables -fno-unwind-tables \
 		   $(call cc-option,-fno-addrsig)
 
-ccflags-remove-y += -fpass-plugin=/home/lrk/llvm-tutor/build/lib/libFuncTimer.so
+ccflags-remove-y += -fpass-plugin=/home/lirk/llvm-tutor/build/lib/libFuncTimer.so
+ccflags-remove-y += -fpass-plugin=/home/lirk/llvm-tutor/build/lib/libInjectTrampoline.so
 
 # remove SCS flags from all objects in this directory
 KBUILD_CFLAGS	:= $(filter-out $(CC_FLAGS_SCS), $(KBUILD_CFLAGS))

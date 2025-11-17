@@ -558,7 +558,8 @@ KBUILD_CFLAGS += -funsigned-char
 KBUILD_CFLAGS += -fno-common
 KBUILD_CFLAGS += -fno-PIE
 KBUILD_CFLAGS += -fno-strict-aliasing
-KBUILD_CFLAGS += -fpass-plugin=/home/lrk/llvm-tutor/build/lib/libFuncTimer.so
+# KBUILD_CFLAGS += -fpass-plugin=/home/lirk/llvm-tutor/build/lib/libFuncTimer.so
+KBUILD_CFLAGS += -fpass-plugin=/home/lirk/llvm-tutor/build/lib/libInjectTrampoline.so
 
 KBUILD_CPPFLAGS := -D__KERNEL__
 KBUILD_RUSTFLAGS := $(rust_common_flags) \
