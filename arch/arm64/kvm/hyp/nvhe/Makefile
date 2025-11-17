@@ -13,7 +13,9 @@ ccflags-y := -D__KVM_NVHE_HYPERVISOR__ -D__DISABLE_EXPORTS -D__DISABLE_TRACE_MMI
 ccflags-y += -fno-stack-protector	\
 	     -DDISABLE_BRANCH_PROFILING	\
 	     $(DISABLE_STACKLEAK_PLUGIN)
-ccflags-remove-y += -fpass-plugin=/home/lrk/llvm-tutor/build/lib/libFuncTimer.so
+		 
+ccflags-remove-y += -fpass-plugin=/home/lirk/llvm-tutor/build/lib/libFuncTimer.so
+ccflags-remove-y += -fpass-plugin=/home/lirk/llvm-tutor/build/lib/libInjectTrampoline.so
 
 hostprogs := gen-hyprel
 HOST_EXTRACFLAGS += -I$(objtree)/include
