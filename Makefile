@@ -558,8 +558,26 @@ KBUILD_CFLAGS += -funsigned-char
 KBUILD_CFLAGS += -fno-common
 KBUILD_CFLAGS += -fno-PIE
 KBUILD_CFLAGS += -fno-strict-aliasing
-# KBUILD_CFLAGS += -fpass-plugin=/home/lirk/llvm-tutor/build/lib/libFuncTimer.so
-KBUILD_CFLAGS += -fpass-plugin=/home/lirk/llvm-tutor/build/lib/libInjectTrampoline.so
+
+# CRR: out-of-tree LLVM passes.  CRR_PLUGIN_DIR points at the llvm-tutor build
+# that provides them; override it if yours lives elsewhere:
+#     make CRR_PLUGIN_DIR=/path/to/llvm-tutor/build/lib
+# Set CRR_TRAMPOLINE=n to build without trampoline injection.
+CRR_PLUGIN_DIR ?= /home/lirk/llvm-tutor/build/lib
+CRR_TRAMPOLINE ?= y
+CRR_PLUGIN_TRAMPOLINE := $(CRR_PLUGIN_DIR)/libInjectTrampoline.so
+CRR_PLUGIN_FUNCTIMER  := $(CRR_PLUGIN_DIR)/libFuncTimer.so
+export CRR_PLUGIN_TRAMPOLINE CRR_PLUGIN_FUNCTIMER
+
+ifeq ($(CRR_TRAMPOLINE),y)
+ifeq ($(wildcard $(CRR_PLUGIN_TRAMPOLINE)),)
+$(error CRR: LLVM pass not found at $(CRR_PLUGIN_TRAMPOLINE). \
+	Build llvm-tutor and point CRR_PLUGIN_DIR at its build/lib, \
+	or pass CRR_TRAMPOLINE=n to build without trampoline injection. \
+	See README.md.)
+endif
+KBUILD_CFLAGS += -fpass-plugin=$(CRR_PLUGIN_TRAMPOLINE)
+endif
 
 KBUILD_CPPFLAGS := -D__KERNEL__
 KBUILD_RUSTFLAGS := $(rust_common_flags) \

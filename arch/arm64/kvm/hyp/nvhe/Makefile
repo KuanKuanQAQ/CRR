@@ -14,8 +14,8 @@ ccflags-y += -fno-stack-protector	\
 	     -DDISABLE_BRANCH_PROFILING	\
 	     $(DISABLE_STACKLEAK_PLUGIN)
 		 
-ccflags-remove-y += -fpass-plugin=/home/lirk/llvm-tutor/build/lib/libFuncTimer.so
-ccflags-remove-y += -fpass-plugin=/home/lirk/llvm-tutor/build/lib/libInjectTrampoline.so
+ccflags-remove-y += -fpass-plugin=$(CRR_PLUGIN_FUNCTIMER)
+ccflags-remove-y += -fpass-plugin=$(CRR_PLUGIN_TRAMPOLINE)
 
 hostprogs := gen-hyprel
 HOST_EXTRACFLAGS += -I$(objtree)/include
