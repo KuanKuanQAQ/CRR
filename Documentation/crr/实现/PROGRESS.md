@@ -27,8 +27,8 @@
 | S0.1 | 进度账本 + 约定 + 实现文档结构 | [x] | ✓ | 本次会话 |
 | S0.2 | E2 跨区域控制流静态扫描器（论文「地基」，ROI 最高） | [x] | ✓ | x86 逻辑已验证；arm64 解析待真实 arm64 映像 |
 | S0.3 | E1 工程量(LOC)统计脚本 | [x] | ✓ | `scripts/ikaslr/loc_stats.sh`，可重复运行 |
-| S0.4 | gadget 普查脚本化（已有 gadget-census.md，补脚本） | [ ] | | 第2章基线；`scripts/ikaslr/gadget_census.sh` |
-| S0.5 | CFI 精度脚本（endbr64/BTI 计数 + kCFI 等价类分布） | [ ] | | cfi-precision-howto.md；`scripts/ikaslr/cfi_precision.py` |
+| S0.4 | gadget 普查脚本 | [x] | ✓ | `gadget_census.py`，复现并成为权威口径 |
+| S0.5 | CFI 精度脚本 | [x] | ✓ | 实测 **IBT 等价类 = 38,180**；kCFI 需 DEBUG_INFO/CFI_CLANG 构建 |
 | S0.6 | CVE 可模块化统计脚本（第1.2节引用，仓库缺，需重建） | [ ] | | `scripts/ikaslr/cve_builtin_stats.py` |
 
 ## Phase 1 — 第3章：持续随机化执行运行时（核心，平台无关优先）
