@@ -55,7 +55,7 @@
 
 | ID | 步骤 | 状态 | 提交 | 备注 |
 | --- | --- | :-: | --- | --- |
-| S2.1 | x86 EPT 物理页级 XOM（嵌套 hypervisor，分 a/b/c/d 步） | [~] | ✓ | **S2.1a VMXON 往返已验证**；b/c/d 待做 |
+| S2.1 | x86 EPT 物理页级 XOM（嵌套 hypervisor，单核量身定制） | [~] | ✓ | S2.1a VMXON + **S2.1b-1 EPT/VMCS 已验证**；VMLAUNCH/XOM 待做 |
 | S2.2 | ARM 观察点 XOM（DBGWCR MASK、per-cpu、hw_breakpoint 协调） | [ ] | | 第4.5.2 节；并入 hw_breakpoint 模块；R-42 |
 | S2.3 | 多源检测（代码读取处理、执行试探 LBR 回溯、控制流异常） | [ ] | | 第4.4.3 节 |
 | S2.4 | 控制流审计（陷阱页重映射 + 入口/中部判据） | [q] | ✓ | 8 次压测通过；LBR 精确分类留 S2.3 |
@@ -111,7 +111,7 @@
 
 下一步顺序：**EPT 方案已简化为单核量身定制**（作者确认；多核由 watchpoint 承担，理由见 `04a-ept-single-core.md`）。范围：单核 + passthrough 一切 + 只处理 CPUID/EPT-violation + 只保护静态 .rand.text，约 500 行。
 
-→ **S2.1b（EPT identity 页表 + VMCS 构造 + VMLAUNCH 把内核降为 self-guest，单核）** → S2.1c（.rand.text 设 X-only，读触发 EPT violation 被捕获）→ S2.5（violation 接控制流审计）→ S2.2（arm64 观察点，含多核，需真机）→ Phase 3。
+→ S2.1b-1（EPT 页表 + VMCS 基础设施）已验证 → **S2.1b-2（完整 VMCS state + VMLAUNCH 降为 self-guest）** → S2.1c（.rand.text 设 X-only，读触发 EPT violation 被捕获）→ S2.5（violation 接控制流审计）→ S2.2（arm64 观察点，含多核，需真机）→ Phase 3。
 
 > **稳定性基线**：连续 12 次启动全部通过（含 8 次用户态触发的随机化）。修复前约 3–4/12 失败。任何改动随机化布局的修改，都应重跑这个压力测试。
 

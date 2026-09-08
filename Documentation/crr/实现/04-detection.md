@@ -26,7 +26,8 @@ hypervisor 把自身降为 guest，用 EPT 施加"内核自己关不掉的"页�
 | 步 | 内容 | 状态 |
 | --- | --- | --- |
 | S2.1a | 进入/退出 VMX root 模式（VMXON/VMXOFF 往返） | ✓ 已验证 |
-| S2.1b | 构造 EPT 页表 + VMCS，VMLAUNCH 把内核降为 self-guest | 待做 |
+| S2.1b-1 | EPT identity 页表 + VMCS 加载 + EPTP 写入校验 | ✓ 已验证 |
+| S2.1b-2 | 完整 host/guest state + controls + VMLAUNCH 降为 self-guest | 待做 |
 | S2.1c | EPT 把代码物理页设为不可读，读触发 EPT violation 被捕获 | 待做 |
 | S2.1d | 内存池划分 + 分配器适配 + 加载期页表切换 | 待做 |
 | S2.5 | EPT violation → 控制流审计 → 触发随机化 | 待做 |
@@ -47,8 +48,29 @@ ikaslr/ept: S2.1a OK: entered and left VMX root mode (rev=300252880, VMXON 22441
 ikaslr/ept: nested virtualization is available to the protected kernel
 ```
 
-无三重故障。VMXON 延迟 22 µs（含首次进入开销；§4.6.4 的 EPT 相关延迟测量应在
-S2.1c 后补全）。
+无三重故障。VMXON 延迟约 20 µs（含首次进入开销）。
+
+### S2.1b-1：EPT 页表与 VMCS 基础设施（已验证）
+
+EPT 用 **identity map + 1GB 大页**：guest 物理 = host 物理，512 个 1GB 项覆盖
+512 GB，EPT 页表只需 PML4(1 项) + PDPT(512 项) 两级，几乎零内存开销；只有要
+保护的 `.rand.text` 页在 S2.1b-2/c 里拆细设为 execute-only。VMCS 基础设施：
+`vmclear`/`vmptrld`/`vmwrite`/`vmread` 封装，分配 VMCS region 并写 revision id。
+
+在 VMX root 模式内实测：构造 EPT、加载 VMCS、写入 EPTP 并读回校验一致，无三重
+故障：
+
+```
+ikaslr/ept: EPT identity map built: 512 GB, EPTP=3cf301e
+ikaslr/ept: S2.1b OK: VMCS loaded, EPTP written+verified (3cf301e)
+```
+
+### S2.1b-2：VMLAUNCH（下一步，危险区）
+
+填完整 host/guest state（CR、段、GDTR/IDTR/TR、MSR）+ 最小 controls（passthrough，
+只 CPUID/EPT-violation exit）+ host entry 汇编 stub，然后 VMLAUNCH 把内核降为
+self-guest。VMCS 字段错即三重故障重启；VMLAUNCH 失败可读 VM-instruction error
+（VMCS 字段 0x4400）诊断迭代。
 
 ## S2.2/S2.3/S2.5（待做）
 

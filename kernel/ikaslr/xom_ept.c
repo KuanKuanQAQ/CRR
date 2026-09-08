@@ -33,6 +33,7 @@
 #include <asm/tlbflush.h>
 #include <asm/special_insns.h>
 #include <asm/io.h>
+#include <asm/vmx.h>
 
 #ifndef MSR_IA32_VMX_BASIC
 #define MSR_IA32_VMX_BASIC	0x00000480
@@ -40,6 +41,16 @@
 
 /* 每 CPU 的 VMXON 区域（4KB，物理连续）。当前只用 boot CPU。*/
 static void *vmxon_region;
+
+/* S2.1b 基础设施（定义在下方，smoke 测试提前使用）。*/
+static int ikaslr_ept_build(void);
+static void ikaslr_ept_free(void);
+static int ikaslr_vmcs_load(u32 rev);
+static int ikaslr_vmwrite(unsigned long field, unsigned long val);
+static unsigned long ikaslr_vmread(unsigned long field);
+static int ikaslr_vmclear(u64 pa);
+static u64 ept_pointer;
+static void *vmcs_region;
 
 /* 确保 VMX 在 IA32_FEAT_CTL 中已启用（未锁定则由我们锁定并启用）。*/
 static int ikaslr_vmx_enable_feat_ctl(void)
@@ -119,13 +130,36 @@ static int __init ikaslr_ept_smoke(void)
 		return 0;
 	}
 
-	/* 已进入 VMX root 模式。S2.1b 将在此构造 VMCS/EPT 并 VMLAUNCH。*/
+	pr_info("S2.1a OK: entered VMX root mode (rev=%u, VMXON %lld ns)\n",
+		rev, ktime_to_ns(ktime_sub(ktime_get(), t0)));
+
+	/* S2.1b：构造 EPT identity 页表，加载 VMCS，写入 EPTP 并读回校验。*/
+	if (!ikaslr_ept_build() && !ikaslr_vmcs_load(rev)) {
+		if (!ikaslr_vmwrite(EPT_POINTER, ept_pointer)) {
+			u64 rb = ikaslr_vmread(EPT_POINTER);
+
+			if (rb == ept_pointer)
+				pr_info("S2.1b OK: VMCS loaded, EPTP written+verified (%llx)\n",
+					rb);
+			else
+				pr_err("S2.1b: EPTP readback mismatch %llx != %llx\n",
+				       rb, ept_pointer);
+		} else {
+			pr_err("S2.1b: VMWRITE(EPT_POINTER) failed\n");
+		}
+	}
+
+	if (vmcs_region) {
+		ikaslr_vmclear(virt_to_phys(vmcs_region));
+		kfree(vmcs_region);
+		vmcs_region = NULL;
+	}
+	ikaslr_ept_free();
+
 	ikaslr_vmxoff();
 	cr4_clear_bits(X86_CR4_VMXE);
 	local_irq_restore(flags);
 
-	pr_info("S2.1a OK: entered and left VMX root mode (rev=%u, VMXON %lld ns)\n",
-		rev, ktime_to_ns(ktime_sub(ktime_get(), t0)));
 	pr_info("nested virtualization is available to the protected kernel\n");
 
 	kfree(vmxon_region);
@@ -133,3 +167,125 @@ static int __init ikaslr_ept_smoke(void)
 	return 0;
 }
 late_initcall(ikaslr_ept_smoke);
+
+/*
+ * ===========================================================================
+ * S2.1b：EPT identity 页表 + VMCS 基础设施
+ * ===========================================================================
+ *
+ * EPT 页表：identity map（guest 物理 = host 物理），用 1GB 大页覆盖全部物理地址
+ * 空间，只有要保护的 .rand.text 页在 S2.1c 里拆细并设为 execute-only。1GB 大页
+ * 使 EPT 页表只需 PML4(1 项) + PDPT(512 项 1GB 页) 两级，几乎零开销。
+ */
+
+/* EPT 项的权限位（低 3 位）与内存类型（bits[5:3]）。*/
+#define EPT_R		(1ull << 0)
+#define EPT_W		(1ull << 1)
+#define EPT_X		(1ull << 2)
+#define EPT_RWX		(EPT_R | EPT_W | EPT_X)
+#define EPT_MT_WB	(6ull << 3)	/* write-back */
+#define EPT_PS		(1ull << 7)	/* 大页 */
+
+/* identity map 覆盖的物理地址空间：512 个 1GB 页 = 512 GB。*/
+#define EPT_NR_1GB	512
+
+static u64 *ept_pml4;			/* 1 页 */
+static u64 *ept_pdpt;			/* 1 页，512 个 1GB 项 */
+/* ept_pointer 前置声明于文件上方 */
+
+static int ikaslr_ept_build(void)
+{
+	u64 pdpt_pa;
+	int i;
+
+	ept_pml4 = (u64 *)get_zeroed_page(GFP_KERNEL);
+	ept_pdpt = (u64 *)get_zeroed_page(GFP_KERNEL);
+	if (!ept_pml4 || !ept_pdpt)
+		return -ENOMEM;
+
+	/* PDPT：512 个 1GB identity 大页，全 RWX（保护在 S2.1c 施加）。*/
+	for (i = 0; i < EPT_NR_1GB; i++)
+		ept_pdpt[i] = ((u64)i << 30) | EPT_RWX | EPT_MT_WB | EPT_PS;
+
+	pdpt_pa = virt_to_phys(ept_pdpt);
+	ept_pml4[0] = pdpt_pa | EPT_RWX;
+
+	/* EPTP：页表基址 | 4 级页遍历(值 3) | 内存类型 WB。*/
+	ept_pointer = virt_to_phys(ept_pml4) |
+		      (3ull << 3) |		/* page-walk length - 1 = 3 → 4 级 */
+		      6ull;			/* EPT paging-structure MT = WB */
+
+	pr_info("EPT identity map built: %d GB, EPTP=%llx\n",
+		EPT_NR_1GB, ept_pointer);
+	return 0;
+}
+
+static void ikaslr_ept_free(void)
+{
+	if (ept_pml4)
+		free_page((unsigned long)ept_pml4);
+	if (ept_pdpt)
+		free_page((unsigned long)ept_pdpt);
+	ept_pml4 = ept_pdpt = NULL;
+}
+
+/* ---- VMCS 基础设施（vmcs_region 前置声明于文件上方）---- */
+
+static int ikaslr_vmclear(u64 pa)
+{
+	u8 err;
+
+	asm volatile ("vmclear %[pa]; setna %[err]"
+		      : [err] "=rm" (err) : [pa] "m" (pa) : "cc", "memory");
+	return err ? -EIO : 0;
+}
+
+static int ikaslr_vmptrld(u64 pa)
+{
+	u8 err;
+
+	asm volatile ("vmptrld %[pa]; setna %[err]"
+		      : [err] "=rm" (err) : [pa] "m" (pa) : "cc", "memory");
+	return err ? -EIO : 0;
+}
+
+static int ikaslr_vmwrite(unsigned long field, unsigned long val)
+{
+	u8 err;
+
+	asm volatile ("vmwrite %[val], %[field]; setna %[err]"
+		      : [err] "=rm" (err)
+		      : [val] "rm" (val), [field] "r" (field) : "cc", "memory");
+	return err ? -EIO : 0;
+}
+
+static unsigned long ikaslr_vmread(unsigned long field)
+{
+	unsigned long val;
+
+	asm volatile ("vmread %[field], %[val]"
+		      : [val] "=rm" (val) : [field] "r" (field) : "cc");
+	return val;
+}
+
+/*
+ * 分配并初始化 VMCS region，vmclear + vmptrld 使其成为当前 VMCS。
+ * 调用时须已处于 VMX root 模式（VMXON 之后）。
+ */
+static int ikaslr_vmcs_load(u32 rev)
+{
+	u64 pa;
+
+	vmcs_region = kzalloc(PAGE_SIZE, GFP_KERNEL);
+	if (!vmcs_region)
+		return -ENOMEM;
+	*(u32 *)vmcs_region = rev;
+	pa = virt_to_phys(vmcs_region);
+
+	if (ikaslr_vmclear(pa) || ikaslr_vmptrld(pa)) {
+		kfree(vmcs_region);
+		vmcs_region = NULL;
+		return -EIO;
+	}
+	return 0;
+}
