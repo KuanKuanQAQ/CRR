@@ -425,6 +425,21 @@
 	. = ALIGN(8);							\
 	__end_rand_ptr_tbl = .;
 
+/*
+ * I-KASLR（论文第 3 章）：跳板表与 target 槽。
+ * 跳板表每个随机化函数一项；target 槽是随机化时唯一被改写的数据，单独成段
+ * 以便第 4 章的只执行内存机制对其单独施加保护。
+ */
+#define IKASLR_TABLE_DATA						\
+	. = ALIGN(8);							\
+	__start_ikaslr_tramp_tbl = .;					\
+	KEEP(*(.data..ikaslr_tramp_tbl))				\
+	__end_ikaslr_tramp_tbl = .;					\
+	. = ALIGN(8);							\
+	__start_ikaslr_target = .;					\
+	KEEP(*(.data..ikaslr_target))					\
+	__end_ikaslr_target = .;
+
 #ifdef CONFIG_HAVE_STATIC_CALL_INLINE
 #define STATIC_CALL_DATA						\
 	. = ALIGN(8);							\

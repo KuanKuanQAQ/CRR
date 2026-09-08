@@ -195,6 +195,7 @@ SECTIONS
 
 		TRAMP_TABLE_DATA
 		RAND_TABLE_DATA
+		IKASLR_TABLE_DATA
 
 		/* End of data section */
 		_edata = .;

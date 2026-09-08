@@ -2,79 +2,130 @@
 /*
  * I-KASLR: 面向 built-in 内核代码的持续随机化（论文第 3 章）。
  *
- * 本头文件是第 3 章"如何随机化"机制的公共接口：随机化区域/跳板区域的段注解、
- * 运行时描述符、以及供 fs/ 等被随机化子系统与运行时核心使用的 API。
- *
  * 分层索引组织（论文 §3.4）：
- *   - 函数粒度内：位置无关代码（由 LLVM pass 生成，见 tools/ikaslr，S1.10）；
- *   - 函数粒度间：固定位置的跳板函数集中索引，一次随机化只更新 target_addr。
+ *   - 函数粒度内：位置无关代码消除索引（LLVM pass，见 S1.10）；
+ *   - 函数粒度间：固定位置的跳板函数集中索引 —— 一次随机化只更新每函数一个
+ *     target_addr，索引更新量与调用点数量无关（需求 D1，O(1)）。
  *
- * 段布局复用既有基础设施（include/asm-generic/vmlinux.lds.h）：
- *   .rand.text.<fn>        随机化函数体，可迁移
- *   .tramp.text.<fn>       固定地址跳板
- *   .data..rand_ptr_tbl    每函数一项，指向函数体，按链接顺序
- *   .data..tramp_ptr_tbl   每函数一项，指向跳板，按链接顺序
- * 两张指针表同步遍历即可配对跳板与函数体，并由相邻项地址差得出函数体大小。
+ * 一个被随机化的函数在源码中写成一对：
+ *
+ *     IKASLR_RAND_FN(ssize_t, vfs_read, struct file *f, ...)   // 函数体，可迁移
+ *     {  ...真实实现...  }
+ *
+ *     IKASLR_TRAMP_FN(ssize_t, vfs_read, struct file *f, ...)  // fixed_in 跳板
+ *     {
+ *         ssize_t ret;
+ *         ikaslr_enter();                                  // 进入随机化区域
+ *         ret = IKASLR_TARGET(vfs_read)(f, ...);           // 经 target 间接转移
+ *         ikaslr_leave();                                  // 离开
+ *         return ret;
+ *     }
+ *
+ * 跳板保留原函数名，因此所有既有调用者不需要改动；函数体改名为 <fn>_body 并落在
+ * .rand.text 中。随机化时只需改写 target 槽。
+ *
+ * 段布局：
+ *   .tramp.text.<fn>        固定地址跳板（不迁移）
+ *   .rand.text.<fn>         随机化函数体（可迁移）
+ *   .data..ikaslr_tramp_tbl 每函数一项 struct ikaslr_tramp
+ *   .data..ikaslr_target    target 槽（随机化时唯一被改写的数据）
  */
 #ifndef _LINUX_IKASLR_H
 #define _LINUX_IKASLR_H
 
-/* ---- 段注解（手工路径；LLVM pass 就绪后可由编译器自动施加，见 S1.10）---- */
-#define __ikaslr_tramp(fn) __section(".tramp.text." #fn) noinline
-#define __ikaslr_rand(fn)  __section(".rand.text." #fn) noinline
-
-#define __ikaslr_tramp_ptr(fn)						\
-	static void *__ikaslr_tramp_ptr_##fn				\
-		__attribute__((section(".data..tramp_ptr_tbl"))) __used = &fn
-#define __ikaslr_rand_ptr(fn)						\
-	static void *__ikaslr_rand_ptr_##fn				\
-		__attribute__((section(".data..rand_ptr_tbl"))) __used = &fn
-
 #ifndef __ASSEMBLY__
 
 #include <linux/types.h>
-
-/* 区域边界与指针表边界符号（由链接脚本给出）。*/
-extern char __rand_text_start[], __rand_text_end[];
-extern char __tramp_text_start[], __tramp_text_end[];
-extern void *__start_tramp_ptr_tbl[], *__end_tramp_ptr_tbl[];
-extern void *__start_rand_ptr_tbl[], *__end_rand_ptr_tbl[];
+#include <linux/compiler.h>
 
 /*
- * 一个随机化函数的运行时描述符（在初始化时由两张指针表构建）。
- * 论文 §3.4.2：随机化时"唯一需要更新的"就是 target ——索引更新量 O(1)。
+ * 一个随机化函数的链接期描述符。位于 .data..ikaslr_tramp_tbl，每函数一项。
+ * size 在初始化时由相邻函数体地址之差算出，其余字段由链接期确定。
  */
-struct ikaslr_func {
-	void	*tramp;		/* fixed_in 跳板入口，位置固定、永不迁移 */
-	void	*body;		/* 函数体当前地址（随机化后更新） */
-	size_t	 size;		/* 函数体字节数（由相邻指针表项之差得出） */
-	/* target/whitelist/计数等字段随 S1.2–S1.8 补入 */
+struct ikaslr_tramp {
+	void		*tramp;	/* fixed_in 跳板入口，地址固定、永不迁移 */
+	void		*body;	/* 函数体的链接期原始地址 */
+	void	       **target;/* -> target 槽：随机化时唯一需要更新的索引 */
+	const char	*name;	/* 函数标识，用于调试与按名迁移 */
+	size_t		 size;	/* 函数体字节数（初始化时填） */
 };
+
+/* 区域与表的边界符号（链接脚本给出）。*/
+extern char __rand_text_start[], __rand_text_end[];
+extern char __tramp_text_start[], __tramp_text_end[];
+/*
+ * 表中存放的是指针而非结构本身。x86-64 会把 >=32 字节的数据对象按 32 字节
+ * 对齐，而本结构 40 字节，直接排布会在表项之间留下 24 字节空洞，按 sizeof
+ * 索引就会落进填充区。改存 8 字节指针即天然紧密排列，这也是内核既有表
+ * （如 __start___tracepoints_ptrs）的通行做法。
+ */
+extern struct ikaslr_tramp *__start_ikaslr_tramp_tbl[], *__end_ikaslr_tramp_tbl[];
+extern void *__start_ikaslr_target[], *__end_ikaslr_target[];
+
+/* ---- 段注解 ---- */
+#define __ikaslr_tramp_sec(fn) __section(".tramp.text." #fn) noinline
+#define __ikaslr_rand_sec(fn)  __section(".rand.text." #fn) noinline
+
+/* 随机化函数体：真实代码，落在 .rand.text，可被迁移。*/
+#define IKASLR_RAND_FN(ret, fn, ...)					\
+	ret fn##_body(__VA_ARGS__);					\
+	ret __ikaslr_rand_sec(fn) fn##_body(__VA_ARGS__)
+
+/*
+ * fixed_in 跳板：保留原函数名与地址（固定），并发出该函数的 target 槽与表项。
+ * 跳板体由调用方按上面的范式书写（enter -> 经 target 间接调用 -> leave）。
+ */
+#define IKASLR_TRAMP_FN(ret, fn, ...)					\
+	ret fn##_body(__VA_ARGS__);					\
+	ret fn(__VA_ARGS__);						\
+	void *__ikaslr_target_##fn					\
+		__attribute__((section(".data..ikaslr_target"))) __used	\
+		= (void *)fn##_body;					\
+	static struct ikaslr_tramp __ikaslr_ent_##fn = {		\
+			.tramp	= (void *)fn,				\
+			.body	= (void *)fn##_body,			\
+			.target = &__ikaslr_target_##fn,		\
+			.name	= #fn,					\
+		};							\
+	static struct ikaslr_tramp *__ikaslr_ptr_##fn			\
+		__attribute__((section(".data..ikaslr_tramp_tbl"))) __used \
+		= &__ikaslr_ent_##fn;					\
+	ret __ikaslr_tramp_sec(fn) fn(__VA_ARGS__)
+
+/*
+ * 在跳板体内取该函数当前的入口地址。READ_ONCE 保证读到随机化线程写入的最新值。
+ * 类型由 <fn>_body 推出，因此调用点保持完全的类型检查。
+ */
+#define IKASLR_TARGET(fn)						\
+	((typeof(&fn##_body))READ_ONCE(__ikaslr_target_##fn))
+
+/* target 槽在跳板体外的引用（例如 fixed_out 或调试代码）需要此声明。*/
+#define IKASLR_DECLARE_TARGET(fn) extern void *__ikaslr_target_##fn
 
 #ifdef CONFIG_IKASLR
 
-/* 已注册的随机化函数数量（初始化后有效）。*/
+/*
+ * 线程追踪（S1.3）。控制流经 fixed_in 进入随机化区域时 enter、经 fixed_out 或
+ * 跳板返回时 leave。论文 §3.4.5：活跃集合为空即可安全切换代码页。
+ */
+void ikaslr_enter(void);
+void ikaslr_leave(void);
+
 int ikaslr_nr_funcs(void);
 
-/*
- * 线程追踪钩子（S1.3 实现；此处为供跳板调用的稳定符号）。
- * enter: 控制流经 fixed_in 进入随机化区域；leave: 经 fixed_out 离开。
- */
-void ikaslr_enter(unsigned int idx);
-void ikaslr_leave(unsigned int idx);
+/* 更新单个函数的 target 槽（随机化时唯一需要改写的索引）。供 S1.4 使用。*/
+void ikaslr_update_target(struct ikaslr_tramp *t, void *new_body);
 
 /*
- * 触发一次重随机化（S1.4/S1.5 实现）。返回 0 表示已完成或已推迟。
- * 完整流程见论文 §3.4.7：检查互斥→生成布局→准备新页→阻断并等待活跃集合清空
- * →更新各 target_addr→切换页权限→复位→回收旧页。
+ * 触发一次重随机化（S1.4/S1.5）。完整流程见论文 §3.4.7。
  */
 int ikaslr_rerandomize(void);
 
 #else  /* !CONFIG_IKASLR */
 
+static inline void ikaslr_enter(void) { }
+static inline void ikaslr_leave(void) { }
 static inline int ikaslr_nr_funcs(void) { return 0; }
-static inline void ikaslr_enter(unsigned int idx) { }
-static inline void ikaslr_leave(unsigned int idx) { }
 static inline int ikaslr_rerandomize(void) { return 0; }
 
 #endif /* CONFIG_IKASLR */
