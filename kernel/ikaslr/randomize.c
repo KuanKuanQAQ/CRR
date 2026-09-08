@@ -37,6 +37,7 @@
 #include <linux/hardirq.h>
 #include <linux/preempt.h>
 #include <linux/log2.h>
+#include <linux/minmax.h>
 
 #include "internal.h"
 
@@ -165,8 +166,23 @@ static void ikaslr_plan(struct ikaslr_variant *v)
 
 	for (i = 0; i < ikaslr_ntramp; i++)
 		order[i] = i;
-	for (i = ikaslr_ntramp - 1; i > 0; i--)
-		swap(order[i], order[get_random_u32_below(i + 1)]);
+	for (i = ikaslr_ntramp - 1; i > 0; i--) {
+		/*
+		 * 随机下标必须先算进变量再交换。
+		 *
+		 * 写成 swap(order[i], order[get_random_u32_below(i + 1)]) 是错的：
+		 * 内核的 swap() 是宏，会把参数展开多次，于是随机数被取两次、得到两个
+		 * 不同的下标——那不是交换，而是破坏排列，产生重复项。结果是某个函数的
+		 * off[] 从未被赋值、保留上一轮的旧偏移，与本轮另一个函数的槽位重叠，
+		 * 表现为随机化之后函数返回错误结果或崩溃（间歇性，取决于随机数）。
+		 */
+		int j = get_random_u32_below(i + 1);
+
+		swap(order[i], order[j]);
+	}
+
+	/* 先清零：若排列有缺项，会立刻表现为偏移 0 而不是沿用上一轮的旧值。*/
+	memset(v->off, 0, ikaslr_ntramp * sizeof(*v->off));
 
 	cur = get_random_u32_below(IKASLR_MAX_GAP);
 	for (i = 0; i < ikaslr_ntramp; i++) {
@@ -180,11 +196,20 @@ static void ikaslr_plan(struct ikaslr_variant *v)
 }
 
 /*
- * 准备一个变体：排布 + 从 src 复制函数体 + 置 RO+X。
+ * 准备一个变体：排布 + 复制函数体 + 置 RO+X。
  * 可能睡眠（set_memory_*），只能在进程上下文调用 —— 这正是要把它移出关键路径的原因。
- * src 为 NULL 时从内核映像的原始函数体复制（仅初始化时）。
+ *
+ * **始终从内核映像里的原始函数体复制，而不是从当前变体。**
+ * 早期实现以 ikaslr_live 为源，结果引入了竞态：准备在工作队列里跑，而
+ * ikaslr_rerandomize() 可能同时把 live 换掉并退役它，另一个工作项又会把已退役的
+ * 变体整体填成陷阱指令——于是可能把半个陷阱页拷进新变体，表现为随机化之后函数
+ * 返回错误结果。实测确实间歇性触发。
+ *
+ * 以映像为唯一源头即消除该竞态，且不会累积复制误差。映像内的 .rand.text 首次
+ * 迁移后已被置 NX，只可读不可执行，因此不构成可用的旧代码副本；其可读性由第 4 章
+ * 的只执行内存机制覆盖。
  */
-static int ikaslr_prepare(struct ikaslr_variant *v, struct ikaslr_variant *src)
+static int ikaslr_prepare(struct ikaslr_variant *v)
 {
 	unsigned long npages = v->cap >> PAGE_SHIFT;
 	u64 t0 = ktime_get_ns();
@@ -199,12 +224,9 @@ static int ikaslr_prepare(struct ikaslr_variant *v, struct ikaslr_variant *src)
 	memset(v->base, 0, v->used);
 	v->poisoned = false;
 
-	for (i = 0; i < ikaslr_ntramp; i++) {
-		const void *from = src ? src->base + src->off[i]
-				       : ikaslr_tbl[i]->body;
-
-		memcpy(v->base + v->off[i], from, ikaslr_tbl[i]->size);
-	}
+	for (i = 0; i < ikaslr_ntramp; i++)
+		memcpy(v->base + v->off[i], ikaslr_tbl[i]->body,
+		       ikaslr_tbl[i]->size);
 	flush_icache_range((unsigned long)v->base,
 			   (unsigned long)v->base + v->used);
 
@@ -226,7 +248,9 @@ static struct ikaslr_variant *ikaslr_take_free(void)
 	spin_lock_irqsave(&ikaslr_pool_lock, flags);
 	for (i = 0; i < IKASLR_NR_VARIANTS; i++) {
 		if (ikaslr_vars[i].state == VAR_FREE) {
-			ikaslr_vars[i].state = VAR_FREE;	/* 占位，仍由调用者准备 */
+			/* 标记为 RETIRED 以占住它：两个补充工作项不能拿到同一份。*/
+			ikaslr_vars[i].state = VAR_RETIRED;
+			ikaslr_vars[i].poisoned = true;	/* 内容无效，无需填陷阱 */
 			spin_unlock_irqrestore(&ikaslr_pool_lock, flags);
 			return &ikaslr_vars[i];
 		}
@@ -338,7 +362,7 @@ static void ikaslr_refill_work_fn(struct work_struct *w)
 	v = ikaslr_take_free();
 	if (!v)
 		return;
-	if (ikaslr_prepare(v, ikaslr_live))
+	if (ikaslr_prepare(v))
 		return;
 	spin_lock_irqsave(&ikaslr_pool_lock, flags);
 	v->state = VAR_READY;
@@ -400,6 +424,26 @@ int ikaslr_rerandomize(void)
 		ikaslr_update_target(ikaslr_tbl[i], next->base + next->off[i]);
 	smp_wmb();
 
+	/*
+	 * 调试用完整性自检：切换之后，每个 target 指向处的开头若干字节必须与
+	 * 映像里该函数体的开头一致。不一致说明要么变体内容被写坏，要么 target
+	 * 指到了错误的偏移——两者都会表现为"随机化之后函数返回错误结果"。
+	 */
+	if (IS_ENABLED(CONFIG_IKASLR_DEBUG)) {
+		for (i = 0; i < ikaslr_ntramp; i++) {
+			const u8 *want = ikaslr_tbl[i]->body;
+			const u8 *got = next->base + next->off[i];
+
+			if (memcmp(want, got, min_t(size_t, 8, ikaslr_tbl[i]->size))) {
+				pr_err("integrity: %s target=%px off=%lu content mismatch "
+				       "(want %02x%02x%02x%02x got %02x%02x%02x%02x)\n",
+				       ikaslr_tbl[i]->name, got, next->off[i],
+				       want[0], want[1], want[2], want[3],
+				       got[0], got[1], got[2], got[3]);
+			}
+		}
+	}
+
 	old = ikaslr_live;
 	spin_lock_irqsave(&ikaslr_pool_lock, flags);
 	next->state = VAR_LIVE;
@@ -414,7 +458,17 @@ int ikaslr_rerandomize(void)
 	ikaslr_unblock_region();
 	WRITE_ONCE(ikaslr_last_ns, ktime_get_ns() - t0);
 
-	/* 关键路径到此结束。后续都是可睡眠的善后工作，交给工作队列。*/
+	/*
+	 * 关键路径到此结束。以下是可睡眠的善后工作。
+	 *
+	 * 填陷阱要尽早：在填上之前，刚退役的变体里仍是**可执行的有效旧代码**，
+	 * 构成一个旧副本暴露窗口。因此只要当前在进程上下文，就地同步填掉，
+	 * 把窗口关死；原子上下文中只能交给工作队列，窗口长度取决于其调度。
+	 */
+	if (old && preemptible()) {
+		if (!ikaslr_poison(old))
+			old->poisoned = true;
+	}
 	schedule_work(&ikaslr_refill_work);
 
 out:
@@ -459,7 +513,7 @@ int __init ikaslr_pool_init(void)
 	}
 
 	/* 第一份：从内核映像复制并启用。*/
-	ret = ikaslr_prepare(&ikaslr_vars[0], NULL);
+	ret = ikaslr_prepare(&ikaslr_vars[0]);
 	if (ret)
 		return ret;
 	for (i = 0; i < ikaslr_ntramp; i++)
@@ -485,7 +539,7 @@ int __init ikaslr_pool_init(void)
 	}
 
 	/* 第二份：预备就绪，使首次随机化即可走零分配的关键路径。*/
-	ret = ikaslr_prepare(&ikaslr_vars[1], ikaslr_live);
+	ret = ikaslr_prepare(&ikaslr_vars[1]);
 	if (ret)
 		return ret;
 	ikaslr_vars[1].state = VAR_READY;

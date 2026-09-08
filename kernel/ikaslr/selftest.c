@@ -19,6 +19,7 @@
 #include <linux/printk.h>
 
 #include <linux/preempt.h>
+#include <linux/string.h>
 
 #include "internal.h"
 #include <linux/errno.h>
@@ -378,6 +379,73 @@ static int __init test_stale_return(void)
 	return 0;
 }
 
+/* randfuncs.c 里那个"一般函数"要调用的非随机化目标。*/
+int ikaslr_rf_helper(int x)
+{
+	return x * 2;
+}
+
+/*
+ * S1.6/S1.7：一般函数的可迁移性。
+ *
+ * 与自测的自足函数不同，ikaslr_rf_general 既引用全局变量、又经 fixed_out 调用
+ * 非随机化区域的函数。若函数体里残留任何指向区域外的 PC 相对引用，迁移之后
+ * 这次调用就会崩溃或算错——因此"迁移后结果依然正确"本身就是位置无关性的验证。
+ */
+static int __init test_general_function(void)
+{
+	void *before, *after;
+	int r1, r2, i;
+
+	if (ikaslr_nr_funcs() < 3) {
+		pr_info("general: randfuncs not built, skipping\n");
+		return 0;
+	}
+
+	/* 找到 ikaslr_rf_general 的表项。*/
+	for (i = 0; i < ikaslr_nr_funcs(); i++)
+		if (!strcmp(ikaslr_tbl[i]->name, "ikaslr_rf_general"))
+			break;
+	if (i == ikaslr_nr_funcs()) {
+		pr_err("FAIL(general): entry not found\n");
+		return -EINVAL;
+	}
+
+	ikaslr_rf_counter = 0;
+	before = READ_ONCE(*ikaslr_tbl[i]->target);
+	r1 = ikaslr_rf_general(5);	/* counter=5, helper(5)=10 -> 15 */
+	if (r1 != 15) {
+		pr_err("FAIL(general): before move got %d, want 15\n", r1);
+		return -EINVAL;
+	}
+
+	ikaslr_defer_flush();
+	if (ikaslr_rerandomize()) {
+		pr_err("FAIL(general): rerandomize failed\n");
+		return -EINVAL;
+	}
+	ikaslr_defer_flush();
+	after = READ_ONCE(*ikaslr_tbl[i]->target);
+
+	/* 迁移之后再调用：全局引用与跨区域调用都必须仍然正确。*/
+	ikaslr_rf_counter = 0;
+	r2 = ikaslr_rf_general(5);
+	pr_info("general: %px -> %px, before=%d after=%d counter=%d\n",
+		before, after, r1, r2, ikaslr_rf_counter);
+
+	if (after == before) {
+		pr_err("FAIL(general): body did not move\n");
+		return -EINVAL;
+	}
+	if (r2 != 15 || ikaslr_rf_counter != 5) {
+		pr_err("FAIL(general): after move got %d counter=%d, want 15/5\n",
+		       r2, ikaslr_rf_counter);
+		return -EINVAL;
+	}
+	pr_info("general: PASS - global refs and cross-region call survived relocation\n");
+	return 0;
+}
+
 static int __init ikaslr_selftest_init(void)
 {
 	int ret;
@@ -401,6 +469,9 @@ static int __init ikaslr_selftest_init(void)
 	if (ret)
 		return ret;
 	ret = test_stale_return();
+	if (ret)
+		return ret;
+	ret = test_general_function();
 	if (ret)
 		return ret;
 

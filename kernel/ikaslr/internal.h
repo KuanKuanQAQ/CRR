@@ -45,6 +45,9 @@ int ikaslr_whitelist_init(void);
 int ikaslr_pool_init(void);
 int ikaslr_fixup_init(void);
 int ikaslr_control_init(void);
+extern int ikaslr_rf_counter;
+int ikaslr_rf_general(int a);
+int ikaslr_rf_helper(int x);
 struct proc_dir_entry;
 int ikaslr_bench_init(struct proc_dir_entry *dir);
 
