@@ -43,6 +43,11 @@ void ikaslr_defer_flush(void);
 
 int ikaslr_whitelist_init(void);
 int ikaslr_pool_init(void);
+int ikaslr_fixup_init(void);
+
+/* 把落在已退役变体中的地址映射到当前变体的对应位置。异常上下文中调用。*/
+bool ikaslr_fixup_addr(unsigned long addr, unsigned long *newp);
+void ikaslr_fixup_stats(unsigned long *ok, unsigned long *fail);
 
 /* 变体池统计：上次准备耗时、因无就绪变体错过的次数、当前就绪数。*/
 void ikaslr_pool_stats(u64 *prep_ns, unsigned long *missed, int *nready);

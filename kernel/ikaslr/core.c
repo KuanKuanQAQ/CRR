@@ -144,6 +144,15 @@ int ikaslr_inside_count(void)
 
 void ikaslr_out_enter(void *target)
 {
+	/*
+	 * 方案 B（作者 2026-09-09 决策）：离开随机化区域时**减少** active。
+	 * 这样随机化不必等到调用外部函数的执行流返回——在真实内核路径上，
+	 * 随机化函数阻塞在 I/O 里是常态，若不减计数，区域将长期非空。
+	 *
+	 * 代价是本执行流的栈帧仍在栈上、返回地址指向旧变体。该返回由退役变体中
+	 * 填充的陷阱指令捕获，再由 fixup 把 PC 指向新变体的对应位置
+	 * （kernel/ikaslr/fixup.c）。
+	 */
 	/* 白名单检查：目标必须是编译期登记的合法跨区域目标（§3.5.2）。*/
 	if (unlikely(!ikaslr_whitelist_ok(target))) {
 		atomic_long_inc(&ikaslr_wl_rejects);
@@ -156,11 +165,21 @@ void ikaslr_out_enter(void *target)
 		 */
 	}
 	atomic_dec(&ikaslr_inside);
+	if (atomic_dec_and_test(&ikaslr_active))
+		wake_up(&ikaslr_zero_wq);
 }
 EXPORT_SYMBOL_GPL(ikaslr_out_enter);
 
+/*
+ * 从外部函数返回到随机化区域。
+ *
+ * 这里**不等待**阻断标志：本次返回是回到调用者的栈帧，而非新的进入。若此刻
+ * 正在随机化，返回地址会落在已退役的变体上并触发陷阱，由 fixup 重定向——
+ * 因此无需（也不能）在此阻塞，否则会与等待计数归零的随机化线程互相等待。
+ */
 void ikaslr_out_leave(void)
 {
+	atomic_inc(&ikaslr_active);
 	atomic_inc(&ikaslr_inside);
 }
 EXPORT_SYMBOL_GPL(ikaslr_out_leave);
@@ -317,6 +336,10 @@ static int __init ikaslr_init(void)
 		pr_err("whitelist init failed: %d\n", ret);
 		return ret;
 	}
+
+	ret = ikaslr_fixup_init();
+	if (ret)
+		return ret;
 
 	ret = ikaslr_pool_init();
 	if (ret) {

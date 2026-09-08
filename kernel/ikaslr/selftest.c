@@ -323,6 +323,57 @@ static int __init test_fixed_out(void)
 	return 0;
 }
 
+/*
+ * S1.11：陈旧返回地址的兜底（方案 B）。
+ *
+ * 直接构造最关键的场景：记下某函数体的当前地址，随机化一轮使该变体退役并被
+ * 填充为陷阱指令，然后**按旧地址调用它**。若兜底机制正确，执行会在旧地址上
+ * 触发陷阱、被改写 PC 到新变体的对应位置，并返回正确结果——这正是"外部调用
+ * 返回到已迁移函数"时发生的事。
+ */
+static int __init test_stale_return(void)
+{
+	int (*stale)(int, int);
+	unsigned long ok0, fail0, ok1, fail1;
+	void *old, *new;
+	int r;
+
+	ikaslr_defer_flush();
+	old = READ_ONCE(*ikaslr_tbl[0]->target);	/* ikaslr_st_add 当前地址 */
+	ikaslr_fixup_stats(&ok0, &fail0);
+
+	if (ikaslr_rerandomize()) {
+		pr_err("FAIL(stale): rerandomize failed\n");
+		return -EINVAL;
+	}
+	/* 等待退役变体被填充陷阱（在关键路径之外异步完成）。*/
+	ikaslr_defer_flush();
+
+	new = READ_ONCE(*ikaslr_tbl[0]->target);
+	if (new == old) {
+		pr_err("FAIL(stale): body did not move\n");
+		return -EINVAL;
+	}
+
+	/* 按旧地址调用：应触发陷阱并被重定向到新地址。*/
+	stale = (int (*)(int, int))old;
+	r = stale(40, 2);
+
+	ikaslr_fixup_stats(&ok1, &fail1);
+	pr_info("stale: called retired %px -> got %d (fixups %lu->%lu, fails %lu->%lu, now %px)\n",
+		old, r, ok0, ok1, fail0, fail1, new);
+
+	if (ok1 <= ok0) {
+		pr_err("FAIL(stale): no fixup was performed\n");
+		return -EINVAL;
+	}
+	if (r != 42) {
+		pr_err("FAIL(stale): redirected call returned %d\n", r);
+		return -EINVAL;
+	}
+	return 0;
+}
+
 static int __init ikaslr_selftest_init(void)
 {
 	int ret;
@@ -345,8 +396,11 @@ static int __init ikaslr_selftest_init(void)
 	ret = test_fixed_out();
 	if (ret)
 		return ret;
+	ret = test_stale_return();
+	if (ret)
+		return ret;
 
-	pr_info("PASS: dispatch + tracking + block + rerand + deferral + fixed_out\n");
+	pr_info("PASS: dispatch + tracking + block + rerand + defer + fixed_out + stale-return\n");
 	return 0;
 }
 /* 在 core 的 late_initcall 之后运行，确保 target 槽已初始化。*/

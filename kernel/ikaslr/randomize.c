@@ -46,6 +46,16 @@
 /* 变体份数。>=3 才能做到"一份在用、一份就绪、至少一份可回收"。*/
 #define IKASLR_NR_VARIANTS	4
 
+/*
+ * 退役变体的填充字节（方案 B）。执行到它即产生异常，由 fixup 把 PC 指向新位置。
+ * x86-64 用 int3（0xCC，单字节陷阱）；arm64 用 UDF #0（0x00000000）。
+ */
+#ifdef CONFIG_X86_64
+#define IKASLR_POISON_BYTE	0xcc
+#else
+#define IKASLR_POISON_BYTE	0x00
+#endif
+
 enum ikaslr_var_state {
 	VAR_FREE,	/* 空闲，可被 prepare */
 	VAR_READY,	/* 已排布好并置 RO+X，等待启用 */
@@ -59,6 +69,7 @@ struct ikaslr_variant {
 	unsigned long		 used;	/* 本次排布实际占用 */
 	unsigned long		*off;	/* 每个函数在本变体内的偏移 */
 	enum ikaslr_var_state	 state;
+	bool			 poisoned;/* 退役后是否已填充陷阱指令 */
 	unsigned long		 round;	/* 成为 LIVE / RETIRED 时的轮次 */
 };
 
@@ -95,6 +106,30 @@ void ikaslr_pool_stats(u64 *prep_ns, unsigned long *missed, int *nready)
 	*prep_ns = READ_ONCE(ikaslr_last_prep_ns);
 	*missed = READ_ONCE(ikaslr_no_ready);
 	*nready = n;
+}
+
+/*
+ * 变体页的权限切换，始终维持 W^X。
+ *
+ * 顺序很重要：不能在页面仍可执行时直接加写权限，否则会出现 W+X，内核的 CPA
+ * 会报 "W^X violation"。因此写之前先去掉执行权限，写完之后先只读再加回执行。
+ */
+static int ikaslr_make_writable(void *base, unsigned long npages)
+{
+	int ret = set_memory_nx((unsigned long)base, npages);
+
+	if (ret)
+		return ret;
+	return set_memory_rw((unsigned long)base, npages);
+}
+
+static int ikaslr_make_exec(void *base, unsigned long npages)
+{
+	int ret = set_memory_ro((unsigned long)base, npages);
+
+	if (ret)
+		return ret;
+	return set_memory_x((unsigned long)base, npages);
 }
 
 /* 单个变体所需的最大容量：各函数按 16 对齐 + 每个函数后一段随机间隙。*/
@@ -155,13 +190,14 @@ static int ikaslr_prepare(struct ikaslr_variant *v, struct ikaslr_variant *src)
 	u64 t0 = ktime_get_ns();
 	int i, ret;
 
-	/* 变体在 READY/RETIRED 时是 RO+X，改写前先放开写权限。*/
-	ret = set_memory_rw((unsigned long)v->base, npages);
+	/* 变体在 READY/RETIRED 时是 RO+X，改写前先去执行权限再放开写权限。*/
+	ret = ikaslr_make_writable(v->base, npages);
 	if (ret)
 		return ret;
 
 	ikaslr_plan(v);
 	memset(v->base, 0, v->used);
+	v->poisoned = false;
 
 	for (i = 0; i < ikaslr_ntramp; i++) {
 		const void *from = src ? src->base + src->off[i]
@@ -172,7 +208,7 @@ static int ikaslr_prepare(struct ikaslr_variant *v, struct ikaslr_variant *src)
 	flush_icache_range((unsigned long)v->base,
 			   (unsigned long)v->base + v->used);
 
-	ret = set_memory_ro((unsigned long)v->base, npages);
+	ret = ikaslr_make_exec(v->base, npages);
 	if (ret)
 		return ret;
 
@@ -211,12 +247,95 @@ static struct ikaslr_variant *ikaslr_take_free(void)
 	return oldest;
 }
 
+/*
+ * 退役变体填充陷阱指令（方案 B）。
+ *
+ * 切换时活跃集合为空，保证没有执行流**正在**退役变体中执行；但可能有执行流
+ * 正在外部函数里，其栈帧的返回地址仍指向退役变体（fixed_out 已减计数）。
+ * 这些返回由填充的陷阱指令捕获，再由 ikaslr_fixup_addr() 把 PC 指向新变体中的
+ * 对应位置。
+ *
+ * 可能睡眠（set_memory_*），只在工作队列中调用。
+ */
+static int ikaslr_poison(struct ikaslr_variant *v)
+{
+	unsigned long npages = v->cap >> PAGE_SHIFT;
+	int ret;
+
+	ret = ikaslr_make_writable(v->base, npages);
+	if (ret)
+		return ret;
+	memset(v->base, IKASLR_POISON_BYTE, v->used);
+	flush_icache_range((unsigned long)v->base,
+			   (unsigned long)v->base + v->used);
+	/* 保持可执行：必须能执行到陷阱指令才会触发 fixup。*/
+	return ikaslr_make_exec(v->base, npages);
+}
+
+/*
+ * 把一个落在已退役变体中的地址映射到当前变体中的对应位置。
+ *
+ * 在异常上下文中调用，因此**不取锁**：变体数组是定长的，状态变化稀少，
+ * 竞态最坏结果是本次映射失败（会被如实上报），而不是数据损坏。
+ */
+bool ikaslr_fixup_addr(unsigned long addr, unsigned long *newp)
+{
+	struct ikaslr_variant *live = READ_ONCE(ikaslr_live);
+	int i, f;
+
+	if (!live)
+		return false;
+
+	for (i = 0; i < IKASLR_NR_VARIANTS; i++) {
+		struct ikaslr_variant *v = &ikaslr_vars[i];
+		unsigned long base = (unsigned long)READ_ONCE(v->base);
+		unsigned long delta;
+
+		if (!base || v == live)
+			continue;
+		if (addr < base || addr >= base + v->used)
+			continue;
+		if (READ_ONCE(v->state) != VAR_RETIRED) {
+			/* 落在非退役变体中：说明该变体已被回收复用，无法安全映射。*/
+			pr_warn_ratelimited("stale return into recycled variant %px\n",
+					    (void *)addr);
+			return false;
+		}
+
+		delta = addr - base;
+		for (f = 0; f < ikaslr_ntramp; f++) {
+			unsigned long fo = v->off[f];
+
+			if (delta < fo || delta >= fo + ikaslr_tbl[f]->size)
+				continue;
+			*newp = (unsigned long)live->base + live->off[f] +
+				(delta - fo);
+			return true;
+		}
+		/* 落在函数之间的随机间隙里：不是合法的返回地址。*/
+		return false;
+	}
+	return false;
+}
+
 /* 后台：把一个变体准备成 READY。*/
 static void ikaslr_refill_work_fn(struct work_struct *w)
 {
-	struct ikaslr_variant *v = ikaslr_take_free();
+	struct ikaslr_variant *v;
 	unsigned long flags;
+	int i;
 
+	/* 先给尚未填充陷阱的退役变体填上（关键路径之外，可睡眠）。*/
+	for (i = 0; i < IKASLR_NR_VARIANTS; i++) {
+		struct ikaslr_variant *r = &ikaslr_vars[i];
+
+		if (r->state == VAR_RETIRED && !r->poisoned) {
+			if (!ikaslr_poison(r))
+				r->poisoned = true;
+		}
+	}
+
+	v = ikaslr_take_free();
 	if (!v)
 		return;
 	if (ikaslr_prepare(v, ikaslr_live))
@@ -324,9 +443,14 @@ int __init ikaslr_pool_init(void)
 		v->off = kcalloc(ikaslr_ntramp, sizeof(*v->off), GFP_KERNEL);
 		if (!v->off)
 			return -ENOMEM;
+		/*
+		 * 以可读写、不可执行分配（PAGE_KERNEL 而非 PAGE_KERNEL_EXEC）：
+		 * 分配出来就是 RWX 同样构成 W^X 违规。执行权限在 prepare 写完
+		 * 之后才加上。
+		 */
 		v->base = __vmalloc_node_range(cap, PAGE_SIZE,
 					       VMALLOC_START, VMALLOC_END,
-					       GFP_KERNEL, PAGE_KERNEL_EXEC,
+					       GFP_KERNEL, PAGE_KERNEL,
 					       VM_FLUSH_RESET_PERMS, NUMA_NO_NODE,
 					       __builtin_return_address(0));
 		if (!v->base)
