@@ -51,6 +51,8 @@ static unsigned long ikaslr_vmread(unsigned long field);
 static int ikaslr_vmclear(u64 pa);
 static u64 ept_pointer;
 static void *vmcs_region;
+static void ikaslr_setup_vmcs(void);
+static unsigned long vmcs_fail_field;
 
 /* 确保 VMX 在 IA32_FEAT_CTL 中已启用（未锁定则由我们锁定并启用）。*/
 static int ikaslr_vmx_enable_feat_ctl(void)
@@ -138,12 +140,20 @@ static int __init ikaslr_ept_smoke(void)
 		if (!ikaslr_vmwrite(EPT_POINTER, ept_pointer)) {
 			u64 rb = ikaslr_vmread(EPT_POINTER);
 
-			if (rb == ept_pointer)
-				pr_info("S2.1b OK: VMCS loaded, EPTP written+verified (%llx)\n",
+			if (rb == ept_pointer) {
+				pr_info("S2.1b-1 OK: VMCS loaded, EPTP verified (%llx)\n",
 					rb);
-			else
+				/* S2.1b-2a：填满所有 VMCS 字段并校验（不 VMLAUNCH）。*/
+				ikaslr_setup_vmcs();
+				if (vmcs_fail_field)
+					pr_err("S2.1b-2a: VMWRITE failed at field %lx\n",
+					       vmcs_fail_field);
+				else
+					pr_info("S2.1b-2a OK: all VMCS fields written and valid\n");
+			} else {
 				pr_err("S2.1b: EPTP readback mismatch %llx != %llx\n",
 				       rb, ept_pointer);
+			}
 		} else {
 			pr_err("S2.1b: VMWRITE(EPT_POINTER) failed\n");
 		}
@@ -288,4 +298,159 @@ static int ikaslr_vmcs_load(u32 rev)
 		return -EIO;
 	}
 	return 0;
+}
+
+/*
+ * ===========================================================================
+ * S2.1b-2a：填充 VMCS 的 host / guest / control 字段
+ * ===========================================================================
+ *
+ * 本步只做 VMWRITE 并逐个校验成功，**不 VMLAUNCH**——因此不会三重故障，可安全
+ * 验证所有字段编码与取值合法。VMLAUNCH 在 S2.1b-2b。
+ *
+ * guest state = 当前内核状态的延续（passthrough）：guest 就是这个内核自己，因此
+ * guest 的 CR/段/描述符表/MSR 全部取当前值。host state 同样取当前值（VM exit 后
+ * 回到内核）。controls 配成最小拦截：不拦中断/异常/CR/MSR，启用 EPT，只有 CPUID
+ * 与 EPT violation 之类才 exit。
+ */
+#include <asm/desc.h>
+#include <asm/segment.h>
+
+/* 段 AR：VMX access-rights 字节，内核平坦段的标准值。*/
+#define AR_CODE64	0xa09b	/* P,S,type=exec/read/acc,L=1,G=1 */
+#define AR_DATA		0xc093	/* P,S,type=data/write/acc,D/B=1,G=1 */
+#define AR_TSS64	0x008b	/* P,type=busy 64-bit TSS,S=0 */
+#define AR_UNUSABLE	0x10000	/* bit16: unusable */
+
+static u32 vmx_adjust_ctl(u32 want, u32 msr)
+{
+	u32 lo, hi;
+
+	rdmsr(msr, lo, hi);	/* lo=allowed-0(必须为1), hi=allowed-1(可为1) */
+	want |= lo;
+	want &= hi;
+	return want;
+}
+
+/* vmcs_fail_field 前置声明于文件上方 */
+
+static int vmcs_w(unsigned long field, unsigned long val)
+{
+	if (ikaslr_vmwrite(field, val)) {
+		if (!vmcs_fail_field)
+			vmcs_fail_field = field ? field : 0xdead;
+		return -EIO;
+	}
+	return 0;
+}
+
+static u16 read_cs(void) { u16 v; asm("mov %%cs,%0" : "=r"(v)); return v; }
+static u16 read_ds(void) { u16 v; asm("mov %%ds,%0" : "=r"(v)); return v; }
+static u16 read_es(void) { u16 v; asm("mov %%es,%0" : "=r"(v)); return v; }
+static u16 read_ss(void) { u16 v; asm("mov %%ss,%0" : "=r"(v)); return v; }
+static u16 read_fs(void) { u16 v; asm("mov %%fs,%0" : "=r"(v)); return v; }
+static u16 read_gs(void) { u16 v; asm("mov %%gs,%0" : "=r"(v)); return v; }
+static u16 read_tr(void) { u16 v; asm("str %0" : "=r"(v)); return v; }
+static u16 read_ldtr(void) { u16 v; asm("sldt %0" : "=r"(v)); return v; }
+
+static void ikaslr_setup_vmcs(void)
+{
+	struct desc_ptr gdt, idt;
+	unsigned long cr0 = read_cr0(), cr3 = __read_cr3(), cr4 = __read_cr4();
+	unsigned long tr_base;
+	u16 tr = read_tr();
+
+	native_store_gdt(&gdt);
+	store_idt(&idt);
+
+	/* TR base：从 GDT 中 TR 选择子对应的描述符取出。*/
+	{
+		struct ldttss_desc *d =
+			(struct ldttss_desc *)(gdt.address + (tr & ~7));
+		tr_base = ((unsigned long)d->base0) |
+			  ((unsigned long)d->base1 << 16) |
+			  ((unsigned long)d->base2 << 24) |
+			  ((unsigned long)d->base3 << 32);
+	}
+
+	vmcs_fail_field = 0;
+
+	/* ---- control 字段 ---- */
+	vmcs_w(PIN_BASED_VM_EXEC_CONTROL,
+	       vmx_adjust_ctl(0, MSR_IA32_VMX_TRUE_PINBASED_CTLS));
+	vmcs_w(CPU_BASED_VM_EXEC_CONTROL,
+	       vmx_adjust_ctl(CPU_BASED_ACTIVATE_SECONDARY_CONTROLS,
+			      MSR_IA32_VMX_TRUE_PROCBASED_CTLS));
+	vmcs_w(SECONDARY_VM_EXEC_CONTROL,
+	       vmx_adjust_ctl(SECONDARY_EXEC_ENABLE_EPT,
+			      MSR_IA32_VMX_PROCBASED_CTLS2));
+	vmcs_w(VM_EXIT_CONTROLS,
+	       vmx_adjust_ctl(VM_EXIT_HOST_ADDR_SPACE_SIZE |
+			      VM_EXIT_LOAD_IA32_EFER | VM_EXIT_SAVE_IA32_EFER,
+			      MSR_IA32_VMX_TRUE_EXIT_CTLS));
+	vmcs_w(VM_ENTRY_CONTROLS,
+	       vmx_adjust_ctl(VM_ENTRY_IA32E_MODE | VM_ENTRY_LOAD_IA32_EFER,
+			      MSR_IA32_VMX_TRUE_ENTRY_CTLS));
+	vmcs_w(EXCEPTION_BITMAP, 0);
+	vmcs_w(EPT_POINTER, ept_pointer);
+	vmcs_w(VMCS_LINK_POINTER, ~0ul);
+
+	/* ---- host state ---- */
+	vmcs_w(HOST_CR0, cr0);
+	vmcs_w(HOST_CR3, cr3);
+	vmcs_w(HOST_CR4, cr4);
+	vmcs_w(HOST_CS_SELECTOR, read_cs() & ~7);
+	vmcs_w(HOST_DS_SELECTOR, read_ds() & ~7);
+	vmcs_w(HOST_ES_SELECTOR, read_es() & ~7);
+	vmcs_w(HOST_SS_SELECTOR, read_ss() & ~7);
+	vmcs_w(HOST_FS_SELECTOR, read_fs() & ~7);
+	vmcs_w(HOST_GS_SELECTOR, read_gs() & ~7);
+	vmcs_w(HOST_TR_SELECTOR, tr & ~7);
+	vmcs_w(HOST_FS_BASE, __rdmsr(MSR_FS_BASE));
+	vmcs_w(HOST_GS_BASE, __rdmsr(MSR_GS_BASE));
+	vmcs_w(HOST_TR_BASE, tr_base);
+	vmcs_w(HOST_GDTR_BASE, gdt.address);
+	vmcs_w(HOST_IDTR_BASE, idt.address);
+	vmcs_w(HOST_IA32_SYSENTER_CS, __rdmsr(MSR_IA32_SYSENTER_CS));
+	vmcs_w(HOST_IA32_SYSENTER_ESP, __rdmsr(MSR_IA32_SYSENTER_ESP));
+	vmcs_w(HOST_IA32_SYSENTER_EIP, __rdmsr(MSR_IA32_SYSENTER_EIP));
+	vmcs_w(HOST_IA32_EFER, __rdmsr(MSR_EFER));
+
+	/* ---- guest state（= 当前内核状态）---- */
+	vmcs_w(GUEST_CR0, cr0);
+	vmcs_w(GUEST_CR3, cr3);
+	vmcs_w(GUEST_CR4, cr4);
+	vmcs_w(GUEST_DR7, 0x400);
+	vmcs_w(GUEST_RFLAGS, 0x2);	/* 保留位1，其余清（关中断） */
+	vmcs_w(GUEST_IA32_EFER, __rdmsr(MSR_EFER));
+
+#define SEG(pfx, selv, basev, arv)					\
+	do {								\
+		vmcs_w(GUEST_##pfx##_SELECTOR, (selv));			\
+		vmcs_w(GUEST_##pfx##_BASE, (basev));			\
+		vmcs_w(GUEST_##pfx##_LIMIT, 0xffffffff);		\
+		vmcs_w(GUEST_##pfx##_AR_BYTES, (arv));			\
+	} while (0)
+	SEG(CS, read_cs(), 0, AR_CODE64);
+	SEG(DS, read_ds(), 0, AR_DATA);
+	SEG(ES, read_es(), 0, AR_DATA);
+	SEG(SS, read_ss(), 0, AR_DATA);
+	SEG(FS, read_fs(), __rdmsr(MSR_FS_BASE), AR_DATA);
+	SEG(GS, read_gs(), __rdmsr(MSR_GS_BASE), AR_DATA);
+	SEG(TR, tr, tr_base, AR_TSS64);
+	SEG(LDTR, read_ldtr(), 0, AR_UNUSABLE);
+#undef SEG
+	vmcs_w(GUEST_TR_LIMIT, 0x67);
+	vmcs_w(GUEST_LDTR_LIMIT, 0);
+
+	vmcs_w(GUEST_GDTR_BASE, gdt.address);
+	vmcs_w(GUEST_GDTR_LIMIT, gdt.size);
+	vmcs_w(GUEST_IDTR_BASE, idt.address);
+	vmcs_w(GUEST_IDTR_LIMIT, idt.size);
+	vmcs_w(GUEST_SYSENTER_CS, __rdmsr(MSR_IA32_SYSENTER_CS));
+	vmcs_w(GUEST_SYSENTER_ESP, __rdmsr(MSR_IA32_SYSENTER_ESP));
+	vmcs_w(GUEST_SYSENTER_EIP, __rdmsr(MSR_IA32_SYSENTER_EIP));
+	vmcs_w(GUEST_ACTIVITY_STATE, 0);
+	vmcs_w(GUEST_INTERRUPTIBILITY_INFO, 0);
+	vmcs_w(GUEST_PENDING_DBG_EXCEPTIONS, 0);
 }
