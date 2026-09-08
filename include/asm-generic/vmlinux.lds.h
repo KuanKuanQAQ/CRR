@@ -588,7 +588,7 @@
 		*(.text.asan.* .text.tsan.*)				\
 	MEM_KEEP(init.text*)						\
 
-#ifdef CONFIG_CKASLR
+#if defined(CONFIG_CKASLR) || defined(CONFIG_IKASLR)
 #define TRAMP_TEXT						\
 		ALIGN_FUNCTION();					\
 		__tramp_text_start = .;					\

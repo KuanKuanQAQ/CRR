@@ -16,6 +16,7 @@ obj-$(CONFIG_USERMODE_DRIVER) += usermode_driver.o
 obj-$(CONFIG_MULTIUSER) += groups.o
 obj-$(CONFIG_VHOST_TASK) += vhost_task.o
 obj-$(CONFIG_CKASLR) += rerand.o rerand_utils.o
+obj-$(CONFIG_IKASLR) += ikaslr/
 
 ifdef CONFIG_FUNCTION_TRACER
 # Do not trace internal ftrace files

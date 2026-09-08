@@ -136,7 +136,7 @@ SECTIONS
 		*(.text..__x86.indirect_thunk)
 		*(.text..__x86.return_thunk)
 #endif
-#ifdef CONFIG_CKASLR
+#if defined(CONFIG_CKASLR) || defined(CONFIG_IKASLR)
 		. = ALIGN(PAGE_SIZE);
 		TRAMP_TEXT
 		. = ALIGN(PAGE_SIZE);

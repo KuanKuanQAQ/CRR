@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config IKASLR
+	bool "I-KASLR: continuous re-randomization of built-in kernel code"
+	depends on X86_64 || ARM64
+	help
+	  面向 built-in 内核代码的持续随机化（论文第 3 章）。以固定位置的跳板函数
+	  集中代码索引，使一次随机化只需更新 O(1) 个索引；以跳板进出计数精确追踪
+	  随机化区域内的执行流，实现无副本随机化。
+
+	  这是 I-KASLR 系统的执行机制层，第 4 章的按需触发与第 5 章的 PA 精准 CFI
+	  在其之上展开。
+
+	  实验/研究用途。若不确定，选 N。
+
+config IKASLR_DEBUG
+	bool "I-KASLR debugging output"
+	depends on IKASLR
+	help
+	  打开 I-KASLR 各阶段的诊断输出（区域边界、指针表、随机化时间分解等）。
