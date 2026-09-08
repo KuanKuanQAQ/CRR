@@ -20,6 +20,7 @@
 
 #include <linux/preempt.h>
 #include <linux/string.h>
+#include <asm/sections.h>
 
 #include "internal.h"
 #include <linux/errno.h>
@@ -446,6 +447,69 @@ static int __init test_general_function(void)
 	return 0;
 }
 
+/*
+ * S1.6：函数指针的取值语义（论文 §3.4.4）。
+ *
+ * §3.4.4 担心"函数指针指向跳板会破坏四类用法"，并提出给指针加一个固定偏移。
+ * 本测试逐条检验这四类用法在**不加任何偏移**时是否成立——因为在本实现的命名
+ * 方案下（跳板保留原函数名、位于内核代码段内），它们本来就成立。
+ */
+static int __init test_fnptr_semantics(void)
+{
+	int (*fp_add)(int, int) = ikaslr_st_add;
+	int (*fp_mul)(int, int) = ikaslr_st_mul;
+	void *before, *after;
+	int i;
+
+	/* (1) 取地址得到的就是跳板地址（固定、不随随机化改变）。*/
+	for (i = 0; i < ikaslr_nr_funcs(); i++)
+		if (!strcmp(ikaslr_tbl[i]->name, "ikaslr_st_add"))
+			break;
+	if ((void *)fp_add != ikaslr_tbl[i]->tramp) {
+		pr_err("FAIL(fnptr): &fn=%px != tramp=%px\n",
+		       fp_add, ikaslr_tbl[i]->tramp);
+		return -EINVAL;
+	}
+
+	/* (2) 落在内核代码段区间内：内核里多处会做这种范围检查。*/
+	if ((char *)fp_add < _stext || (char *)fp_add >= _etext) {
+		pr_err("FAIL(fnptr): &fn=%px outside _stext.._etext\n", fp_add);
+		return -EINVAL;
+	}
+
+	/* (3) 不同函数的指针互不相同 —— 比较/排序/以地址为键的哈希据此成立。*/
+	if (fp_add == fp_mul) {
+		pr_err("FAIL(fnptr): distinct functions share a pointer\n");
+		return -EINVAL;
+	}
+
+	/* (4) 关键性质：指针的**数值在随机化前后不变**。*/
+	before = (void *)fp_add;
+	ikaslr_defer_flush();
+	if (ikaslr_rerandomize()) {
+		pr_err("FAIL(fnptr): rerandomize failed\n");
+		return -EINVAL;
+	}
+	ikaslr_defer_flush();
+	after = (void *)(int (*)(int, int))ikaslr_st_add;
+
+	/* 经函数指针调用仍必须正确（控制流经跳板到达当前函数体）。*/
+	if (fp_add(40, 2) != 42 || fp_mul(6, 7) != 42) {
+		pr_err("FAIL(fnptr): call through pointer wrong after rerand\n");
+		return -EINVAL;
+	}
+
+	pr_info("fnptr: &fn=%px stable across rerand (%s), in _stext.._etext, %%pS=%pS\n",
+		before, before == after ? "yes" : "NO", before);
+
+	if (before != after) {
+		pr_err("FAIL(fnptr): pointer value changed across randomization\n");
+		return -EINVAL;
+	}
+	pr_info("fnptr: PASS - no offset needed; see 03-randomization.md on §3.4.4\n");
+	return 0;
+}
+
 static int __init ikaslr_selftest_init(void)
 {
 	int ret;
@@ -472,6 +536,9 @@ static int __init ikaslr_selftest_init(void)
 	if (ret)
 		return ret;
 	ret = test_general_function();
+	if (ret)
+		return ret;
+	ret = test_fnptr_semantics();
 	if (ret)
 		return ret;
 
