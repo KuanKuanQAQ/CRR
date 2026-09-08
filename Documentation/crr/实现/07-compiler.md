@@ -80,12 +80,31 @@ PASS: both calls went through the trampoline
   故只有自足函数可迁移；
 - 第 5 章的 PA 插桩。
 
-## GCC 版（`tools/ikaslr/gcc/`）
+## GCC 版（`tools/ikaslr/gcc/`，已编译并运行验证）
 
-> **本机无法编译**：缺 `gcc-11-plugin-dev`（`gcc -print-file-name=plugin` 目录下
-> 没有 `include/gcc-plugin.h`），安装需要 root。源码与 Makefile 已就位，
-> 在装有该包的机器上 `make` 即可。**因此 GCC 版尚未经过编译与运行验证**，
-> 这一点在论文与答辩中都应如实说明。
+```sh
+sudo apt install gcc-11-plugin-dev          # 版本须与所用 gcc 一致
+cd tools/ikaslr/gcc && make                 # 产出 ikaslr_gcc.so
+IKASLR_FUNCS=funcs.txt gcc -O2 -fplugin=./ikaslr_gcc.so -c t.c -o t.o
+```
+
+### 编译时补的头文件与 API
+
+- `change_decl_assembler_name` 是 `symtab` 的成员：写成 `symtab->change_decl_assembler_name(...)`；
+- `update_stmt` 在 `tree-ssa-operands.h`；改写 GIMPLE 调用需 include `gimple-ssa.h`。
+
+### 验证（用与 LLVM 版**完全相同**的测试文件）
+
+生成的跳板（x86-64，-O2）：压参数寄存器 → `call ikaslr_enter` → 恢复 →
+`call *__ikaslr_target(%rip)` 间接转移 → 保护返回值 → `call ikaslr_leave` → `ret`；
+`caller_fn` 落到 `target_fn`（跳板）。链接运行：
+
+```
+target_fn(6,7)=43 caller_fn(5)=16 enters=2 leaves=2
+PASS: both calls went through the trampoline
+```
+
+与 LLVM 版结果一致。**两个编译器插件现在都真实可编译、可运行。**
 
 安装依赖后：
 
@@ -97,4 +116,6 @@ IKASLR_FUNCS=funcs.txt gcc -O2 -fplugin=./ikaslr_gcc.so -c t.c -o t.o
 
 设计与 LLVM 版一致，但跳板以**顶层内联汇编**发出而非在 GIMPLE 中构造函数——
 后者在 GCC 里要操作 cgraph 与 GIMPLE，代价高且难以验证；前者形式固定、逐架构
-各一段，反而更贴近论文对跳板"函数体极短且形式单一"的描述。
+各一段，反而更贴近论文对跳板"函数体极短且形式单一"的描述。x86-64 跳板压/弹
+参数寄存器（rdi..r9）以保护它们越过 `ikaslr_enter`，压/弹 rax:rdx 以保护返回值
+越过 `ikaslr_leave`，6 次压栈维持 16 字节栈对齐。

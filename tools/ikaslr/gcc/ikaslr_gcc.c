@@ -35,6 +35,8 @@
 #include "attribs.h"
 #include "output.h"
 #include "varasm.h"
+#include "gimple-ssa.h"
+#include "tree-ssa-operands.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -205,7 +207,7 @@ static void ikaslr_transform_decl(tree decl, const char *name)
 		set_decl_section_name(decl, sec);
 	}
 	snprintf(body, sizeof(body), "%s_body", name);
-	change_decl_assembler_name(decl, get_identifier(body));
+	symtab->change_decl_assembler_name(decl, get_identifier(body));
 
 	ikaslr_emit_asm(name);
 }
