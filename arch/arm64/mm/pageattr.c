@@ -128,6 +128,7 @@ int set_memory_ro(unsigned long addr, int numpages)
 					__pgprot(PTE_RDONLY),
 					__pgprot(PTE_WRITE));
 }
+EXPORT_SYMBOL(set_memory_ro);
 
 int set_memory_rw(unsigned long addr, int numpages)
 {
@@ -135,6 +136,7 @@ int set_memory_rw(unsigned long addr, int numpages)
 					__pgprot(PTE_WRITE),
 					__pgprot(PTE_RDONLY));
 }
+EXPORT_SYMBOL(set_memory_rw);
 
 int set_memory_nx(unsigned long addr, int numpages)
 {
@@ -142,6 +144,7 @@ int set_memory_nx(unsigned long addr, int numpages)
 					__pgprot(PTE_PXN),
 					__pgprot(PTE_MAYBE_GP));
 }
+EXPORT_SYMBOL(set_memory_nx);
 
 int set_memory_x(unsigned long addr, int numpages)
 {
@@ -149,6 +152,7 @@ int set_memory_x(unsigned long addr, int numpages)
 					__pgprot(PTE_MAYBE_GP),
 					__pgprot(PTE_PXN));
 }
+EXPORT_SYMBOL(set_memory_x);
 
 int set_memory_valid(unsigned long addr, int numpages, int enable)
 {
