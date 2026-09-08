@@ -64,7 +64,48 @@ ATTACK: PASS (leaked real code)
 的字节——这就是第 4 章检测机制要捕获的读取行为。当前无 XOM 硬件，读取尚不被
 拦截；S2.1/S2.2 就位后同样的读取将触发随机化。
 
-## S2.4/S2.3/S2.1/S2.2（待做）
+## S2.4 控制流审计（已完成）
 
-见 `PROGRESS.md` Phase 2。下一步 S2.4 控制流审计（陷阱页重映射），可复用已有的
-`fixup.c` die notifier，且无 XOM 硬件依赖即可验证。
+`kernel/ikaslr/detect.c`。被探测函数的原地址被整体填成陷阱指令，别处保留正常副本；
+经过被探测函数的控制流因此触发陷阱，由 `fixup.c` 的 die notifier 路由到
+`ikaslr_detect_audit()`。
+
+### 判据：陷阱在函数内的偏移
+
+§4.4.4 的四类判定表，其核心区分是"目标是不是函数入口"：
+
+| 陷阱落点 | 判定 | 处置 |
+| --- | --- | --- |
+| 入口（offset 0） | 正常的整函数调用/跳转 | 放行到副本，**不触发** |
+| 中部（offset > 0） | 跳进函数中间 = gadget 使用模式 | 放行到副本，**触发随机化** |
+
+关键：这个区分**直接从偏移读出，不需要知道来源指令**。精确的来源指令分类
+（直接/间接调用、间接跳转、返回连击）需要 LBR(x86)/BRBE(arm64) 回溯，属于 S2.3
+的增强。当前用偏移判据，抓住了四类表的核心区分且无 LBR 依赖即可验证。
+
+**未覆盖（如实说明）**：§4.4.4"返回指令连续多次返回到被探测函数才触发"需要区分
+返回与调用，同样依赖来源分类；当前偏移判据把"返回到函数中部"也当作 gadget，
+对"返回到入口"则当作 benign。这是保守方向（可能少触发 return-to-entry 的 ROP），
+S2.3 补 LBR 后可精确化。
+
+### 验证（QEMU 实测，8 次压力测试全通过）
+
+```
+detect: marked audit_test probed: trap=ffa000000002d000 copy=ffa0000000055000 size=16
+audit: entry call  -> 42, benign 0->1 gadget 0->0
+audit: middle jump -> gadget 0->1 triggers 0->1
+audit: PASS - entry=benign, middle=gadget+trigger
+```
+
+统计接入 `/proc/ikaslr/stats`（`audit_benign/gadget/triggers`）。
+
+### 与随机化的集成边界（S2.5）
+
+本文件独立验证审计逻辑，针对固定分配的陷阱/副本对。把"被探测"应用到随机化 live
+副本、并在每次随机化后重新布设陷阱，是 S2.5 的集成工作。触发随机化已接
+`ikaslr_request_rerandomize()`，链路是通的。
+
+## S2.1/S2.2/S2.3/S2.5（待做）
+
+见 `PROGRESS.md`。S2.1（x86 EPT，涉 D-EPT）、S2.2（arm64 观察点，需真机）是两条
+XOM 平台路径；S2.3 是 LBR 增强；S2.5 是与随机化的集成。

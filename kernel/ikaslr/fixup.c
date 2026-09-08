@@ -63,6 +63,16 @@ static int ikaslr_die_notify(struct notifier_block *nb, unsigned long val,
 	return NOTIFY_DONE;
 #endif
 
+	/* 先看是不是落在被探测函数的陷阱区（第 4 章控制流审计）。*/
+	if (ikaslr_detect_audit(faulting, &target)) {
+#ifdef CONFIG_X86_64
+		regs->ip = target;
+#elif defined(CONFIG_ARM64)
+		regs->pc = target;
+#endif
+		return NOTIFY_STOP;
+	}
+
 	if (!ikaslr_fixup_addr(faulting, &target)) {
 		/* 不是落在退役变体里的地址：与本机制无关，交给其它处理者。*/
 		return NOTIFY_DONE;

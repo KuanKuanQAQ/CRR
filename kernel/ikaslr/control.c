@@ -38,6 +38,14 @@ static int ikaslr_stats_show(struct seq_file *m, void *v)
 	ikaslr_pool_stats(&prep_ns, &missed, &nready);
 	ikaslr_defer_stats(&dcount, &davg, &dmax);
 	ikaslr_fixup_stats(&fok, &ffail);
+	{
+		unsigned long ab, ag, at;
+
+		ikaslr_detect_stats(&ab, &ag, &at);
+		seq_printf(m, "audit_benign       %lu\n", ab);
+		seq_printf(m, "audit_gadget       %lu\n", ag);
+		seq_printf(m, "audit_triggers     %lu\n", at);
+	}
 
 	seq_printf(m, "functions          %d\n", ikaslr_nr_funcs());
 	seq_printf(m, "rand_region_bytes  %lu\n",

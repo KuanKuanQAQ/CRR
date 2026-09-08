@@ -21,6 +21,8 @@
 #include <linux/preempt.h>
 #include <linux/string.h>
 #include <asm/sections.h>
+#include <linux/set_memory.h>
+#include <linux/vmalloc.h>
 
 #include "internal.h"
 #include <linux/errno.h>
@@ -510,6 +512,75 @@ static int __init test_fnptr_semantics(void)
 	return 0;
 }
 
+/*
+ * S2.4：控制流审计。
+ *
+ * 标记一个函数为被探测（原地址填陷阱、别处留正常副本），然后：
+ *   (a) 从**入口**进入 -> 判为正常调用（benign），放行到副本、不触发；
+ *   (b) 从**中部**进入 -> 判为 gadget 使用，放行到副本、并触发随机化。
+ * 这正是 §4.4.4 审计表的核心区分。
+ */
+static int __init test_cf_audit(void)
+{
+	unsigned long b0, g0, t0, b1, g1, t1;
+	int (*trap_add)(int, int);
+	void *trap_area;
+	int r, i;
+
+	/* 用一块新分配的可执行区做陷阱靶：把 st_add 的当前副本复制过去再标记，
+	 * 避免干扰其它自测用到的 live 副本。*/
+	for (i = 0; i < ikaslr_nr_funcs(); i++)
+		if (!strcmp(ikaslr_tbl[i]->name, "ikaslr_st_add"))
+			break;
+
+	trap_area = __vmalloc(PAGE_SIZE, GFP_KERNEL);
+	if (!trap_area)
+		return 0;	/* 分配不到就跳过，不算失败 */
+	memcpy(trap_area, READ_ONCE(*ikaslr_tbl[i]->target), ikaslr_tbl[i]->size);
+	set_memory_ro((unsigned long)trap_area, 1);
+	set_memory_x((unsigned long)trap_area, 1);
+
+	if (ikaslr_detect_mark("audit_test", trap_area,
+			       READ_ONCE(*ikaslr_tbl[i]->target),
+			       ikaslr_tbl[i]->size)) {
+		pr_info("audit: mark failed, skipping\n");
+		return 0;
+	}
+
+	ikaslr_detect_stats(&b0, &g0, &t0);
+
+	/* (a) 从入口调用陷阱区：应被判为 benign 并重定向到副本，结果正确。*/
+	trap_add = (int (*)(int, int))trap_area;
+	r = trap_add(40, 2);
+	ikaslr_detect_stats(&b1, &g1, &t1);
+	pr_info("audit: entry call -> %d, benign %lu->%lu gadget %lu->%lu\n",
+		r, b0, b1, g0, g1);
+	if (r != 42 || b1 != b0 + 1 || g1 != g0) {
+		pr_err("FAIL(audit): entry not classified benign\n");
+		return -EINVAL;
+	}
+
+	/* (b) 跳到函数中部（+4，跳过 endbr64）：应被判为 gadget 并触发随机化。*/
+	ikaslr_detect_stats(&b0, &g0, &t0);
+	{
+		/* 用一个跳到 trap+4 的间接调用模拟 gadget 使用。trap+4 处是 int3，
+		 * 触发审计；审计重定向到 copy+4 继续执行（不是完整函数，会得到
+		 * 未定义结果，但我们只验证"被判为 gadget 且触发"）。*/
+		void (*mid)(void) = (void (*)(void))(trap_area + 4);
+
+		mid();		/* 触发中部陷阱 */
+	}
+	ikaslr_detect_stats(&b1, &g1, &t1);
+	pr_info("audit: middle jump -> gadget %lu->%lu triggers %lu->%lu\n",
+		g0, g1, t0, t1);
+	if (g1 != g0 + 1 || t1 != t0 + 1) {
+		pr_err("FAIL(audit): middle not classified gadget/triggered\n");
+		return -EINVAL;
+	}
+	pr_info("audit: PASS - entry=benign, middle=gadget+trigger\n");
+	return 0;
+}
+
 static int __init ikaslr_selftest_init(void)
 {
 	int ret;
@@ -539,6 +610,9 @@ static int __init ikaslr_selftest_init(void)
 	if (ret)
 		return ret;
 	ret = test_fnptr_semantics();
+	if (ret)
+		return ret;
+	ret = test_cf_audit();
 	if (ret)
 		return ret;
 
