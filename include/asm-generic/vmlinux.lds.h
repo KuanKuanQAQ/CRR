@@ -411,6 +411,20 @@
 	. = ALIGN(8);							\
 	BOUNDED_SECTION_BY(__jump_table, ___jump_table)
 
+#define TRAMP_TABLE_DATA					\
+	. = ALIGN(8);							\
+	__start_tramp_ptr_tbl = .;				\
+    KEEP(*(.data..tramp_ptr_tbl))					\
+	. = ALIGN(8);							\
+	__end_tramp_ptr_tbl = .;
+
+#define RAND_TABLE_DATA					\
+	. = ALIGN(8);							\
+	__start_rand_ptr_tbl = .;				\
+    KEEP(*(.data..rand_ptr_tbl))					\
+	. = ALIGN(8);							\
+	__end_rand_ptr_tbl = .;
+
 #ifdef CONFIG_HAVE_STATIC_CALL_INLINE
 #define STATIC_CALL_DATA						\
 	. = ALIGN(8);							\
@@ -574,6 +588,19 @@
 		*(.text.asan.* .text.tsan.*)				\
 	MEM_KEEP(init.text*)						\
 
+#ifdef CONFIG_CKASLR
+#define TRAMP_TEXT						\
+		ALIGN_FUNCTION();					\
+		__tramp_text_start = .;					\
+		KEEP(*(.tramp.text.*))						\
+		__tramp_text_end = .;
+
+#define RAND_TEXT							\
+		ALIGN_FUNCTION();					\
+		__rand_text_start = .;					\
+		KEEP(*(.rand.text.*))						\
+		__rand_text_end = .;
+#endif
 
 /* sched.text is aling to function alignment to secure we have same
  * address even at second ld pass when generating System.map */

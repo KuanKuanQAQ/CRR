@@ -136,6 +136,13 @@ SECTIONS
 		*(.text..__x86.indirect_thunk)
 		*(.text..__x86.return_thunk)
 #endif
+#ifdef CONFIG_CKASLR
+		. = ALIGN(PAGE_SIZE);
+		TRAMP_TEXT
+		. = ALIGN(PAGE_SIZE);
+		RAND_TEXT
+		. = ALIGN(PAGE_SIZE);
+#endif
 		STATIC_CALL_TEXT
 
 		ALIGN_ENTRY_TEXT_BEGIN
@@ -185,6 +192,9 @@ SECTIONS
 
 		/* rarely changed data like cpu maps */
 		READ_MOSTLY_DATA(INTERNODE_CACHE_BYTES)
+
+		TRAMP_TABLE_DATA
+		RAND_TABLE_DATA
 
 		/* End of data section */
 		_edata = .;
