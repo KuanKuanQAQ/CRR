@@ -401,6 +401,37 @@ defer: deferred 1 time(s), window avg=3181 ns max=3181 ns
 这是**有界但非零风险**的假设；S1.11 的 int3 兜底把"返回到已回收变体"从静默错误
 变成可检测事件。
 
-## S1.6、S1.7、S1.9、S1.10a/b、S1.11（待实现）
+## S1.9 控制接口与测试环境（已完成）
+
+`/proc/ikaslr/` 三个入口，供第 4 章按需触发实验与第 6 章系统级实验驱动：
+
+| 入口 | 权限 | 用途 |
+| --- | --- | --- |
+| `stats` | 0444 | 区域、变体池、随机化、推迟、兜底、白名单全部统计 |
+| `trigger` | 0200 | 写入即触发一次随机化 |
+| `layout` | 0400 | 每个函数的当前地址（**仅 CONFIG_IKASLR_DEBUG**） |
+
+> `layout` 等同于泄露随机化结果，因此只在调试配置下提供且仅 root 可读，
+> 部署配置不应启用 —— 论文写实验方法时需要说明这一点。
+
+### 最小 initramfs 测试环境
+
+`scripts/ikaslr/mkinitramfs.sh` + `tools/ikaslr/init_smoke.c`：构建一个不依赖
+busybox 或宿主 rootfs 的最小 initramfs（静态链接的 `/init`），在 QEMU 中以用户态
+驱动实验后自动关机。后续 Phase 4 的实验脚本都可复用这套环境。
+
+实测（8 次触发）：
+
+```
+rounds 6 -> 14, critical_path_ns 495-562, prepare_ns ~50000,
+variants_ready 1, rounds_missed 0, stale_fixup_fails 0
+SMOKE: layout changed = 1 / PASS
+```
+
+> 注意一个小样本产物：只有 2 个函数、4 份变体循环使用时，某个函数可能在若干轮后
+> 回到相同地址。真实规模下不成问题，但实验脚本统计"地址是否变化"时应按全部函数
+> 判断而非单个函数。
+
+## S1.6、S1.7、S1.10a/b（待实现）
 
 见 `PROGRESS.md` Phase 1。

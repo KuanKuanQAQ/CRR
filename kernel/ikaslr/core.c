@@ -347,6 +347,8 @@ static int __init ikaslr_init(void)
 		return ret;
 	}
 
+	ikaslr_control_init();		/* 接口缺失不应阻止机制本身工作 */
+
 	pr_info("registered %d randomizable function(s), rand region %lu B\n",
 		ikaslr_ntramp, rand_sz);
 	return 0;
