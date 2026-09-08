@@ -44,3 +44,18 @@ config IKASLR_EVAL_VULN
 	  绝不能进入任何可部署的构建。加载时会污染内核（TAINT）。默认且必须为 N。
 
 	  If unsure, say N.
+
+config IKASLR_XOM_EPT
+	bool "I-KASLR x86 EPT-based execute-only memory (nested hypervisor)"
+	depends on IKASLR && X86_64
+	help
+	  第 4 章 x86 平台的只执行内存路径（论文 §4.5.1）。内核启动一层薄
+	  hypervisor 把自身降为 guest，用二级地址翻译（EPT）把代码物理页设为
+	  不可读；攻击者读代码页触发 EPT violation，被捕获并触发随机化。
+
+	  作用于物理页面，因而天然覆盖该页的全部虚拟映射，避免以虚存页权限实现
+	  XOM 的多重映射绕过。
+
+	  需要 CPU 支持 VMX+EPT，且在 QEMU 下需要开启嵌套虚拟化（kvm nested=Y）。
+	  这是一个精细的底层机制，分步实现（见 04-detection.md）。研究用途，
+	  默认 N。

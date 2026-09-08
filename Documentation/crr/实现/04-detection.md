@@ -3,19 +3,54 @@
 > 对应论文第 4 章与 `PROGRESS.md` 的 Phase 2。设计依据见
 > `../设计文档/草稿/毕业论文_第4章_v4.md`。本文随实现推进增补。
 
-## 平台分工与待定项
+## 平台分工与部署模型
 
 第 4 章有两条平台路径：
 
 | 平台 | 检测机制 | 状态 |
 | --- | --- | --- |
-| x86 | 二级地址翻译（EPT）物理页级 XOM | 待做（S2.1），见下方 D-EPT |
+| x86 | 二级地址翻译（EPT）物理页级 XOM | 进行中（S2.1），嵌套 hypervisor |
 | ARM | 硬件调试观察点 | 待做（S2.2），需 ARM 真机 |
 
-**待定项 D-EPT（部署模型）**：EPT 要给"受保护内核自己关不掉的"页权限，这意味着
-受保护内核要么跑在一层薄 hypervisor 之下、要么让 XOM 强制落在 L0/KVM。在 QEMU+KVM
-里跑受保护内核（L1）、要它自己用 EPT 保护自己，需要**嵌套 EPT**；否则 XOM 逻辑
-得实现在宿主 KVM 侧。这一决策留待 S2.1，当前运行时写成平台无关。
+**D-EPT 部署模型已定（作者 2026-09-09）：嵌套 EPT。** 内核**自带**一层薄
+hypervisor 把自身降为 guest，用 EPT 施加"内核自己关不掉的"页权限。QEMU+KVM 只
+提供裸机等价的嵌套虚拟化环境，**不参与 XOM 逻辑、没有 hypercall**——真机上就是
+内核 late-launch 成 hypervisor（类似 BitVisor/SecVisor）。
+
+### x86 EPT 路径的工程性质与分步
+
+**这是一个学位论文级的子系统**，不同于前面每步都能一次干净验证的工作：它要正确
+处理所有 VM exit、多核、且一旦 VMCS 字段出错就三重故障重启。因此分步实现，每步
+独立可验证：
+
+| 步 | 内容 | 状态 |
+| --- | --- | --- |
+| S2.1a | 进入/退出 VMX root 模式（VMXON/VMXOFF 往返） | ✓ 已验证 |
+| S2.1b | 构造 EPT 页表 + VMCS，VMLAUNCH 把内核降为 self-guest | 待做 |
+| S2.1c | EPT 把代码物理页设为不可读，读触发 EPT violation 被捕获 | 待做 |
+| S2.1d | 内存池划分 + 分配器适配 + 加载期页表切换 | 待做 |
+| S2.5 | EPT violation → 控制流审计 → 触发随机化 | 待做 |
+
+### S2.1a：VMX root 模式往返（已验证）
+
+`kernel/ikaslr/xom_ept.c`，`CONFIG_IKASLR_XOM_EPT`。确认 L1 内核确实能进入 VMX
+root 模式，即嵌套虚拟化对受保护内核可用——这是后续一切的地基。
+
+流程：检查 `X86_FEATURE_VMX` → 确保 `IA32_FEAT_CTL` 启用 VMX（未锁定则锁定并启用）
+→ 分配 VMXON 区域并写入 VMCS revision id（`IA32_VMX_BASIC[30:0]`）→ 关中断 →
+置 `CR4.VMXE` → `VMXON` → `VMXOFF` → 复位。
+
+QEMU+KVM（nested=Y）实测：
+
+```
+ikaslr/ept: S2.1a OK: entered and left VMX root mode (rev=300252880, VMXON 22441 ns)
+ikaslr/ept: nested virtualization is available to the protected kernel
+```
+
+无三重故障。VMXON 延迟 22 µs（含首次进入开销；§4.6.4 的 EPT 相关延迟测量应在
+S2.1c 后补全）。
+
+## S2.2/S2.3/S2.5（待做）
 
 ## S2.6 评估用含漏洞载体（已完成）
 
@@ -105,7 +140,4 @@ audit: PASS - entry=benign, middle=gadget+trigger
 副本、并在每次随机化后重新布设陷阱，是 S2.5 的集成工作。触发随机化已接
 `ikaslr_request_rerandomize()`，链路是通的。
 
-## S2.1/S2.2/S2.3/S2.5（待做）
-
-见 `PROGRESS.md`。S2.1（x86 EPT，涉 D-EPT）、S2.2（arm64 观察点，需真机）是两条
-XOM 平台路径；S2.3 是 LBR 增强；S2.5 是与随机化的集成。
+见 `PROGRESS.md`。S2.2（arm64 观察点，需真机）；S2.3（LBR 增强）；S2.5（与随机化集成）。
