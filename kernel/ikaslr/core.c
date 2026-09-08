@@ -20,19 +20,141 @@
 #include <linux/printk.h>
 #include <linux/errno.h>
 #include <linux/sort.h>
+#include <linux/atomic.h>
+#include <linux/wait.h>
+#include <linux/delay.h>
+#include <linux/jiffies.h>
+#include <linux/preempt.h>
+#include <linux/export.h>
 
-static struct ikaslr_tramp **ikaslr_tbl;	/* 指针数组，见 ikaslr.h 说明 */
-static int ikaslr_ntramp;
+#include "internal.h"
+
+struct ikaslr_tramp **ikaslr_tbl;	/* 指针数组，见 ikaslr.h 说明 */
+int ikaslr_ntramp;
+
+/*
+ * ---- S1.3 精确线程追踪（论文 §3.4.5）----
+ *
+ * 活跃执行流集合以一个计数实现：控制流经 fixed_in 进入随机化区域时加一，
+ * 经跳板返回（fixed_out / 跳板尾部）时减一。计数为零即可确定区域内既没有
+ * 执行流在跑，也没有栈帧会返回到区域内——此时切换代码页是安全的，因而不必
+ * 保留旧代码副本（Shuffler 式方案必须保留，见 §3.2.2）。
+ *
+ * 这个信息是"免费"的：跳板本来就必须被经过。
+ */
+static atomic_t ikaslr_active = ATOMIC_INIT(0);
+static bool ikaslr_blocked;			/* 阻断标志：禁止新执行流进入 */
+static DECLARE_WAIT_QUEUE_HEAD(ikaslr_zero_wq);	/* 计数归零时唤醒随机化线程 */
+static DECLARE_WAIT_QUEUE_HEAD(ikaslr_unblock_wq);/* 放行时唤醒被挡住的执行流 */
+
+static atomic_long_t ikaslr_enters;
+static atomic_long_t ikaslr_backoffs;
+static int ikaslr_max_active;
+
+int ikaslr_active_count(void)
+{
+	return atomic_read(&ikaslr_active);
+}
+
+void ikaslr_get_stats(struct ikaslr_stats *out)
+{
+	out->enters = atomic_long_read(&ikaslr_enters);
+	out->backoffs = atomic_long_read(&ikaslr_backoffs);
+	out->max_active = READ_ONCE(ikaslr_max_active);
+}
+
+/* 等待阻断解除。可能在非抢占上下文（中断、持锁）被调用，故分两条路径。*/
+static void ikaslr_wait_unblocked(void)
+{
+	while (READ_ONCE(ikaslr_blocked)) {
+		if (preemptible())
+			wait_event(ikaslr_unblock_wq, !READ_ONCE(ikaslr_blocked));
+		else
+			cpu_relax();
+	}
+}
+
+/*
+ * 进入随机化区域。
+ *
+ * 竞态要点：不能"先查阻断标志再加一"——在这两步之间随机化线程可能置位标志并
+ * 看到计数为零，于是在本执行流已经进入的情况下开始搬移代码。因此这里先加一、
+ * 再查标志；若发现已被阻断就退出并重试。随机化线程置位标志后看到的计数，
+ * 必然已经把所有"先加一"的执行流计入。
+ */
+void ikaslr_enter(void)
+{
+	int cur;
+
+retry:
+	atomic_inc(&ikaslr_active);
+	smp_mb();			/* 加一 与 读标志 之间不得重排 */
+	if (unlikely(READ_ONCE(ikaslr_blocked))) {
+		atomic_long_inc(&ikaslr_backoffs);
+		if (atomic_dec_and_test(&ikaslr_active))
+			wake_up(&ikaslr_zero_wq);
+		ikaslr_wait_unblocked();
+		goto retry;
+	}
+
+	atomic_long_inc(&ikaslr_enters);
+	cur = atomic_read(&ikaslr_active);
+	if (cur > READ_ONCE(ikaslr_max_active))
+		WRITE_ONCE(ikaslr_max_active, cur);
+}
+EXPORT_SYMBOL_GPL(ikaslr_enter);
+
+/* 离开随机化区域；归零时唤醒等待中的随机化线程。*/
+void ikaslr_leave(void)
+{
+	if (atomic_dec_and_test(&ikaslr_active))
+		wake_up(&ikaslr_zero_wq);
+}
+EXPORT_SYMBOL_GPL(ikaslr_leave);
+
+void ikaslr_block_region(void)
+{
+	WRITE_ONCE(ikaslr_blocked, true);
+	smp_mb();			/* 置标志 先于 读计数 */
+}
+
+void ikaslr_unblock_region(void)
+{
+	WRITE_ONCE(ikaslr_blocked, false);
+	smp_mb();
+	wake_up_all(&ikaslr_unblock_wq);
+}
+
+/*
+ * 等待活跃集合变空。返回 0 表示已空，-ETIMEDOUT 表示超时。
+ * 超时是必要的：若某个执行流长时间停留在区域内（例如阻塞在 I/O 上），
+ * 随机化应当放弃本次而不是无限期挂住——放弃只损失一次随机化机会，
+ * 挂住则会拖垮系统。
+ */
+int ikaslr_wait_region_empty(unsigned int timeout_ms)
+{
+	unsigned long deadline = jiffies + msecs_to_jiffies(timeout_ms);
+
+	while (atomic_read(&ikaslr_active) != 0) {
+		if (preemptible()) {
+			if (!wait_event_timeout(ikaslr_zero_wq,
+						atomic_read(&ikaslr_active) == 0,
+						deadline - jiffies))
+				break;
+		} else {
+			if (time_after(jiffies, deadline))
+				break;
+			cpu_relax();
+		}
+	}
+	return atomic_read(&ikaslr_active) == 0 ? 0 : -ETIMEDOUT;
+}
 
 int ikaslr_nr_funcs(void)
 {
 	return ikaslr_ntramp;
 }
 EXPORT_SYMBOL_GPL(ikaslr_nr_funcs);
-
-/* ---- S1.3 线程追踪：此处仍为桩，真实实现在下一步 ---- */
-void ikaslr_enter(void) { }
-void ikaslr_leave(void) { }
 
 /*
  * 更新一个函数的 target 槽 —— 随机化时"唯一需要更新的索引"。

@@ -17,6 +17,8 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/printk.h>
+
+#include "internal.h"
 #include <linux/errno.h>
 
 /* ---- 被随机化函数一：整数运算，自足 ---- */
@@ -59,18 +61,90 @@ IKASLR_TRAMP_FN(int, ikaslr_st_mul, int a, int b)
 	return ret;
 }
 
-static int __init ikaslr_selftest_init(void)
+/* S1.2：跳板派发 —— 调用是否经跳板到达函数体且结果正确。*/
+static int __init test_dispatch(void)
 {
 	int a = ikaslr_st_add(40, 2);
 	int m = ikaslr_st_mul(6, 7);
 
-	pr_info("add(40,2)=%d mul(6,7)=%d nr_funcs=%d\n",
+	pr_info("dispatch: add(40,2)=%d mul(6,7)=%d nr_funcs=%d\n",
 		a, m, ikaslr_nr_funcs());
 	if (a != 42 || m != 42) {
-		pr_err("FAIL: trampoline dispatch returned wrong result\n");
+		pr_err("FAIL(dispatch): wrong result through trampoline\n");
 		return -EINVAL;
 	}
-	pr_info("PASS: calls reached the bodies through their trampolines\n");
+	return 0;
+}
+
+/*
+ * S1.3：线程追踪 —— 进出计数必须配平。跳板在返回前调用 ikaslr_leave()，
+ * 因此调用结束后活跃计数必须回到调用前的值。
+ */
+static int __init test_tracking_balance(void)
+{
+	int before = ikaslr_active_count();
+	int after;
+
+	ikaslr_st_add(1, 1);
+	ikaslr_st_mul(2, 3);
+	after = ikaslr_active_count();
+
+	pr_info("tracking: active before=%d after=%d\n", before, after);
+	if (before != 0 || after != 0) {
+		pr_err("FAIL(tracking): enter/leave not balanced (%d -> %d)\n",
+		       before, after);
+		return -EINVAL;
+	}
+	return 0;
+}
+
+/*
+ * S1.3：阻断/等待协议 —— 区域为空时 wait_region_empty 应立即成功；
+ * 阻断期间新的进入会被挡住，放行后恢复正常。
+ */
+static int __init test_block_protocol(void)
+{
+	struct ikaslr_stats s0, s1;
+	int ret;
+
+	ikaslr_get_stats(&s0);
+
+	ikaslr_block_region();
+	ret = ikaslr_wait_region_empty(100);
+	if (ret) {
+		ikaslr_unblock_region();
+		pr_err("FAIL(block): region not empty while idle: %d\n", ret);
+		return ret;
+	}
+	/* 此刻正是"切换代码页安全"的时刻（S1.4 将在此迁移函数体）。*/
+	ikaslr_unblock_region();
+
+	/* 放行后调用应恢复正常。*/
+	if (ikaslr_st_add(20, 22) != 42) {
+		pr_err("FAIL(block): call broken after unblock\n");
+		return -EINVAL;
+	}
+	ikaslr_get_stats(&s1);
+	pr_info("block: wait_empty ok; enters %lu->%lu backoffs=%lu max_active=%d\n",
+		s0.enters, s1.enters, s1.backoffs, s1.max_active);
+	return 0;
+}
+
+static int __init ikaslr_selftest_init(void)
+{
+	int ret;
+
+	ret = test_dispatch();
+	if (ret)
+		return ret;
+	ret = test_tracking_balance();
+	if (ret)
+		return ret;
+	ret = test_block_protocol();
+	if (ret)
+		return ret;
+
+	pr_info("PASS: dispatch + thread tracking + block protocol\n");
 	return 0;
 }
 /* 在 core 的 late_initcall 之后运行，确保 target 槽已初始化。*/

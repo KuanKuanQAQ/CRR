@@ -119,7 +119,52 @@ ikaslr/selftest: PASS: calls reached the bodies through their trampolines
 S1.4 的重定位处理或 S1.10 的 LLVM pass。这是**当前实现与论文设计之间一处真实的
 差距**，不应在论文中含糊带过。
 
-## S1.3–S1.10（待实现）
+## S1.3 精确线程追踪（已完成）
 
-见 `PROGRESS.md` Phase 1。`ikaslr_enter/leave` 目前为空桩（S1.3 补入活跃执行流
-集合），`ikaslr_rerandomize` 为空桩（S1.4/S1.5）。
+### 机制
+
+活跃执行流集合以一个原子计数实现：经 `fixed_in` 进入时加一，跳板返回前减一。
+**这个信息是免费的**——跳板本来就必须被经过（论文 §3.4.5）。计数为零即可确定
+区域内既没有执行流在跑、也没有栈帧会返回到区域内，因此可以直接切换代码页，
+不必像 Shuffler 那样保留旧副本（§3.2.2）。
+
+### 竞态：为什么先加一再查标志
+
+朴素写法"先查阻断标志、未阻断则加一"是**错的**：两步之间随机化线程可能置位
+标志并读到计数为零，于是在本执行流已经进入的情况下开始搬移代码。
+
+正确顺序是 **先加一 → 内存屏障 → 再查标志**；若发现已被阻断就减一退出、等待
+放行后重试。这样随机化线程置位标志后读到的计数，必然已经把所有"先加一"的执行
+流计入。对称地，随机化线程置位标志后也要有屏障再读计数。
+
+```
+ikaslr_enter():                    randomizer:
+    atomic_inc(active)                 WRITE_ONCE(blocked, true)
+    smp_mb()                           smp_mb()
+    if (blocked) { dec; wait; retry }  wait until active == 0
+```
+
+### 非抢占上下文
+
+`ikaslr_enter()` 可能在中断、持锁等非抢占上下文被调用，因此等待分两条路径：
+可抢占时 `wait_event()` 睡眠，否则 `cpu_relax()` 自旋。自旋会把随机化耗时转成
+中断延迟——这正是 §3.4.6 推迟随机化（S1.5）要解决的问题。
+
+### 超时
+
+`ikaslr_wait_region_empty()` 带超时。若某执行流长时间停留在区域内（例如阻塞在
+I/O 上），随机化应当**放弃本次**而不是无限期挂住：放弃只损失一次随机化机会，
+挂住会拖垮系统。
+
+### 验证（QEMU 实测）
+
+```
+ikaslr/selftest: dispatch: add(40,2)=42 mul(6,7)=42 nr_funcs=2
+ikaslr/selftest: tracking: active before=0 after=0
+ikaslr/selftest: block: wait_empty ok; enters 4->5 backoffs=0 max_active=1
+ikaslr/selftest: PASS: dispatch + thread tracking + block protocol
+```
+
+## S1.4–S1.10（待实现）
+
+见 `PROGRESS.md` Phase 1。`ikaslr_rerandomize` 仍为空桩。
