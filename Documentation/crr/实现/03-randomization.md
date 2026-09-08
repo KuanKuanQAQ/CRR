@@ -165,6 +165,62 @@ ikaslr/selftest: block: wait_empty ok; enters 4->5 backoffs=0 max_active=1
 ikaslr/selftest: PASS: dispatch + thread tracking + block protocol
 ```
 
-## S1.4–S1.10（待实现）
+## S1.4 无副本随机化（已完成）
 
-见 `PROGRESS.md` Phase 1。`ikaslr_rerandomize` 仍为空桩。
+`kernel/ikaslr/randomize.c`。一次随机化的完整流程（论文 §3.4.7）：
+
+| 步 | 动作 | 说明 |
+| --- | --- | --- |
+| 1 | 检查互斥标志 | `atomic_cmpxchg`，随机化不可嵌套（§3.4.6 策略一） |
+| 2 | 生成新布局 | Fisher-Yates 打乱函数顺序 + 函数间随机间隙（≤256 B） |
+| 3 | 分配新代码页并复制 | 此时**尚未阻断**，不影响正在执行的流；随后降为 RO+X |
+| 4 | 阻断入口并等待清空 | `ikaslr_block_region()` + `ikaslr_wait_region_empty()` |
+| 5 | **更新所有 target 槽** | **唯一的代码索引更新**，量 = 函数数，与调用点数量无关 |
+| 6/7 | 交接并放行 | 切换 `ikaslr_cur_base`，`ikaslr_unblock_region()` |
+| 8 | 使旧份不再可执行 | vmalloc 的直接 `vfree`；映像内的置 NX |
+
+### 第 8 步：无副本性质的关键
+
+**这一步容易被忽略而使"无副本"落空。** 旧份若在 vmalloc 中，`vfree` 即可
+（`VM_FLUSH_RESET_PERMS` 会复位权限）；但**首次**迁移时旧份在内核映像的
+`.rand.text` 里，无法回收——若不处理，映像中那份旧代码仍然可执行，攻击者
+依旧能把它当作 gadget 来源，随机化形同虚设。
+
+因此首次迁移后对映像内 `.rand.text` 置 NX。链接脚本已把该段按页对齐并独占整页
+（前后各有 `ALIGN(PAGE_SIZE)`），故置 NX 不会波及其它代码。之后随机化区域内
+**任一时刻只有一份可执行代码**，不存在 Shuffler 式的旧副本暴露窗口。
+
+### 超时即放弃
+
+若等待清空超时（默认 100 ms），本次随机化**放弃**并保持原状，而不是继续等待：
+放弃只损失一次随机化机会，挂住会拖垮系统。
+
+### 验证（QEMU 实测，两轮随机化）
+
+```
+ikaslr: retired in-image .rand.text (1 page(s), now NX)
+ikaslr/selftest: rerand: ikaslr_st_add ffffffff81dab000 -> ffa0000000035170,
+                         ikaslr_st_mul ffffffff81dab010 -> ffa0000000035100 (8732707 ns, round 1)
+ikaslr/selftest: rerand: second round ok, now at ffa000000002d0b0 / ffa000000002d050
+ikaslr/selftest: no-copy: all bodies left the image region
+ikaslr/selftest: PASS: dispatch + tracking + block protocol + rerandomization
+```
+
+调用者与跳板**一行未改**，函数体两次搬到全新地址后调用结果依旧正确——这就是
+需求 D1 的端到端体现。
+
+> **关于耗时**：实测单轮 3.6–8.7 ms（仅 2 个极小函数）。这个数字**几乎全部来自
+> `__vmalloc_node_range` 与 `set_memory_ro`**，而非索引更新（更新量只有 2 个槽）。
+> 论文 §3.6.4 的时间分解应据此分列，不要让读者误以为代价来自索引更新。
+> 真实规模下需要重测，并考虑预分配代码页池以摊掉分配开销。
+
+### 当前限制
+
+复制式迁移要求函数体**自足**（不含指向区域外的 PC 相对引用）。自测函数满足此
+条件（`add` 无任何 PC 相对引用；`mul` 只有函数内部的相对跳转）。一般函数含有
+对外部函数的调用与全局变量引用，搬移后会失效，需 S1.7 共享 GOT 与 S1.10 的
+LLVM 函数级 PIC 消除。**这是当前实现与论文设计之间一处真实差距。**
+
+## S1.5–S1.10（待实现）
+
+见 `PROGRESS.md` Phase 1。

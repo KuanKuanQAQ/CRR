@@ -34,4 +34,7 @@ struct ikaslr_stats {
 };
 void ikaslr_get_stats(struct ikaslr_stats *out);
 
+/* 随机化统计：上一次耗时（ns）与累计轮数（§3.6.4 时间分解）。*/
+void ikaslr_rand_stats(u64 *last_ns, unsigned long *rounds);
+
 #endif /* _KERNEL_IKASLR_INTERNAL_H */

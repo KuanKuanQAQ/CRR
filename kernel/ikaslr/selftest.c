@@ -130,6 +130,74 @@ static int __init test_block_protocol(void)
 	return 0;
 }
 
+/*
+ * S1.4：无副本随机化 —— 迁移函数体后，调用应仍然正确，且地址必须真的变了。
+ * 这是需求 D1 的端到端验证：调用者一行未改，只更新了 target 槽。
+ */
+static int __init test_rerandomize(void)
+{
+	void *a_before, *m_before, *a_after, *m_after;
+	u64 ns; unsigned long rounds;
+	int ret;
+
+	a_before = READ_ONCE(*ikaslr_tbl[0]->target);
+	m_before = READ_ONCE(*ikaslr_tbl[1]->target);
+
+	ret = ikaslr_rerandomize();
+	if (ret) {
+		pr_err("FAIL(rerand): rerandomize returned %d\n", ret);
+		return ret;
+	}
+
+	a_after = READ_ONCE(*ikaslr_tbl[0]->target);
+	m_after = READ_ONCE(*ikaslr_tbl[1]->target);
+	ikaslr_rand_stats(&ns, &rounds);
+
+	pr_info("rerand: %s %px -> %px, %s %px -> %px (%llu ns, round %lu)\n",
+		ikaslr_tbl[0]->name, a_before, a_after,
+		ikaslr_tbl[1]->name, m_before, m_after, ns, rounds);
+
+	if (a_after == a_before || m_after == m_before) {
+		pr_err("FAIL(rerand): body address did not change\n");
+		return -EINVAL;
+	}
+	/* 迁移后经同一个跳板调用，结果必须不变。*/
+	if (ikaslr_st_add(40, 2) != 42 || ikaslr_st_mul(6, 7) != 42) {
+		pr_err("FAIL(rerand): wrong result after relocation\n");
+		return -EINVAL;
+	}
+	/* 再来一轮，验证可反复随机化（含回收上一份）。*/
+	ret = ikaslr_rerandomize();
+	if (ret) {
+		pr_err("FAIL(rerand): second round returned %d\n", ret);
+		return ret;
+	}
+	if (ikaslr_st_add(1, 41) != 42 || ikaslr_st_mul(21, 2) != 42) {
+		pr_err("FAIL(rerand): wrong result after second round\n");
+		return -EINVAL;
+	}
+	pr_info("rerand: second round ok, now at %px / %px\n",
+		READ_ONCE(*ikaslr_tbl[0]->target),
+		READ_ONCE(*ikaslr_tbl[1]->target));
+
+	/*
+	 * 无副本性质（§3.6.5）：迁移后不应再存在旧代码的可执行副本。
+	 * 当前 target 必须已离开内核映像的 .rand.text 区间。
+	 */
+	for (ret = 0; ret < ikaslr_nr_funcs(); ret++) {
+		void *cur = READ_ONCE(*ikaslr_tbl[ret]->target);
+
+		if ((char *)cur >= __rand_text_start &&
+		    (char *)cur < __rand_text_end) {
+			pr_err("FAIL(no-copy): %s still inside image .rand.text\n",
+			       ikaslr_tbl[ret]->name);
+			return -EINVAL;
+		}
+	}
+	pr_info("no-copy: all bodies left the image region\n");
+	return 0;
+}
+
 static int __init ikaslr_selftest_init(void)
 {
 	int ret;
@@ -143,8 +211,11 @@ static int __init ikaslr_selftest_init(void)
 	ret = test_block_protocol();
 	if (ret)
 		return ret;
+	ret = test_rerandomize();
+	if (ret)
+		return ret;
 
-	pr_info("PASS: dispatch + thread tracking + block protocol\n");
+	pr_info("PASS: dispatch + tracking + block protocol + rerandomization\n");
 	return 0;
 }
 /* 在 core 的 late_initcall 之后运行，确保 target 槽已初始化。*/
