@@ -109,7 +109,9 @@
 2. **随机化不应在关键路径上分配内存**：新代码变体**提前准备好**，随机化时只做指针改写。原先「§3.4.6 按字面不可实现」的结论**作废** —— 是实现缺陷而非设计缺陷。→ S1.12 变体池 / 预备变体。
 3. **编译器插件要 LLVM 与 GCC 各一份**。→ S1.10 拆为 S1.10a(LLVM) / S1.10b(GCC)。
 
-下一步顺序：D-EPT 已定（嵌套 EPT）；GCC 插件已验证；S2.1a（VMXON 往返）已验证 → **S2.1b（构造 EPT+VMCS，VMLAUNCH 把内核降为 self-guest）** —— 高风险底层，一旦 VMCS 字段错即三重故障重启；分步验证 → S2.1c（EPT XOM 捕获代码读取）→ S2.1d → S2.5 → S2.2（arm64，需真机）→ Phase 3。
+下一步顺序：**EPT 方案已简化为单核量身定制**（作者确认；多核由 watchpoint 承担，理由见 `04a-ept-single-core.md`）。范围：单核 + passthrough 一切 + 只处理 CPUID/EPT-violation + 只保护静态 .rand.text，约 500 行。
+
+→ **S2.1b（EPT identity 页表 + VMCS 构造 + VMLAUNCH 把内核降为 self-guest，单核）** → S2.1c（.rand.text 设 X-only，读触发 EPT violation 被捕获）→ S2.5（violation 接控制流审计）→ S2.2（arm64 观察点，含多核，需真机）→ Phase 3。
 
 > **稳定性基线**：连续 12 次启动全部通过（含 8 次用户态触发的随机化）。修复前约 3–4/12 失败。任何改动随机化布局的修改，都应重跑这个压力测试。
 
@@ -133,6 +135,7 @@
 - 2026-09-09：S1.10a LLVM pass 完成并运行验证；发现并修正两处会静默破坏不变式的坑（内联绕过跳板、改名不重定向调用者）。S1.10b GCC 插件源码就位但本机缺 plugin-dev 无法编译。
 - 2026-09-09：S0.4/S0.5 测量脚本（实测 IBT 等价类 38,180）。S4.1 跳板微开销测量：发现 wake_up 风暴并修正（224→133 ns），新增独立的 CONFIG_IKASLR_STATS，生产配置 102 ns/次；关键结论是开销在**计数**而非间接转移（2 ns）。
 - 2026-09-09：S0.6 CVE 可模块化统计脚本，**独立复现论文表 1-2**（可模块化 7299 vs 论文 7295，子系统分布亦吻合）。Phase 0 全部完成。
+- 2026-09-09：EPT 方案定为**单核量身定制**（passthrough + 只处理 CPUID/EPT-violation）。多核 EPT 的两个本质难点（物理页级临时开读的全局窗口、EPT TLB shootdown 一致性）写入 04a-ept-single-core.md，多核测量由 watchpoint 路径承担。
 - 2026-09-09：GCC 插件编译验证通过（结果与 LLVM 版一致）。D-EPT 定为嵌套 EPT。S2.1a VMXON/VMXOFF 往返验证通过——L1 内核能进入 VMX root 模式，嵌套虚拟化对受保护内核可用。
 - 2026-09-09：S2.4 控制流审计（陷阱页重映射 + 入口/中部偏移判据），8 次压测通过；LBR 精确来源分类留待 S2.3。
 - 2026-09-09：S2.6 评估用含漏洞载体（/proc/ikaslr/attack 任意读写后门），QEMU 实测用户态读到随机化区真实代码；严格 Kconfig 门 + TAINT，仅评估。
