@@ -12,6 +12,17 @@ config IKASLR
 
 	  实验/研究用途。若不确定，选 N。
 
+config IKASLR_STATS
+	bool "I-KASLR runtime statistics"
+	depends on IKASLR
+	default y
+	help
+	  在跳板热路径上累计进入次数、最大并发数等统计量。
+
+	  实测这些统计占了跳板开销的绝大部分（§3.6.3），因此测量"生产配置"下的
+	  跳板开销时应关掉本项；它与 IKASLR_DEBUG 独立，正是为了能在开着调试
+	  接口（/proc/ikaslr/bench）的同时关掉统计。
+
 config IKASLR_DEBUG
 	bool "I-KASLR debugging output"
 	depends on IKASLR

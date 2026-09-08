@@ -95,6 +95,7 @@ int main(void)
 
 	printf("---- after 8 triggers ----\n%s", after);
 	dump("/proc/ikaslr/stats");
+	dump("/proc/ikaslr/bench");
 	printf("SMOKE: layout changed = %d\n", changed);
 	printf("SMOKE: %s\n", changed ? "PASS" : "FAIL (layout did not change)");
 

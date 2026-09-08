@@ -134,6 +134,7 @@ int __init ikaslr_control_init(void)
 	/* 布局等同于泄露随机化结果，仅调试配置提供且仅 root 可读。*/
 	if (!proc_create("layout", 0400, dir, &ikaslr_layout_ops))
 		return -ENOMEM;
+	ikaslr_bench_init(dir);		/* §3.6.3 微观开销测量 */
 #endif
 	pr_info("procfs interface at /proc/ikaslr\n");
 	return 0;

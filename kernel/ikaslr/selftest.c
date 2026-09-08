@@ -296,7 +296,11 @@ static int __init test_fixed_out(void)
 		pr_err("FAIL(whitelist): registered target rejected\n");
 		return -EINVAL;
 	}
-	if (ikaslr_whitelist_ok((void *)&ikaslr_st_external + 0x12345)) {
+	/*
+	 * 用一个纯粹的无效地址，而不是"某函数地址 + 偏移"——后者会在映像里留下
+	 * 指向函数中部的重定位，objtool 会因 IBT 规则报 "relocation to !ENDBR"。
+	 */
+	if (ikaslr_whitelist_ok((void *)0xdead000000000000UL)) {
 		pr_err("FAIL(whitelist): unlisted target accepted\n");
 		return -EINVAL;
 	}

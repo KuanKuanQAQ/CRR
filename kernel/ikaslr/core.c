@@ -93,25 +93,44 @@ retry:
 	smp_mb();			/* 加一 与 读标志 之间不得重排 */
 	if (unlikely(READ_ONCE(ikaslr_blocked))) {
 		atomic_long_inc(&ikaslr_backoffs);
-		if (atomic_dec_and_test(&ikaslr_active))
+		if (atomic_dec_and_test(&ikaslr_active) &&
+		    wq_has_sleeper(&ikaslr_zero_wq))
 			wake_up(&ikaslr_zero_wq);
 		ikaslr_wait_unblocked();
 		goto retry;
 	}
 
-	atomic_inc(&ikaslr_inside);
-	atomic_long_inc(&ikaslr_enters);
-	cur = atomic_read(&ikaslr_active);
-	if (cur > READ_ONCE(ikaslr_max_active))
-		WRITE_ONCE(ikaslr_max_active, cur);
+	/*
+	 * 以下全部是统计，不参与机制本身。实测它们在跳板热路径上占了绝大部分
+	 * 开销（§3.6.3），因此由独立的 CONFIG_IKASLR_STATS 控制——与 DEBUG 分开，
+	 * 才能在开着 /proc/ikaslr/bench 的同时关掉统计来测"生产配置"的开销。
+	 * 关掉后 enter 只剩「加一 + 屏障 + 查标志」。
+	 */
+	if (IS_ENABLED(CONFIG_IKASLR_STATS)) {
+		atomic_inc(&ikaslr_inside);
+		atomic_long_inc(&ikaslr_enters);
+		cur = atomic_read(&ikaslr_active);
+		if (cur > READ_ONCE(ikaslr_max_active))
+			WRITE_ONCE(ikaslr_max_active, cur);
+	}
 }
 EXPORT_SYMBOL_GPL(ikaslr_enter);
 
 /* 离开随机化区域；归零时唤醒等待中的随机化线程。*/
 void ikaslr_leave(void)
 {
-	atomic_dec(&ikaslr_inside);
-	if (atomic_dec_and_test(&ikaslr_active))
+	if (IS_ENABLED(CONFIG_IKASLR_STATS))
+		atomic_dec(&ikaslr_inside);
+	/*
+	 * 只有真的有人在等才唤醒。
+	 *
+	 * 无条件 wake_up() 会在每次计数归零时去拿等待队列的锁，而绝大多数时候
+	 * 根本没有随机化线程在等——实测这一处就占了跳板开销的大头（关掉统计后
+	 * 仍有 151 ns/次，改用 wq_has_sleeper 后见 §3.6.3）。
+	 * wq_has_sleeper() 自带所需的屏障，不会漏唤醒。
+	 */
+	if (atomic_dec_and_test(&ikaslr_active) &&
+	    wq_has_sleeper(&ikaslr_zero_wq))
 		wake_up(&ikaslr_zero_wq);
 }
 EXPORT_SYMBOL_GPL(ikaslr_leave);
@@ -164,8 +183,10 @@ void ikaslr_out_enter(void *target)
 		 * CFI violation（与第 5 章的 PA 验证一并处理）。
 		 */
 	}
-	atomic_dec(&ikaslr_inside);
-	if (atomic_dec_and_test(&ikaslr_active))
+	if (IS_ENABLED(CONFIG_IKASLR_STATS))
+		atomic_dec(&ikaslr_inside);
+	if (atomic_dec_and_test(&ikaslr_active) &&
+	    wq_has_sleeper(&ikaslr_zero_wq))
 		wake_up(&ikaslr_zero_wq);
 }
 EXPORT_SYMBOL_GPL(ikaslr_out_enter);
@@ -180,7 +201,8 @@ EXPORT_SYMBOL_GPL(ikaslr_out_enter);
 void ikaslr_out_leave(void)
 {
 	atomic_inc(&ikaslr_active);
-	atomic_inc(&ikaslr_inside);
+	if (IS_ENABLED(CONFIG_IKASLR_STATS))
+		atomic_inc(&ikaslr_inside);
 }
 EXPORT_SYMBOL_GPL(ikaslr_out_leave);
 

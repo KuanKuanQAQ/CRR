@@ -45,6 +45,8 @@ int ikaslr_whitelist_init(void);
 int ikaslr_pool_init(void);
 int ikaslr_fixup_init(void);
 int ikaslr_control_init(void);
+struct proc_dir_entry;
+int ikaslr_bench_init(struct proc_dir_entry *dir);
 
 /* 把落在已退役变体中的地址映射到当前变体的对应位置。异常上下文中调用。*/
 bool ikaslr_fixup_addr(unsigned long addr, unsigned long *newp);
