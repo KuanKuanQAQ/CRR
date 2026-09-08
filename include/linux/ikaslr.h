@@ -61,6 +61,7 @@ extern char __tramp_text_start[], __tramp_text_end[];
  */
 extern struct ikaslr_tramp *__start_ikaslr_tramp_tbl[], *__end_ikaslr_tramp_tbl[];
 extern void *__start_ikaslr_target[], *__end_ikaslr_target[];
+extern void *__start_ikaslr_whitelist[], *__end_ikaslr_whitelist[];
 
 /* ---- 段注解 ---- */
 #define __ikaslr_tramp_sec(fn) __section(".tramp.text." #fn) noinline
@@ -102,6 +103,36 @@ extern void *__start_ikaslr_target[], *__end_ikaslr_target[];
 /* target 槽在跳板体外的引用（例如 fixed_out 或调试代码）需要此声明。*/
 #define IKASLR_DECLARE_TARGET(fn) extern void *__ikaslr_target_##fn
 
+/*
+ * 登记一个被随机化代码调用的外部函数为合法的跨区域目标（§3.5.2）。
+ * 链接器把这些项汇总成白名单，fixed_out 在放行前查询。
+ */
+#define IKASLR_WHITELIST(fn)						\
+	static void *__ikaslr_wl_##fn					\
+		__attribute__((section(".data..ikaslr_whitelist"))) __used \
+		= (void *)fn
+
+/*
+ * fixed_out 跳板：从随机化区域离开。按 §3.4.2 依次执行
+ *   pop（记录离开随机化区域）-> 白名单检查 -> 转移 -> 返回后重新进入。
+ * 第 5 章在同一位置叠加 PA 验证。
+ */
+#define IKASLR_OUT_CALL(fn, ...)					\
+({									\
+	typeof(fn(__VA_ARGS__)) __out_ret;				\
+	ikaslr_out_enter((void *)fn);					\
+	__out_ret = fn(__VA_ARGS__);					\
+	ikaslr_out_leave();						\
+	__out_ret;							\
+})
+
+#define IKASLR_OUT_CALL_VOID(fn, ...)					\
+do {									\
+	ikaslr_out_enter((void *)fn);					\
+	fn(__VA_ARGS__);						\
+	ikaslr_out_leave();						\
+} while (0)
+
 #ifdef CONFIG_IKASLR
 
 /*
@@ -127,6 +158,17 @@ int ikaslr_rerandomize(void);
  */
 int ikaslr_request_rerandomize(void);
 
+/* 白名单查询：目标是否为编译期登记的合法跨区域目标。*/
+bool ikaslr_whitelist_ok(void *target);
+int ikaslr_whitelist_count(void);
+
+/*
+ * fixed_out 的进出。out_enter 记录"控制流离开随机化区域去执行外部函数"
+ * 并做白名单检查；out_leave 记录回到区域内。
+ */
+void ikaslr_out_enter(void *target);
+void ikaslr_out_leave(void);
+
 #else  /* !CONFIG_IKASLR */
 
 static inline void ikaslr_enter(void) { }
@@ -134,6 +176,10 @@ static inline void ikaslr_leave(void) { }
 static inline int ikaslr_nr_funcs(void) { return 0; }
 static inline int ikaslr_rerandomize(void) { return 0; }
 static inline int ikaslr_request_rerandomize(void) { return 0; }
+static inline bool ikaslr_whitelist_ok(void *target) { return true; }
+static inline int ikaslr_whitelist_count(void) { return 0; }
+static inline void ikaslr_out_enter(void *target) { }
+static inline void ikaslr_out_leave(void) { }
 
 #endif /* CONFIG_IKASLR */
 

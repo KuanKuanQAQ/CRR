@@ -253,6 +253,58 @@ static int __init test_deferred(void)
 	return 0;
 }
 
+/* 一个"外部函数"，代表随机化代码要调用的非随机化区域目标。*/
+static noinline int ikaslr_st_external(int x)
+{
+	return x + 1;
+}
+IKASLR_WHITELIST(ikaslr_st_external);
+
+/*
+ * S1.8：fixed_out 与白名单。
+ *
+ * 这里直接测机制本身，而不是从一个被随机化的函数体里发起跨区域调用——因为在
+ * LLVM pass 就绪前，含外部调用的函数体不是位置无关代码，无法被迁移（见
+ * 03-randomization.md）。等 S1.7/S1.10 之后再把两者串起来。
+ */
+static int __init test_fixed_out(void)
+{
+	int inside_before, inside_mid, inside_after;
+	int r;
+
+	if (!ikaslr_whitelist_ok((void *)ikaslr_st_external)) {
+		pr_err("FAIL(whitelist): registered target rejected\n");
+		return -EINVAL;
+	}
+	/* 一个未登记的地址必须不在白名单内。*/
+	if (ikaslr_whitelist_ok((void *)&ikaslr_st_external + 0x12345)) {
+		pr_err("FAIL(whitelist): unlisted target accepted\n");
+		return -EINVAL;
+	}
+
+	/* fixed_out 的进出应当只影响 inside，不影响 active。*/
+	inside_before = ikaslr_inside_count();
+	ikaslr_out_enter((void *)ikaslr_st_external);
+	inside_mid = ikaslr_inside_count();
+	r = ikaslr_st_external(41);
+	ikaslr_out_leave();
+	inside_after = ikaslr_inside_count();
+
+	pr_info("fixed_out: whitelist=%d entries, inside %d->%d->%d, call=%d, rejects=%lu\n",
+		ikaslr_whitelist_count(), inside_before, inside_mid,
+		inside_after, r, ikaslr_whitelist_rejects());
+
+	if (inside_mid != inside_before - 1 || inside_after != inside_before) {
+		pr_err("FAIL(fixed_out): inside accounting wrong\n");
+		return -EINVAL;
+	}
+	if (r != 42) {
+		pr_err("FAIL(fixed_out): external call returned %d\n", r);
+		return -EINVAL;
+	}
+	return 0;
+}
+
 static int __init ikaslr_selftest_init(void)
 {
 	int ret;
@@ -272,8 +324,11 @@ static int __init ikaslr_selftest_init(void)
 	ret = test_deferred();
 	if (ret)
 		return ret;
+	ret = test_fixed_out();
+	if (ret)
+		return ret;
 
-	pr_info("PASS: dispatch + tracking + block + rerandomization + deferral\n");
+	pr_info("PASS: dispatch + tracking + block + rerand + deferral + fixed_out\n");
 	return 0;
 }
 /* 在 core 的 late_initcall 之后运行，确保 target 槽已初始化。*/

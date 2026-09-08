@@ -438,7 +438,11 @@
 	. = ALIGN(8);							\
 	__start_ikaslr_target = .;					\
 	KEEP(*(.data..ikaslr_target))					\
-	__end_ikaslr_target = .;
+	__end_ikaslr_target = .;					\
+	. = ALIGN(8);							\
+	__start_ikaslr_whitelist = .;					\
+	KEEP(*(.data..ikaslr_whitelist))				\
+	__end_ikaslr_whitelist = .;
 
 #ifdef CONFIG_HAVE_STATIC_CALL_INLINE
 #define STATIC_CALL_DATA						\

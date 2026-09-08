@@ -43,6 +43,8 @@ int ikaslr_ntramp;
  * 这个信息是"免费"的：跳板本来就必须被经过。
  */
 static atomic_t ikaslr_active = ATOMIC_INIT(0);
+/* 当前真正在区域内代码中执行的流；只用于观测，不参与安全判定（见下方说明）。*/
+static atomic_t ikaslr_inside = ATOMIC_INIT(0);
 static bool ikaslr_blocked;			/* 阻断标志：禁止新执行流进入 */
 static DECLARE_WAIT_QUEUE_HEAD(ikaslr_zero_wq);	/* 计数归零时唤醒随机化线程 */
 static DECLARE_WAIT_QUEUE_HEAD(ikaslr_unblock_wq);/* 放行时唤醒被挡住的执行流 */
@@ -97,6 +99,7 @@ retry:
 		goto retry;
 	}
 
+	atomic_inc(&ikaslr_inside);
 	atomic_long_inc(&ikaslr_enters);
 	cur = atomic_read(&ikaslr_active);
 	if (cur > READ_ONCE(ikaslr_max_active))
@@ -107,10 +110,65 @@ EXPORT_SYMBOL_GPL(ikaslr_enter);
 /* 离开随机化区域；归零时唤醒等待中的随机化线程。*/
 void ikaslr_leave(void)
 {
+	atomic_dec(&ikaslr_inside);
 	if (atomic_dec_and_test(&ikaslr_active))
 		wake_up(&ikaslr_zero_wq);
 }
 EXPORT_SYMBOL_GPL(ikaslr_leave);
+
+/*
+ * ---- fixed_out：离开随机化区域（§3.4.2）----
+ *
+ * 注意这里对计数的处理，它牵涉一处必须讲清楚的不变式。
+ *
+ * ikaslr_active 计的是"会返回到随机化区域的执行流"，由 fixed_in 加一、跳板返回
+ * 前减一。随机化线程等待的正是它归零——因为 §3.4.5 的安全条件是"既没有执行流在
+ * 区域内运行，**也没有任何栈帧会返回到区域内**"。
+ *
+ * 因此 fixed_out **不减** active：随机化函数 F 经 fixed_out 调用外部函数 G 时，
+ * F 的栈帧仍在栈上，其返回地址指向 F 的函数体；若此时把 active 减到零并搬移 F，
+ * G 返回后就会跳回已失效的旧地址。
+ *
+ * fixed_out 改为维护另一个计数 inside（当前真正在区域内代码中执行的流），
+ * 它只用于观测与统计，不参与随机化的安全判定。
+ *
+ * 这一取舍与论文 §3.4.2「fixed_out 执行 pop_thread()」的字面描述不同，
+ * 详见 03-randomization.md 中的说明与两种方案的比较。
+ */
+static atomic_long_t ikaslr_wl_rejects;
+
+int ikaslr_inside_count(void)
+{
+	return atomic_read(&ikaslr_inside);
+}
+
+void ikaslr_out_enter(void *target)
+{
+	/* 白名单检查：目标必须是编译期登记的合法跨区域目标（§3.5.2）。*/
+	if (unlikely(!ikaslr_whitelist_ok(target))) {
+		atomic_long_inc(&ikaslr_wl_rejects);
+		pr_warn_ratelimited("cross-region call to unlisted target %px\n",
+				    target);
+		/*
+		 * 当前实现只告警不阻断：白名单尚未由编译器全覆盖生成，
+		 * 贸然阻断会误杀合法路径。全覆盖之后应改为拒绝并上报
+		 * CFI violation（与第 5 章的 PA 验证一并处理）。
+		 */
+	}
+	atomic_dec(&ikaslr_inside);
+}
+EXPORT_SYMBOL_GPL(ikaslr_out_enter);
+
+void ikaslr_out_leave(void)
+{
+	atomic_inc(&ikaslr_inside);
+}
+EXPORT_SYMBOL_GPL(ikaslr_out_leave);
+
+unsigned long ikaslr_whitelist_rejects(void)
+{
+	return atomic_long_read(&ikaslr_wl_rejects);
+}
 
 void ikaslr_block_region(void)
 {
@@ -254,6 +312,12 @@ static int __init ikaslr_init(void)
 			"(no annotations / LLVM pass not wired)\n");
 		return 0;
 	}
+	ret = ikaslr_whitelist_init();
+	if (ret) {
+		pr_err("whitelist init failed: %d\n", ret);
+		return ret;
+	}
+
 	pr_info("registered %d randomizable function(s), rand region %lu B\n",
 		ikaslr_ntramp, rand_sz);
 	return 0;

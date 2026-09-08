@@ -41,4 +41,10 @@ void ikaslr_rand_stats(u64 *last_ns, unsigned long *rounds);
 void ikaslr_defer_stats(unsigned long *count, u64 *avg_ns, u64 *max_ns);
 void ikaslr_defer_flush(void);
 
+int ikaslr_whitelist_init(void);
+
+/* 当前正在随机化区域**代码内**执行的流数（区别于 active：后者含会返回区域的栈帧）。*/
+int ikaslr_inside_count(void);
+unsigned long ikaslr_whitelist_rejects(void);
+
 #endif /* _KERNEL_IKASLR_INTERNAL_H */
