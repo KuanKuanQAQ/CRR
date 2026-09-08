@@ -221,6 +221,38 @@ ikaslr/selftest: PASS: dispatch + tracking + block protocol + rerandomization
 对外部函数的调用与全局变量引用，搬移后会失效，需 S1.7 共享 GOT 与 S1.10 的
 LLVM 函数级 PIC 消除。**这是当前实现与论文设计之间一处真实差距。**
 
-## S1.5–S1.10（待实现）
+## S1.5 非抢占上下文的推迟随机化（已完成）
 
-见 `PROGRESS.md` Phase 1。
+**策略一（互斥）** 已在 S1.4 以 `ikaslr_in_progress` 的 `cmpxchg` 实现，消除嵌套。
+
+**策略二（推迟而非阻塞）**：`ikaslr_request_rerandomize()` 是统一触发入口（第 4 章
+检测模块调用）。它先判断当前上下文——要求**可抢占、不在中断/软中断中、且未禁用
+中断**，三者任一不满足即置 per-CPU 推迟标志并正常返回，交由工作队列在进程上下文
+完成。
+
+### 与论文设计的一处偏差（必须如实记录）
+
+§3.4.6 与【图 3-6】把随机化本身放在**中断返回路径**上执行。**这一点按字面无法
+实现**：`ikaslr_rerandomize()` 需要分配内存（`kcalloc`、`__vmalloc_node_range`）
+并可能睡眠，而中断返回路径仍处于原子上下文。因此本实现把"安全点"落在**进程
+上下文**。
+
+要真正做到在中断返回路径上完成随机化，必须先**消除分配**：预先分配一个代码页池，
+使随机化只做拷贝与指针改写。这同时也能消掉 S1.4 实测中占绝大部分的分配开销
+（单轮 3.6–8.7 ms 几乎全是 `vmalloc` + `set_memory_ro`）。**记为 S1.9 的改进项。**
+论文行文时应改为"推迟到安全点"，并说明安全点的位置取决于随机化是否需要分配。
+
+### 验证（QEMU 实测）
+
+```
+ikaslr/selftest: defer: deferred 1 time(s), window avg=1273 ns max=1273 ns
+ikaslr/selftest: defer: in-context request executed inline
+```
+
+> **测量口径提醒**：上面 1273 ns 的推迟窗口是自测中"请求后立即 flush"测出的下界，
+> 不代表真实负载下的分布。§3.6.6 要求的推迟时长分布须在真实负载下测（S4.1）。
+
+## S1.6–S1.10（待实现）
+
+见 `PROGRESS.md` Phase 1。**注意：目前只实现了 `fixed_in`，`fixed_out`（离开随机化
+区域 + 白名单检查）尚未实现**，它同时是第 5 章 PA 验证的施加点。

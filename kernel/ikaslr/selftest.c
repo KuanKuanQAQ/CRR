@@ -18,6 +18,8 @@
 #include <linux/kernel.h>
 #include <linux/printk.h>
 
+#include <linux/preempt.h>
+
 #include "internal.h"
 #include <linux/errno.h>
 
@@ -198,6 +200,59 @@ static int __init test_rerandomize(void)
 	return 0;
 }
 
+/*
+ * S1.5：推迟随机化 —— 在非抢占上下文请求随机化必须被推迟而非就地执行，
+ * 并在回到进程上下文后完成（§3.4.6 策略二）。
+ */
+static int __init test_deferred(void)
+{
+	void *before = READ_ONCE(*ikaslr_tbl[0]->target);
+	unsigned long c0, c1;
+	u64 avg, max;
+	void *after;
+
+	ikaslr_defer_stats(&c0, &avg, &max);
+
+	/* 禁用抢占以模拟非抢占上下文（中断/持锁路径同理）。*/
+	preempt_disable();
+	ikaslr_request_rerandomize();
+	preempt_enable();
+
+	ikaslr_defer_stats(&c1, &avg, &max);
+	if (c1 != c0 + 1) {
+		pr_err("FAIL(defer): request was not deferred (%lu -> %lu)\n",
+		       c0, c1);
+		return -EINVAL;
+	}
+
+	/* 回到进程上下文后应当被执行。*/
+	ikaslr_defer_flush();
+	after = READ_ONCE(*ikaslr_tbl[0]->target);
+	ikaslr_defer_stats(&c1, &avg, &max);
+	pr_info("defer: deferred %lu time(s), window avg=%llu ns max=%llu ns\n",
+		c1, avg, max);
+
+	if (after == before) {
+		pr_err("FAIL(defer): deferred randomization did not run\n");
+		return -EINVAL;
+	}
+	if (ikaslr_st_add(40, 2) != 42 || ikaslr_st_mul(6, 7) != 42) {
+		pr_err("FAIL(defer): wrong result after deferred round\n");
+		return -EINVAL;
+	}
+
+	/* 安全点上的请求应当就地执行，不计入推迟。*/
+	ikaslr_defer_stats(&c0, &avg, &max);
+	ikaslr_request_rerandomize();
+	ikaslr_defer_stats(&c1, &avg, &max);
+	if (c1 != c0) {
+		pr_err("FAIL(defer): in-context request was deferred\n");
+		return -EINVAL;
+	}
+	pr_info("defer: in-context request executed inline\n");
+	return 0;
+}
+
 static int __init ikaslr_selftest_init(void)
 {
 	int ret;
@@ -214,8 +269,11 @@ static int __init ikaslr_selftest_init(void)
 	ret = test_rerandomize();
 	if (ret)
 		return ret;
+	ret = test_deferred();
+	if (ret)
+		return ret;
 
-	pr_info("PASS: dispatch + tracking + block protocol + rerandomization\n");
+	pr_info("PASS: dispatch + tracking + block + rerandomization + deferral\n");
 	return 0;
 }
 /* 在 core 的 late_initcall 之后运行，确保 target 槽已初始化。*/

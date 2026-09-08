@@ -121,12 +121,19 @@ void ikaslr_update_target(struct ikaslr_tramp *t, void *new_body);
  */
 int ikaslr_rerandomize(void);
 
+/*
+ * 随机化的统一触发入口（第 4 章检测模块调用）。可在任意上下文调用：
+ * 处于安全点则就地执行，否则推迟到进程上下文（§3.4.6 策略二）。
+ */
+int ikaslr_request_rerandomize(void);
+
 #else  /* !CONFIG_IKASLR */
 
 static inline void ikaslr_enter(void) { }
 static inline void ikaslr_leave(void) { }
 static inline int ikaslr_nr_funcs(void) { return 0; }
 static inline int ikaslr_rerandomize(void) { return 0; }
+static inline int ikaslr_request_rerandomize(void) { return 0; }
 
 #endif /* CONFIG_IKASLR */
 

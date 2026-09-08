@@ -30,6 +30,10 @@
 #include <linux/mm.h>
 #include <linux/atomic.h>
 #include <linux/ktime.h>
+#include <linux/workqueue.h>
+#include <linux/percpu.h>
+#include <linux/hardirq.h>
+#include <linux/preempt.h>
 
 #include "internal.h"
 
@@ -218,3 +222,94 @@ out:
 	return ret;
 }
 EXPORT_SYMBOL_GPL(ikaslr_rerandomize);
+
+
+/*
+ * ---- S1.5 非抢占上下文的推迟随机化（论文 §3.4.6）----
+ *
+ * 策略一（随机化互斥）已在 ikaslr_rerandomize() 中以 ikaslr_in_progress 实现，
+ * 消除了嵌套。本节实现策略二：推迟而非阻塞。
+ *
+ * 触发可能发生在中断处理程序、异常处理程序、持有自旋锁的临界区中。在这些
+ * 上下文里就地随机化会引发三类问题：中断延迟过长、随机化所需的锁被已禁用
+ * 中断的上下文持有而死锁、以及嵌套。因此这里不立即执行，而是置一个 per-CPU
+ * 推迟标志并正常返回，等回到安全点再执行。
+ *
+ * ------------------------------------------------------------------
+ * 与论文设计的一处偏差，必须如实记录：
+ *
+ * §3.4.6 与【图 3-6】把随机化本身放在**中断返回路径**上执行。这一点按字面
+ * 无法实现：ikaslr_rerandomize() 需要分配内存（kcalloc/__vmalloc_node_range）
+ * 并可能睡眠，而中断返回路径仍处于原子上下文。因此这里把"安全点"落在**进程
+ * 上下文**——经工作队列执行。
+ *
+ * 若要真正做到在中断返回路径上完成随机化，必须先消除分配：预先分配一个代码页
+ * 池，使随机化只做拷贝与指针改写。这同时也能消掉 S1.4 实测中占绝大部分的分配
+ * 开销（单轮 3.6–8.7 ms 几乎全是 vmalloc + set_memory_ro）。记为 S1.9 的改进项。
+ * ------------------------------------------------------------------
+ */
+
+static DEFINE_PER_CPU(bool, ikaslr_deferred);
+static atomic_long_t ikaslr_defer_count;
+static atomic_long_t ikaslr_defer_ns_total;
+static u64 ikaslr_defer_max_ns;
+
+/* 请求发起的时刻，用于统计推迟窗口长度（§3.6.6）。*/
+static u64 ikaslr_defer_req_ns;
+
+static void ikaslr_defer_work_fn(struct work_struct *w);
+static DECLARE_WORK(ikaslr_defer_work, ikaslr_defer_work_fn);
+
+/*
+ * 当前上下文能否就地随机化。
+ * 需要可抢占、不在中断/软中断中、且未禁用中断——三者任一不满足都必须推迟。
+ */
+static bool ikaslr_context_ok(void)
+{
+	return preemptible() && !in_interrupt() && !irqs_disabled();
+}
+
+static void ikaslr_defer_work_fn(struct work_struct *w)
+{
+	u64 waited = ktime_get_ns() - READ_ONCE(ikaslr_defer_req_ns);
+
+	atomic_long_add(waited, &ikaslr_defer_ns_total);
+	if (waited > READ_ONCE(ikaslr_defer_max_ns))
+		WRITE_ONCE(ikaslr_defer_max_ns, waited);
+
+	this_cpu_write(ikaslr_deferred, false);
+	ikaslr_rerandomize();
+}
+
+/*
+ * 随机化的统一入口：由第 4 章的检测模块在判定发生信息泄露时调用。
+ * 安全点就地执行，否则推迟。返回 0 表示已执行或已成功排入推迟队列。
+ */
+int ikaslr_request_rerandomize(void)
+{
+	if (ikaslr_context_ok())
+		return ikaslr_rerandomize();
+
+	/* 非抢占上下文：置推迟标志，交由工作队列在进程上下文中完成。*/
+	this_cpu_write(ikaslr_deferred, true);
+	atomic_long_inc(&ikaslr_defer_count);
+	WRITE_ONCE(ikaslr_defer_req_ns, ktime_get_ns());
+	schedule_work(&ikaslr_defer_work);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(ikaslr_request_rerandomize);
+
+/* 等待所有已推迟的随机化完成（自测与实验用）。*/
+void ikaslr_defer_flush(void)
+{
+	flush_work(&ikaslr_defer_work);
+}
+
+void ikaslr_defer_stats(unsigned long *count, u64 *avg_ns, u64 *max_ns)
+{
+	unsigned long n = atomic_long_read(&ikaslr_defer_count);
+
+	*count = n;
+	*avg_ns = n ? atomic_long_read(&ikaslr_defer_ns_total) / n : 0;
+	*max_ns = READ_ONCE(ikaslr_defer_max_ns);
+}
