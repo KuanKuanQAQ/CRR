@@ -135,6 +135,9 @@ int __init ikaslr_control_init(void)
 	if (!proc_create("layout", 0400, dir, &ikaslr_layout_ops))
 		return -ENOMEM;
 	ikaslr_bench_init(dir);		/* §3.6.3 微观开销测量 */
+#ifdef CONFIG_IKASLR_EVAL_VULN
+	ikaslr_evalvuln_init(dir);	/* §4.6.1 评估用含漏洞载体（后门） */
+#endif
 #endif
 	pr_info("procfs interface at /proc/ikaslr\n");
 	return 0;
