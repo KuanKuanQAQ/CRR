@@ -1,13 +1,10 @@
-KERNEL="../build/arch/x86/boot/bzImage"
-DRIVE="./bullseye.img"
-MNTPATH="./mnt_path/"
+#!/usr/bin/env bash
+# Same as boot.sh, but stopped at reset (-S) waiting for a debugger:
+#
+#     ./boot-S.sh
+#     gdb build/vmlinux -ex 'target remote :1234'
+set -eu
+cd "$(dirname "$0")"
+. ./config.sh
 
-sudo qemu-system-x86_64 -s -S \
-    -enable-kvm -cpu host -smp 1 \
-    -m 16G \
-    -kernel "$KERNEL" \
-    -drive file="$DRIVE",if=virtio,format=raw \
-    -fsdev local,path="$MNTPATH",security_model=mapped,id=dev-1 \
-    -device virtio-9p,fsdev=dev-1,mount_tag=mount-1 \
-    -nographic \
-    -append "kaslr console=ttyS0 root=/dev/vda earlyprintk=serial ramdisk_size=2097152"
+exec sudo "$QEMU" -s -S "${QEMU_ARGS[@]}"

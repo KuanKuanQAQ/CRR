@@ -14,6 +14,9 @@ if [ -z ${ADD_PACKAGE+x} ]; then
     ADD_PACKAGE="make,sysbench,git,vim,tmux,usbutils,tcpdump,perl,perl-modules,gcc"
 fi
 
+# Guest network interface name, see the note further down.
+NIC="${NIC:-enp0s1}"
+
 # Variables affected by options
 ARCH=$(uname -m)
 RELEASE=bullseye
@@ -165,8 +168,10 @@ fi
 # Set some defaults and enable promtless ssh to the machine for root.
 sudo sed -i '/^root/ { s/:x:/::/ }' $DIR/etc/passwd
 echo 'T0:23:respawn:/sbin/getty -L ttyS0 115200 vt100' | sudo tee -a $DIR/etc/inittab
-# 可能会需要某种修改！把enp0s1改成ip link show查询出的设备名
-printf '\nauto ens3\niface ens3 inet dhcp\n' | sudo tee -a $DIR/etc/network/interfaces
+# Guest NIC name: differs between machine types (ens3 on q35, enp0s1 on
+# arm64 virt).  Check with "ip link show" inside the guest and override:
+#     NIC=ens3 ./create-image.sh
+printf '\nauto %s\niface %s inet dhcp\n' "$NIC" "$NIC" | sudo tee -a $DIR/etc/network/interfaces
 echo '/dev/root / ext4 defaults 0 0' | sudo tee -a $DIR/etc/fstab
 echo 'debugfs /sys/kernel/debug debugfs defaults 0 0' | sudo tee -a $DIR/etc/fstab
 echo 'securityfs /sys/kernel/security securityfs defaults 0 0' | sudo tee -a $DIR/etc/fstab
