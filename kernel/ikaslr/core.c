@@ -318,6 +318,12 @@ static int __init ikaslr_init(void)
 		return ret;
 	}
 
+	ret = ikaslr_pool_init();
+	if (ret) {
+		pr_err("variant pool init failed: %d\n", ret);
+		return ret;
+	}
+
 	pr_info("registered %d randomizable function(s), rand region %lu B\n",
 		ikaslr_ntramp, rand_sz);
 	return 0;

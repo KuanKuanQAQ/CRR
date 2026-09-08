@@ -42,6 +42,10 @@ void ikaslr_defer_stats(unsigned long *count, u64 *avg_ns, u64 *max_ns);
 void ikaslr_defer_flush(void);
 
 int ikaslr_whitelist_init(void);
+int ikaslr_pool_init(void);
+
+/* 变体池统计：上次准备耗时、因无就绪变体错过的次数、当前就绪数。*/
+void ikaslr_pool_stats(u64 *prep_ns, unsigned long *missed, int *nready);
 
 /* 当前正在随机化区域**代码内**执行的流数（区别于 active：后者含会返回区域的栈帧）。*/
 int ikaslr_inside_count(void);

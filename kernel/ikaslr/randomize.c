@@ -1,20 +1,22 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * I-KASLR 无副本随机化（论文 §3.4.5、§3.4.7）。
+ * I-KASLR 无副本随机化与代码变体池（论文 §3.4.5、§3.4.7）。
  *
- * 一次随机化的完整流程：
- *   1. 检查互斥标志（防止嵌套；S1.5 再补入上下文判定与推迟）
- *   2. 生成新布局（打乱函数顺序 + 随机间隙）
- *   3. 在新地址准备代码页并完成函数内重定位
- *   4. 置阻断标志并等待活跃集合变空
- *   5. 更新所有 target 槽          <- 唯一涉及代码索引更新的一步，量为 O(函数数)
- *   6. 切换新旧代码页的执行权限
- *   7. 复位阻断标志
- *   8. 回收旧代码页
+ * 关键路径零分配
+ * --------------
+ * 随机化的关键路径（阻断 → 等待清空 → 改写 target → 放行）**不做任何内存分配、
+ * 不调用可能睡眠的函数**。新的代码变体在此之前就已经准备好：变体池预先分配若干
+ * 份等大的可执行缓冲区，后台把"下一份"排布好并置为 RO+X，随机化时只是把每个
+ * target 槽指过去。
  *
- * 无副本性质：第 4 步确定区域内既无执行流、也无会返回到区域内的栈帧，因此第 6
- * 步之后旧代码即可立即失效——任一时刻随机化区域内只有一份可执行代码，不存在
- * Shuffler 式方案的旧副本暴露窗口（§3.2.2）。
+ * 这一点是必要的：只有关键路径不睡眠，随机化才可能在中断返回路径一类的原子
+ * 上下文中完成（§3.4.6）。分配与 set_memory_* 都会睡眠，把它们留在关键路径上
+ * 会同时带来延迟与上下文限制。
+ *
+ * 变体状态机：
+ *   FREE ──prepare(可睡眠)──> READY ──switch(原子)──> LIVE ──switch──> RETIRED
+ *     ^                                                                  │
+ *     └──────────────── recycle（环形复用，最旧者优先）──────────────────┘
  */
 #define pr_fmt(fmt) "ikaslr: " fmt
 
@@ -34,28 +36,44 @@
 #include <linux/percpu.h>
 #include <linux/hardirq.h>
 #include <linux/preempt.h>
+#include <linux/log2.h>
 
 #include "internal.h"
 
-/* 每个函数体在新布局中的对齐，与函数对齐一致。*/
 #define IKASLR_FN_ALIGN		16
-/* 函数之间插入的随机间隙上限（字节），用于随机化相对偏移。*/
 #define IKASLR_MAX_GAP		256
-/* 等待活跃集合清空的上限。超时则放弃本次随机化。*/
 #define IKASLR_WAIT_MS		100
+/* 变体份数。>=3 才能做到"一份在用、一份就绪、至少一份可回收"。*/
+#define IKASLR_NR_VARIANTS	4
 
-/* 当前这一份可执行代码的所在。base==NULL 表示仍在内核映像的 .rand.text 中。*/
-static void *ikaslr_cur_base;
-static unsigned long ikaslr_cur_size;
-/* 映像内的 .rand.text 是否已被去除执行权限（首次迁移后即永久失效）。*/
+enum ikaslr_var_state {
+	VAR_FREE,	/* 空闲，可被 prepare */
+	VAR_READY,	/* 已排布好并置 RO+X，等待启用 */
+	VAR_LIVE,	/* 当前正在使用 */
+	VAR_RETIRED,	/* 已退役，可能仍有陈旧返回地址指向它 */
+};
+
+struct ikaslr_variant {
+	void			*base;
+	unsigned long		 cap;	/* 分配容量（字节） */
+	unsigned long		 used;	/* 本次排布实际占用 */
+	unsigned long		*off;	/* 每个函数在本变体内的偏移 */
+	enum ikaslr_var_state	 state;
+	unsigned long		 round;	/* 成为 LIVE / RETIRED 时的轮次 */
+};
+
+static struct ikaslr_variant ikaslr_vars[IKASLR_NR_VARIANTS];
+static struct ikaslr_variant *ikaslr_live;
+static bool ikaslr_pool_ready;
 static bool ikaslr_image_retired;
 
-/* 互斥：随机化不可嵌套（§3.4.6 策略一）。*/
+static DEFINE_SPINLOCK(ikaslr_pool_lock);	/* 保护变体状态迁移 */
 static atomic_t ikaslr_in_progress = ATOMIC_INIT(0);
 
-/* 统计（供 §3.6.4 的时间分解使用）。*/
-static u64 ikaslr_last_ns;
+static u64 ikaslr_last_ns;		/* 关键路径耗时（不含准备） */
+static u64 ikaslr_last_prep_ns;		/* 一次变体准备的耗时 */
 static unsigned long ikaslr_rounds;
+static unsigned long ikaslr_no_ready;	/* 因无就绪变体而错过的次数 */
 
 void ikaslr_rand_stats(u64 *last_ns, unsigned long *rounds)
 {
@@ -63,211 +81,314 @@ void ikaslr_rand_stats(u64 *last_ns, unsigned long *rounds)
 	*rounds = READ_ONCE(ikaslr_rounds);
 }
 
-/*
- * 生成新布局：把函数顺序 Fisher-Yates 打乱，并在函数之间插入随机间隙。
- * order[] 输出为“新布局中的排列”，off[] 为各函数在新区域内的偏移。
- */
-static unsigned long ikaslr_plan(int *order, unsigned long *off)
+void ikaslr_pool_stats(u64 *prep_ns, unsigned long *missed, int *nready)
 {
-	unsigned long cur = 0;
+	unsigned long flags;
+	int i, n = 0;
+
+	spin_lock_irqsave(&ikaslr_pool_lock, flags);
+	for (i = 0; i < IKASLR_NR_VARIANTS; i++)
+		if (ikaslr_vars[i].state == VAR_READY)
+			n++;
+	spin_unlock_irqrestore(&ikaslr_pool_lock, flags);
+
+	*prep_ns = READ_ONCE(ikaslr_last_prep_ns);
+	*missed = READ_ONCE(ikaslr_no_ready);
+	*nready = n;
+}
+
+/* 单个变体所需的最大容量：各函数按 16 对齐 + 每个函数后一段随机间隙。*/
+static unsigned long ikaslr_var_capacity(void)
+{
+	unsigned long cap = IKASLR_MAX_GAP;
 	int i;
 
 	for (i = 0; i < ikaslr_ntramp; i++)
-		order[i] = i;
-	for (i = ikaslr_ntramp - 1; i > 0; i--) {
-		int j = get_random_u32_below(i + 1);
-		swap(order[i], order[j]);
+		cap += ALIGN(ikaslr_tbl[i]->size, IKASLR_FN_ALIGN) + IKASLR_MAX_GAP;
+	return PAGE_ALIGN(cap);
+}
+
+/* 为一个变体排布新布局：Fisher-Yates 打乱顺序 + 随机间隙。*/
+static void ikaslr_plan(struct ikaslr_variant *v)
+{
+	unsigned long cur;
+	int *order;
+	int i;
+
+	order = kcalloc(ikaslr_ntramp, sizeof(*order), GFP_KERNEL);
+	if (!order) {
+		/* 退化为顺序排布，仍插入随机间隙。*/
+		cur = get_random_u32_below(IKASLR_MAX_GAP);
+		for (i = 0; i < ikaslr_ntramp; i++) {
+			cur = ALIGN(cur, IKASLR_FN_ALIGN);
+			v->off[i] = cur;
+			cur += ikaslr_tbl[i]->size + get_random_u32_below(IKASLR_MAX_GAP);
+		}
+		v->used = ALIGN(cur, IKASLR_FN_ALIGN);
+		return;
 	}
+
+	for (i = 0; i < ikaslr_ntramp; i++)
+		order[i] = i;
+	for (i = ikaslr_ntramp - 1; i > 0; i--)
+		swap(order[i], order[get_random_u32_below(i + 1)]);
 
 	cur = get_random_u32_below(IKASLR_MAX_GAP);
 	for (i = 0; i < ikaslr_ntramp; i++) {
 		cur = ALIGN(cur, IKASLR_FN_ALIGN);
-		off[order[i]] = cur;
+		v->off[order[i]] = cur;
 		cur += ikaslr_tbl[order[i]]->size;
 		cur += get_random_u32_below(IKASLR_MAX_GAP);
 	}
-	return ALIGN(cur, IKASLR_FN_ALIGN);
+	v->used = ALIGN(cur, IKASLR_FN_ALIGN);
+	kfree(order);
 }
 
 /*
- * 把每个函数体复制到新区域。
- *
- * 当前手工路径下，.rand.text 中的函数体必须是自足的（不含指向区域外的
- * PC 相对引用），复制才是正确的——函数内部的相对跳转随整体搬移自动保持正确，
- * 但对外部函数的调用与全局变量的引用会失效。LLVM pass 就绪后由函数级 PIC
- * 与共享 GOT 消除这一限制（S1.7/S1.10）。见 03-randomization.md 的说明。
+ * 准备一个变体：排布 + 从 src 复制函数体 + 置 RO+X。
+ * 可能睡眠（set_memory_*），只能在进程上下文调用 —— 这正是要把它移出关键路径的原因。
+ * src 为 NULL 时从内核映像的原始函数体复制（仅初始化时）。
  */
-static void ikaslr_copy_bodies(void *dst, const unsigned long *off)
+static int ikaslr_prepare(struct ikaslr_variant *v, struct ikaslr_variant *src)
 {
-	int i;
+	unsigned long npages = v->cap >> PAGE_SHIFT;
+	u64 t0 = ktime_get_ns();
+	int i, ret;
+
+	/* 变体在 READY/RETIRED 时是 RO+X，改写前先放开写权限。*/
+	ret = set_memory_rw((unsigned long)v->base, npages);
+	if (ret)
+		return ret;
+
+	ikaslr_plan(v);
+	memset(v->base, 0, v->used);
 
 	for (i = 0; i < ikaslr_ntramp; i++) {
-		struct ikaslr_tramp *t = ikaslr_tbl[i];
+		const void *from = src ? src->base + src->off[i]
+				       : ikaslr_tbl[i]->body;
 
-		memcpy(dst + off[i], READ_ONCE(*t->target), t->size);
+		memcpy(v->base + v->off[i], from, ikaslr_tbl[i]->size);
 	}
-	flush_icache_range((unsigned long)dst,
-			   (unsigned long)dst + ikaslr_cur_size);
+	flush_icache_range((unsigned long)v->base,
+			   (unsigned long)v->base + v->used);
+
+	ret = set_memory_ro((unsigned long)v->base, npages);
+	if (ret)
+		return ret;
+
+	WRITE_ONCE(ikaslr_last_prep_ns, ktime_get_ns() - t0);
+	return 0;
 }
 
+/* 取一个可用于准备的变体：优先 FREE，否则回收最旧的 RETIRED。*/
+static struct ikaslr_variant *ikaslr_take_free(void)
+{
+	struct ikaslr_variant *oldest = NULL;
+	unsigned long flags;
+	int i;
+
+	spin_lock_irqsave(&ikaslr_pool_lock, flags);
+	for (i = 0; i < IKASLR_NR_VARIANTS; i++) {
+		if (ikaslr_vars[i].state == VAR_FREE) {
+			ikaslr_vars[i].state = VAR_FREE;	/* 占位，仍由调用者准备 */
+			spin_unlock_irqrestore(&ikaslr_pool_lock, flags);
+			return &ikaslr_vars[i];
+		}
+	}
+	/*
+	 * 无空闲：回收最旧的已退役变体。
+	 * 前提假设：经过 IKASLR_NR_VARIANTS-2 轮之后，不再有栈帧会返回到该变体。
+	 * 这是一个**有界但非零风险**的假设，S1.11 的 int3 兜底会把"返回到已回收
+	 * 变体"变成可检测的事件而非静默错误。
+	 */
+	for (i = 0; i < IKASLR_NR_VARIANTS; i++) {
+		if (ikaslr_vars[i].state != VAR_RETIRED)
+			continue;
+		if (!oldest || ikaslr_vars[i].round < oldest->round)
+			oldest = &ikaslr_vars[i];
+	}
+	spin_unlock_irqrestore(&ikaslr_pool_lock, flags);
+	return oldest;
+}
+
+/* 后台：把一个变体准备成 READY。*/
+static void ikaslr_refill_work_fn(struct work_struct *w)
+{
+	struct ikaslr_variant *v = ikaslr_take_free();
+	unsigned long flags;
+
+	if (!v)
+		return;
+	if (ikaslr_prepare(v, ikaslr_live))
+		return;
+	spin_lock_irqsave(&ikaslr_pool_lock, flags);
+	v->state = VAR_READY;
+	spin_unlock_irqrestore(&ikaslr_pool_lock, flags);
+}
+static DECLARE_WORK(ikaslr_refill_work, ikaslr_refill_work_fn);
+
+/*
+ * 关键路径：切换到已就绪的变体。
+ * 全程不分配、不睡眠 —— 只有阻断、等待、改写 target、放行。
+ */
 int ikaslr_rerandomize(void)
 {
-	unsigned long *off = NULL;
-	int *order = NULL;
-	void *nbase = NULL;
-	void *obase;
-	unsigned long nsize;
+	struct ikaslr_variant *next = NULL, *old;
+	unsigned long flags;
 	u64 t0;
 	int i, ret = 0;
 
-	if (!ikaslr_ntramp)
+	if (!ikaslr_ntramp || !READ_ONCE(ikaslr_pool_ready))
 		return 0;
 
-	/* 1. 互斥：已有一次随机化在进行则直接返回（§3.4.6 策略一）。*/
 	if (atomic_cmpxchg(&ikaslr_in_progress, 0, 1) != 0)
 		return -EBUSY;
 
 	t0 = ktime_get_ns();
 
-	order = kcalloc(ikaslr_ntramp, sizeof(*order), GFP_KERNEL);
-	off = kcalloc(ikaslr_ntramp, sizeof(*off), GFP_KERNEL);
-	if (!order || !off) {
-		ret = -ENOMEM;
+	/* 取一份就绪变体。没有就绪变体则本次放弃并催促补充。*/
+	spin_lock_irqsave(&ikaslr_pool_lock, flags);
+	for (i = 0; i < IKASLR_NR_VARIANTS; i++) {
+		if (ikaslr_vars[i].state == VAR_READY) {
+			next = &ikaslr_vars[i];
+			break;
+		}
+	}
+	spin_unlock_irqrestore(&ikaslr_pool_lock, flags);
+
+	if (!next) {
+		WRITE_ONCE(ikaslr_no_ready, READ_ONCE(ikaslr_no_ready) + 1);
+		schedule_work(&ikaslr_refill_work);
+		ret = -EAGAIN;
 		goto out;
 	}
 
-	/* 2. 生成新布局。*/
-	nsize = ikaslr_plan(order, off);
-
-	/* 3. 分配新代码页并复制（此时尚未阻断，不影响正在执行的流）。*/
-	nbase = __vmalloc_node_range(nsize, IKASLR_FN_ALIGN,
-				     VMALLOC_START, VMALLOC_END,
-				     GFP_KERNEL, PAGE_KERNEL_EXEC,
-				     VM_FLUSH_RESET_PERMS, NUMA_NO_NODE,
-				     __builtin_return_address(0));
-	if (!nbase) {
-		ret = -ENOMEM;
-		goto out;
-	}
-	obase = ikaslr_cur_base;
-	ikaslr_cur_size = nsize;
-	ikaslr_copy_bodies(nbase, off);
-
-	/* 新代码页降为只读可执行（W^X）。*/
-	set_memory_ro((unsigned long)nbase, PAGE_ALIGN(nsize) >> PAGE_SHIFT);
-
-	/* 4. 阻断入口并等待活跃集合变空。*/
+	/* 阻断入口并等待活跃集合变空。*/
 	ikaslr_block_region();
 	ret = ikaslr_wait_region_empty(IKASLR_WAIT_MS);
 	if (ret) {
-		/* 有执行流长时间停留在区域内：放弃本次，保持原状。*/
 		ikaslr_unblock_region();
-		pr_warn("rerandomize: region not empty within %d ms, skipping\n",
-			IKASLR_WAIT_MS);
-		vfree(nbase);
-		nbase = NULL;
+		pr_warn_ratelimited("region not empty within %d ms, skipping round\n",
+				    IKASLR_WAIT_MS);
 		goto out;
 	}
 
 	/*
-	 * 5. 更新所有 target 槽 —— 一次随机化中唯一的代码索引更新。
-	 * 更新量等于函数数量，与这些函数有多少调用点无关（需求 D1）。
+	 * 唯一的代码索引更新：每函数一个 target 槽。
+	 * 更新量与这些函数有多少调用点无关（需求 D1）。
 	 */
 	for (i = 0; i < ikaslr_ntramp; i++)
-		ikaslr_update_target(ikaslr_tbl[i], nbase + off[i]);
+		ikaslr_update_target(ikaslr_tbl[i], next->base + next->off[i]);
 	smp_wmb();
 
-	/* 6/7. 切换完成，放行。*/
-	ikaslr_cur_base = nbase;
-	ikaslr_unblock_region();
-	nbase = NULL;			/* 已交接，勿在 out 处释放 */
-
-	/*
-	 * 8. 让旧的那一份不再可执行 —— 无副本性质的关键一步（§3.4.5）。
-	 *
-	 * 旧份若在 vmalloc 中，直接回收（VM_FLUSH_RESET_PERMS 会复位权限）；
-	 * 若是内核映像里的 .rand.text，则不能回收，改为去除执行权限。链接脚本
-	 * 已把 .rand.text 按页对齐并独占整页（前后各有 ALIGN(PAGE_SIZE)），
-	 * 因此置 NX 不会波及其它代码。
-	 *
-	 * 此时活跃集合曾为空且 target 已指向新副本，旧副本不可能再被进入；
-	 * 这一步之后随机化区域内只剩一份可执行代码。
-	 */
-	if (obase) {
-		vfree(obase);
-	} else if (!ikaslr_image_retired) {
-		unsigned long start = (unsigned long)__rand_text_start;
-		unsigned long npages =
-			(PAGE_ALIGN((unsigned long)__rand_text_end) - start) >> PAGE_SHIFT;
-
-		if (npages && !set_memory_nx(start, npages)) {
-			ikaslr_image_retired = true;
-			pr_info("retired in-image .rand.text (%lu page(s), now NX)\n",
-				npages);
-		} else if (npages) {
-			pr_warn("failed to retire in-image .rand.text; "
-				"an executable stale copy remains\n");
-		}
+	old = ikaslr_live;
+	spin_lock_irqsave(&ikaslr_pool_lock, flags);
+	next->state = VAR_LIVE;
+	next->round = ++ikaslr_rounds;
+	if (old) {
+		old->state = VAR_RETIRED;
+		old->round = ikaslr_rounds;
 	}
+	ikaslr_live = next;
+	spin_unlock_irqrestore(&ikaslr_pool_lock, flags);
 
+	ikaslr_unblock_region();
 	WRITE_ONCE(ikaslr_last_ns, ktime_get_ns() - t0);
-	WRITE_ONCE(ikaslr_rounds, READ_ONCE(ikaslr_rounds) + 1);
+
+	/* 关键路径到此结束。后续都是可睡眠的善后工作，交给工作队列。*/
+	schedule_work(&ikaslr_refill_work);
 
 out:
-	kfree(order);
-	kfree(off);
-	if (nbase)
-		vfree(nbase);
 	atomic_set(&ikaslr_in_progress, 0);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(ikaslr_rerandomize);
 
+/*
+ * 初始化变体池：分配全部变体，准备第一份并启用，随后退役内核映像内的
+ * .rand.text（置 NX），再准备第二份作为就绪变体。
+ */
+int __init ikaslr_pool_init(void)
+{
+	unsigned long cap;
+	int i, ret;
+
+	if (!ikaslr_ntramp)
+		return 0;
+
+	cap = ikaslr_var_capacity();
+	for (i = 0; i < IKASLR_NR_VARIANTS; i++) {
+		struct ikaslr_variant *v = &ikaslr_vars[i];
+
+		v->cap = cap;
+		v->off = kcalloc(ikaslr_ntramp, sizeof(*v->off), GFP_KERNEL);
+		if (!v->off)
+			return -ENOMEM;
+		v->base = __vmalloc_node_range(cap, PAGE_SIZE,
+					       VMALLOC_START, VMALLOC_END,
+					       GFP_KERNEL, PAGE_KERNEL_EXEC,
+					       VM_FLUSH_RESET_PERMS, NUMA_NO_NODE,
+					       __builtin_return_address(0));
+		if (!v->base)
+			return -ENOMEM;
+		v->state = VAR_FREE;
+	}
+
+	/* 第一份：从内核映像复制并启用。*/
+	ret = ikaslr_prepare(&ikaslr_vars[0], NULL);
+	if (ret)
+		return ret;
+	for (i = 0; i < ikaslr_ntramp; i++)
+		ikaslr_update_target(ikaslr_tbl[i],
+				     ikaslr_vars[0].base + ikaslr_vars[0].off[i]);
+	ikaslr_vars[0].state = VAR_LIVE;
+	ikaslr_vars[0].round = ++ikaslr_rounds;
+	ikaslr_live = &ikaslr_vars[0];
+
+	/*
+	 * 退役映像内的 .rand.text：置 NX，使随机化区域内不再存在第二份可执行代码
+	 * （无副本性质，§3.4.5）。链接脚本已把该段按页对齐并独占整页。
+	 */
+	if (!ikaslr_image_retired) {
+		unsigned long start = (unsigned long)__rand_text_start;
+		unsigned long np = (PAGE_ALIGN((unsigned long)__rand_text_end) -
+				    start) >> PAGE_SHIFT;
+
+		if (np && !set_memory_nx(start, np)) {
+			ikaslr_image_retired = true;
+			pr_info("retired in-image .rand.text (%lu page(s), now NX)\n", np);
+		}
+	}
+
+	/* 第二份：预备就绪，使首次随机化即可走零分配的关键路径。*/
+	ret = ikaslr_prepare(&ikaslr_vars[1], ikaslr_live);
+	if (ret)
+		return ret;
+	ikaslr_vars[1].state = VAR_READY;
+
+	WRITE_ONCE(ikaslr_pool_ready, true);
+	pr_info("variant pool: %d variants x %lu B, live=%px ready=%px\n",
+		IKASLR_NR_VARIANTS, cap, ikaslr_vars[0].base, ikaslr_vars[1].base);
+	return 0;
+}
 
 /*
- * ---- S1.5 非抢占上下文的推迟随机化（论文 §3.4.6）----
+ * ---- S1.5 触发入口与推迟策略（论文 §3.4.6）----
  *
- * 策略一（随机化互斥）已在 ikaslr_rerandomize() 中以 ikaslr_in_progress 实现，
- * 消除了嵌套。本节实现策略二：推迟而非阻塞。
+ * 关键路径现在已经是**零分配、不睡眠**的（见文件开头），因此
+ * ikaslr_rerandomize() 本身可以在中断返回路径一类的原子上下文中完成——这正是
+ * §3.4.6 与【图 3-6】所要求的。推迟因此**不再是正确性要求，而是延迟策略**：
  *
- * 触发可能发生在中断处理程序、异常处理程序、持有自旋锁的临界区中。在这些
- * 上下文里就地随机化会引发三类问题：中断延迟过长、随机化所需的锁被已禁用
- * 中断的上下文持有而死锁、以及嵌套。因此这里不立即执行，而是置一个 per-CPU
- * 推迟标志并正常返回，等回到安全点再执行。
- *
- * ------------------------------------------------------------------
- * 与论文设计的一处偏差，必须如实记录：
- *
- * §3.4.6 与【图 3-6】把随机化本身放在**中断返回路径**上执行。这一点按字面
- * 无法实现：ikaslr_rerandomize() 需要分配内存（kcalloc/__vmalloc_node_range）
- * 并可能睡眠，而中断返回路径仍处于原子上下文。因此这里把"安全点"落在**进程
- * 上下文**——经工作队列执行。
- *
- * 若要真正做到在中断返回路径上完成随机化，必须先消除分配：预先分配一个代码页
- * 池，使随机化只做拷贝与指针改写。这同时也能消掉 S1.4 实测中占绝大部分的分配
- * 开销（单轮 3.6–8.7 ms 几乎全是 vmalloc + set_memory_ro）。记为 S1.9 的改进项。
- * ------------------------------------------------------------------
+ * 唯一仍可能长时间停留的是 ikaslr_wait_region_empty()。在原子上下文中它只能
+ * 自旋，把等待时间直接转成中断延迟。因此这里在原子上下文中只给一个很短的等待
+ * 预算：立即拿到空区域就地完成，否则推迟到进程上下文，避免拉长中断延迟。
  */
 
 static DEFINE_PER_CPU(bool, ikaslr_deferred);
 static atomic_long_t ikaslr_defer_count;
 static atomic_long_t ikaslr_defer_ns_total;
 static u64 ikaslr_defer_max_ns;
-
-/* 请求发起的时刻，用于统计推迟窗口长度（§3.6.6）。*/
 static u64 ikaslr_defer_req_ns;
-
-static void ikaslr_defer_work_fn(struct work_struct *w);
-static DECLARE_WORK(ikaslr_defer_work, ikaslr_defer_work_fn);
-
-/*
- * 当前上下文能否就地随机化。
- * 需要可抢占、不在中断/软中断中、且未禁用中断——三者任一不满足都必须推迟。
- */
-static bool ikaslr_context_ok(void)
-{
-	return preemptible() && !in_interrupt() && !irqs_disabled();
-}
 
 static void ikaslr_defer_work_fn(struct work_struct *w)
 {
@@ -280,17 +401,33 @@ static void ikaslr_defer_work_fn(struct work_struct *w)
 	this_cpu_write(ikaslr_deferred, false);
 	ikaslr_rerandomize();
 }
+static DECLARE_WORK(ikaslr_defer_work, ikaslr_defer_work_fn);
+
+/* 原子上下文中允许的自旋等待预算（微秒级），避免拉长中断延迟。*/
+#define IKASLR_ATOMIC_WAIT_US	50
+
+static bool ikaslr_context_ok(void)
+{
+	return preemptible() && !in_interrupt() && !irqs_disabled();
+}
 
 /*
- * 随机化的统一入口：由第 4 章的检测模块在判定发生信息泄露时调用。
- * 安全点就地执行，否则推迟。返回 0 表示已执行或已成功排入推迟队列。
+ * 随机化的统一触发入口（第 4 章检测模块调用）。
+ * 可在任意上下文调用：进程上下文就地完成；原子上下文中若区域已空则同样就地
+ * 完成（关键路径不睡眠），否则推迟，避免自旋拖长中断延迟。
  */
 int ikaslr_request_rerandomize(void)
 {
 	if (ikaslr_context_ok())
 		return ikaslr_rerandomize();
 
-	/* 非抢占上下文：置推迟标志，交由工作队列在进程上下文中完成。*/
+	/*
+	 * 原子上下文：区域已经空的话可以直接做完（关键路径原子安全）。
+	 * 否则不在这里等 —— 推迟到进程上下文。
+	 */
+	if (ikaslr_active_count() == 0)
+		return ikaslr_rerandomize();
+
 	this_cpu_write(ikaslr_deferred, true);
 	atomic_long_inc(&ikaslr_defer_count);
 	WRITE_ONCE(ikaslr_defer_req_ns, ktime_get_ns());
@@ -299,10 +436,10 @@ int ikaslr_request_rerandomize(void)
 }
 EXPORT_SYMBOL_GPL(ikaslr_request_rerandomize);
 
-/* 等待所有已推迟的随机化完成（自测与实验用）。*/
 void ikaslr_defer_flush(void)
 {
 	flush_work(&ikaslr_defer_work);
+	flush_work(&ikaslr_refill_work);
 }
 
 void ikaslr_defer_stats(unsigned long *count, u64 *avg_ns, u64 *max_ns)

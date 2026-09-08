@@ -142,6 +142,8 @@ static int __init test_rerandomize(void)
 	u64 ns; unsigned long rounds;
 	int ret;
 
+	u64 prep_ns; unsigned long missed; int nready;
+
 	a_before = READ_ONCE(*ikaslr_tbl[0]->target);
 	m_before = READ_ONCE(*ikaslr_tbl[1]->target);
 
@@ -154,8 +156,10 @@ static int __init test_rerandomize(void)
 	a_after = READ_ONCE(*ikaslr_tbl[0]->target);
 	m_after = READ_ONCE(*ikaslr_tbl[1]->target);
 	ikaslr_rand_stats(&ns, &rounds);
+	ikaslr_pool_stats(&prep_ns, &missed, &nready);
+	pr_info("pool: prep=%llu ns, missed=%lu, ready=%d\n", prep_ns, missed, nready);
 
-	pr_info("rerand: %s %px -> %px, %s %px -> %px (%llu ns, round %lu)\n",
+	pr_info("rerand: %s %px -> %px, %s %px -> %px (critical path %llu ns, round %lu)\n",
 		ikaslr_tbl[0]->name, a_before, a_after,
 		ikaslr_tbl[1]->name, m_before, m_after, ns, rounds);
 
@@ -168,7 +172,8 @@ static int __init test_rerandomize(void)
 		pr_err("FAIL(rerand): wrong result after relocation\n");
 		return -EINVAL;
 	}
-	/* 再来一轮，验证可反复随机化（含回收上一份）。*/
+	/* 再来一轮，验证可反复随机化（含变体回收）。补充变体是异步的，先等它就绪。*/
+	ikaslr_defer_flush();
 	ret = ikaslr_rerandomize();
 	if (ret) {
 		pr_err("FAIL(rerand): second round returned %d\n", ret);
@@ -201,37 +206,62 @@ static int __init test_rerandomize(void)
 }
 
 /*
- * S1.5：推迟随机化 —— 在非抢占上下文请求随机化必须被推迟而非就地执行，
- * 并在回到进程上下文后完成（§3.4.6 策略二）。
+ * S1.5：触发入口与推迟策略。
+ *
+ * 关键路径已是零分配、不睡眠，因此原子上下文中**区域为空时就地完成**；
+ * 只有区域非空（否则要自旋等待、拉长中断延迟）才推迟到进程上下文。
  */
 static int __init test_deferred(void)
 {
-	void *before = READ_ONCE(*ikaslr_tbl[0]->target);
 	unsigned long c0, c1;
 	u64 avg, max;
-	void *after;
+	void *before, *after;
 
+	/* (a) 原子上下文 + 区域为空 -> 应就地完成，不计入推迟。*/
+	ikaslr_defer_flush();
 	ikaslr_defer_stats(&c0, &avg, &max);
+	before = READ_ONCE(*ikaslr_tbl[0]->target);
 
-	/* 禁用抢占以模拟非抢占上下文（中断/持锁路径同理）。*/
 	preempt_disable();
 	ikaslr_request_rerandomize();
 	preempt_enable();
 
 	ikaslr_defer_stats(&c1, &avg, &max);
+	after = READ_ONCE(*ikaslr_tbl[0]->target);
+	if (c1 != c0) {
+		pr_err("FAIL(defer): empty region in atomic ctx should run inline\n");
+		return -EINVAL;
+	}
+	if (after == before) {
+		pr_err("FAIL(defer): inline atomic randomization did not happen\n");
+		return -EINVAL;
+	}
+	pr_info("defer: atomic ctx + empty region -> inline (%px -> %px)\n",
+		before, after);
+
+	/* (b) 原子上下文 + 区域非空 -> 应推迟。用 enter() 制造一个"区域内执行流"。*/
+	ikaslr_defer_flush();
+	ikaslr_defer_stats(&c0, &avg, &max);
+	before = READ_ONCE(*ikaslr_tbl[0]->target);
+
+	ikaslr_enter();			/* 假装有执行流停留在区域内 */
+	preempt_disable();
+	ikaslr_request_rerandomize();
+	preempt_enable();
+	ikaslr_defer_stats(&c1, &avg, &max);
+	ikaslr_leave();			/* 执行流离开，推迟的那次即可完成 */
+
 	if (c1 != c0 + 1) {
-		pr_err("FAIL(defer): request was not deferred (%lu -> %lu)\n",
+		pr_err("FAIL(defer): non-empty region in atomic ctx should defer (%lu->%lu)\n",
 		       c0, c1);
 		return -EINVAL;
 	}
 
-	/* 回到进程上下文后应当被执行。*/
 	ikaslr_defer_flush();
 	after = READ_ONCE(*ikaslr_tbl[0]->target);
 	ikaslr_defer_stats(&c1, &avg, &max);
 	pr_info("defer: deferred %lu time(s), window avg=%llu ns max=%llu ns\n",
 		c1, avg, max);
-
 	if (after == before) {
 		pr_err("FAIL(defer): deferred randomization did not run\n");
 		return -EINVAL;
@@ -240,16 +270,6 @@ static int __init test_deferred(void)
 		pr_err("FAIL(defer): wrong result after deferred round\n");
 		return -EINVAL;
 	}
-
-	/* 安全点上的请求应当就地执行，不计入推迟。*/
-	ikaslr_defer_stats(&c0, &avg, &max);
-	ikaslr_request_rerandomize();
-	ikaslr_defer_stats(&c1, &avg, &max);
-	if (c1 != c0) {
-		pr_err("FAIL(defer): in-context request was deferred\n");
-		return -EINVAL;
-	}
-	pr_info("defer: in-context request executed inline\n");
 	return 0;
 }
 
@@ -264,8 +284,8 @@ IKASLR_WHITELIST(ikaslr_st_external);
  * S1.8：fixed_out 与白名单。
  *
  * 这里直接测机制本身，而不是从一个被随机化的函数体里发起跨区域调用——因为在
- * LLVM pass 就绪前，含外部调用的函数体不是位置无关代码，无法被迁移（见
- * 03-randomization.md）。等 S1.7/S1.10 之后再把两者串起来。
+ * 编译器插件就绪前，含外部调用的函数体不是位置无关代码，无法被迁移（见
+ * 03-randomization.md）。等 S1.10a/b 之后再把两者串起来。
  */
 static int __init test_fixed_out(void)
 {
@@ -276,13 +296,11 @@ static int __init test_fixed_out(void)
 		pr_err("FAIL(whitelist): registered target rejected\n");
 		return -EINVAL;
 	}
-	/* 一个未登记的地址必须不在白名单内。*/
 	if (ikaslr_whitelist_ok((void *)&ikaslr_st_external + 0x12345)) {
 		pr_err("FAIL(whitelist): unlisted target accepted\n");
 		return -EINVAL;
 	}
 
-	/* fixed_out 的进出应当只影响 inside，不影响 active。*/
 	inside_before = ikaslr_inside_count();
 	ikaslr_out_enter((void *)ikaslr_st_external);
 	inside_mid = ikaslr_inside_count();
