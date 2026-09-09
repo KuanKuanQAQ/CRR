@@ -181,6 +181,13 @@ SECTIONS
 			KPROBES_TEXT
 			HYPERVISOR_TEXT
 			*(.gnu.warning)
+#if defined(CONFIG_CKASLR) || defined(CONFIG_IKASLR)
+		. = ALIGN(PAGE_SIZE);
+		IKASLR_TRAMP_TEXT
+		. = ALIGN(PAGE_SIZE);
+		IKASLR_RAND_TEXT
+		. = ALIGN(PAGE_SIZE);
+#endif
 	}
 
 	. = ALIGN(SEGMENT_ALIGN);
@@ -288,6 +295,13 @@ SECTIONS
 	_data = .;
 	_sdata = .;
 	RW_DATA(L1_CACHE_BYTES, PAGE_SIZE, THREAD_ALIGN)
+
+	/* I-KASLR 指针表与跳板表（须可写以便运行时更新 target 槽）。*/
+	.data..ikaslr : {
+		TRAMP_TABLE_DATA
+		RAND_TABLE_DATA
+		IKASLR_TABLE_DATA
+	}
 
 	/*
 	 * Data written with the MMU off but read with the MMU on requires

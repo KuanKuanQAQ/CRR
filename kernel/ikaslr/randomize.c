@@ -47,15 +47,7 @@
 /* 变体份数。>=3 才能做到"一份在用、一份就绪、至少一份可回收"。*/
 #define IKASLR_NR_VARIANTS	4
 
-/*
- * 退役变体的填充字节（方案 B）。执行到它即产生异常，由 fixup 把 PC 指向新位置。
- * x86-64 用 int3（0xCC，单字节陷阱）；arm64 用 UDF #0（0x00000000）。
- */
-#ifdef CONFIG_X86_64
-#define IKASLR_POISON_BYTE	0xcc
-#else
-#define IKASLR_POISON_BYTE	0x00
-#endif
+
 
 enum ikaslr_var_state {
 	VAR_FREE,	/* 空闲，可被 prepare */
@@ -289,7 +281,7 @@ static int ikaslr_poison(struct ikaslr_variant *v)
 	ret = ikaslr_make_writable(v->base, npages);
 	if (ret)
 		return ret;
-	memset(v->base, IKASLR_POISON_BYTE, v->used);
+	ikaslr_fill_traps(v->base, v->used);
 	flush_icache_range((unsigned long)v->base,
 			   (unsigned long)v->base + v->used);
 	/* 保持可执行：必须能执行到陷阱指令才会触发 fixup。*/

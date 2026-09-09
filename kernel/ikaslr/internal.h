@@ -44,6 +44,7 @@ void ikaslr_defer_flush(void);
 int ikaslr_whitelist_init(void);
 int ikaslr_pool_init(void);
 int ikaslr_fixup_init(void);
+void ikaslr_fill_traps(void *base, size_t len);
 int ikaslr_control_init(void);
 extern int ikaslr_rf_counter;
 int ikaslr_rf_general(int a);

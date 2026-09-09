@@ -37,12 +37,6 @@
 
 #include "internal.h"
 
-#ifdef CONFIG_X86_64
-#define IKASLR_TRAP_BYTE	0xcc	/* int3 */
-#else
-#define IKASLR_TRAP_BYTE	0x00	/* udf #0 */
-#endif
-
 #define IKASLR_MAX_PROBED	16
 /* 连续多少次"返回到被探测函数"算作 ROP 特征（§4.4.4 返回指令一行）。*/
 #define IKASLR_RET_STREAK	3
@@ -105,7 +99,7 @@ int ikaslr_detect_mark(const char *name, void *trap_at, void *copy_src,
 
 		set_memory_nx(ta, tp);
 		set_memory_rw(ta, tp);
-		memset(trap_at, IKASLR_TRAP_BYTE, size);
+		ikaslr_fill_traps(trap_at, size);
 		flush_icache_range((unsigned long)trap_at,
 				   (unsigned long)trap_at + size);
 		set_memory_ro(ta, tp);

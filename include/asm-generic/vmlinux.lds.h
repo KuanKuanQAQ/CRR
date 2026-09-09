@@ -608,13 +608,15 @@
 	MEM_KEEP(init.text*)						\
 
 #if defined(CONFIG_CKASLR) || defined(CONFIG_IKASLR)
-#define TRAMP_TEXT						\
+/* I-KASLR 随机化区域与跳板区域。宏名带 IKASLR_ 前缀以避免与 arm64 自有的
+ * TRAMP_TEXT（KPTI 入口跳板）冲突。段名与边界符号保持不变。*/
+#define IKASLR_TRAMP_TEXT					\
 		ALIGN_FUNCTION();					\
 		__tramp_text_start = .;					\
 		KEEP(*(.tramp.text.*))						\
 		__tramp_text_end = .;
 
-#define RAND_TEXT							\
+#define IKASLR_RAND_TEXT						\
 		ALIGN_FUNCTION();					\
 		__rand_text_start = .;					\
 		KEEP(*(.rand.text.*))						\

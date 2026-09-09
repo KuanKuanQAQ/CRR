@@ -56,6 +56,7 @@
 | ID | 步骤 | 状态 | 提交 | 备注 |
 | --- | --- | :-: | --- | --- |
 | S2.1 | x86 EPT 物理页级 XOM（嵌套 hypervisor，单核量身定制） | [q] | ✓ | **a/b/c/d 全部验证**：self-guest + XOM 生效 + 10万次 exit/VMRESUME 循环稳固 |
+| S1.arm | arm64 链接 wiring + BRK 陷阱机制（Phase 1 双平台使能） | [q] | ✓ | arm64 QEMU TCG 全 selftest+audit+SMOKE PASS |
 | S2.2 | ARM 观察点 XOM（DBGWCR MASK、per-cpu、hw_breakpoint 协调） | [ ] | | 第4.5.2 节；并入 hw_breakpoint 模块；R-42 |
 | S2.3 | 多源检测（代码读取处理、执行试探 LBR 回溯、控制流异常） | [ ] | | 第4.4.3 节 |
 | S2.4 | 控制流审计（陷阱页重映射 + 入口/中部判据） | [q] | ✓ | 8 次压测通过；LBR 精确分类留 S2.3 |
@@ -126,6 +127,10 @@ x86 EPT 的**检测机制已完整验证**。剩余两类工作性质不同：
 
 其余可插空做的：S2.3（LBR 精确来源分类，增强 detect.c）。
 
+**arm64 已使能**（2026-09-09）：链接 wiring + BRK+break-hook 陷阱机制；Phase 1 全部机制
+与控制流审计在 QEMU TCG 上双平台通过。这解锁了 **Phase 3（第5章 PA CFI）** 与 S2.2
+（观察点）。下一步优先做 Phase 3 PA CFI（最大的未完成安全机制）。
+
 ### 稳定性基线
 连续 12 次启动全部通过（含用户态触发的随机化）。**任何改动随机化布局的修改都应重跑这个
 多次启动压力测试**——随机化本身带随机性，单次跑通测不出布局竞态。
@@ -162,6 +167,7 @@ x86 EPT 的**检测机制已完整验证**。剩余两类工作性质不同：
 - 2026-09-09：EPT 方案定为**单核量身定制**（passthrough + 只处理 CPUID/EPT-violation）。多核 EPT 的两个本质难点（物理页级临时开读的全局窗口、EPT TLB shootdown 一致性）写入 04a-ept-single-core.md，多核测量由 watchpoint 路径承担。
 - 2026-09-09：GCC 插件编译验证通过（结果与 LLVM 版一致）。D-EPT 定为嵌套 EPT。S2.1a VMXON/VMXOFF 往返验证通过——L1 内核能进入 VMX root 模式，嵌套虚拟化对受保护内核可用。
 - 2026-09-09：S2.4 控制流审计（陷阱页重映射 + 入口/中部偏移判据），8 次压测通过；LBR 精确来源分类留待 S2.3。
+- 2026-09-09：**arm64 平台使能**——链接脚本 wiring（IKASLR_ 前缀避开 arm64 自有 TRAMP_TEXT）+ arm64 用 BRK+内核 break hook 做陷阱（不用 UDF+die，会 oops+污染）。QEMU TCG 上 Phase 1 全机制 + 控制流审计双平台 PASS。解锁 Chapter 5 PA CFI。
 - 2026-09-09：移除评估用含漏洞载体（evalvuln.c + init_attack.c，S2.6）——dual-use 攻击面代码，从仓库删除；检测机制的验证改由内核内自测驱动，不依赖用户态后门。
 - 2026-09-09：S1.6 核实函数指针取值语义——跳板保留原函数名且在代码段内，四类用法本就成立，**论文 §3.4.4 的固定偏移不必要且有害**（`+0x1000` 恰好指进 .rand.text），建议改写。
 - 2026-09-09：S1.7 一般函数可迁移（x86 用 -mcmodel=large -fno-pic 绝对寻址）。**发现并修正 Fisher-Yates 洗牌的宏参数重复求值 bug**（间歇性布局重叠，3–4/12 失败 → 12/12 通过），以及拷贝源竞态与旧副本暴露窗口。记录 arm64 与 x86 的架构差异（GOT 在 arm64 是刚需）。

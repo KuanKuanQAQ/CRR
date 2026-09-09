@@ -388,6 +388,7 @@ int ikaslr_rf_helper(int x)
 	return x * 2;
 }
 
+#if IS_ENABLED(CONFIG_X86_64)  /* 一般函数迁移目前用 x86 -mcmodel=large，见 randfuncs.c */
 /*
  * S1.6/S1.7：一般函数的可迁移性。
  *
@@ -456,6 +457,8 @@ static int __init test_general_function(void)
  * 本测试逐条检验这四类用法在**不加任何偏移**时是否成立——因为在本实现的命名
  * 方案下（跳板保留原函数名、位于内核代码段内），它们本来就成立。
  */
+#endif /* CONFIG_X86_64 */
+
 static int __init test_fnptr_semantics(void)
 {
 	int (*fp_add)(int, int) = ikaslr_st_add;
@@ -606,9 +609,11 @@ static int __init ikaslr_selftest_init(void)
 	ret = test_stale_return();
 	if (ret)
 		return ret;
+#if IS_ENABLED(CONFIG_X86_64)
 	ret = test_general_function();
 	if (ret)
 		return ret;
+#endif
 	ret = test_fnptr_semantics();
 	if (ret)
 		return ret;
