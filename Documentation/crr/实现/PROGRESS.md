@@ -81,9 +81,9 @@
 | S4.1 | 第3章实验：跳板微开销（§3.6.3）+ **D1 索引收敛（§3.6.2）**；时间分解/非抢占待补 | [~] | ✓ | 微开销 102ns；D1 收敛 78.9%（4函数，逼近 96.9%）|
 | S4.2 | 第4章：检测覆盖率、误报率、触发延迟分布、gadget 可用性、内存开销 | [ ] | | 4.6 节 |
 | S4.3 | 第5章：**CFI 精度分布已测**（kCFI 最大等价类 2139 vs 本文 1）；PA 降幅/收敛/拦截待补 | [~] | ✓ | `scripts/ikaslr/results/cfi-precision.md` |
-| S4.4 | E3 四档端到端开销 runner（Base/+R/+RD/+RDP） | [ ] | | 6.5 节 |
-| S4.5 | E4 LMBench / E5 SPEC CPU2006 runner | [ ] | | 6.5 节 |
-| S4.6 | E6/E7 网络/存储负载 runner；E8 Adelie/Dbox 对比 | [ ] | | 6.6 节；R-64 |
+| S4.4 | E3 四档端到端 runner | [~] | ✓ | gen-configs.sh + run-suite.sh + analyze.py，待真机 |
+| S4.5 | E4 LMBench / E5 SPEC runner | [~] | ✓ | run-suite.sh 含 LMBench/SPEC替代；SPEC 需授权 |
+| S4.6 | E6/E7 网络/存储 runner；E8 对比 | [~] | ✓ | **完整测试方案 + 脚本就绪**（`10-perf-plan.md` + `scripts/ikaslr/perf/`），待真机跑 |
 | S4.7 | E9 频率敏感性、E10 范围敏感性 | [ ] | | 6.7 节 |
 | S4.8 | E11 真实 CVE 攻击链拦截 | [ ] | | 6.8 节 |
 | S4.9 | E12 开销来源归因 | [ ] | | 6.9 节 |

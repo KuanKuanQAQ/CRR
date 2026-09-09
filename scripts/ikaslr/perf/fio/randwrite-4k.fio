@@ -1,0 +1,13 @@
+[global]
+ioengine=libaio
+direct=1
+runtime=30
+time_based=1
+group_reporting=1
+[randwrite-4k]
+rw=randwrite
+bs=4k
+iodepth=32
+numjobs=4
+size=2G
+filename=/tmp/fio-test.dat
