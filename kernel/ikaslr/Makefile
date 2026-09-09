@@ -2,7 +2,6 @@
 obj-$(CONFIG_IKASLR) += core.o randomize.o whitelist.o fixup.o control.o detect.o
 obj-$(CONFIG_IKASLR_XOM_EPT) += xom_ept.o
 obj-$(CONFIG_IKASLR_DEBUG) += selftest.o bench.o
-obj-$(CONFIG_IKASLR_EVAL_VULN) += evalvuln.o
 
 # 可迁移的一般函数必须避免任何指向区域外的 PC 相对引用（见 randfuncs.c 开头）。
 # x86-64: -mcmodel=large -fno-pic 把外部引用编成 64 位绝对地址。

@@ -50,7 +50,6 @@ int ikaslr_rf_general(int a);
 int ikaslr_rf_helper(int x);
 struct proc_dir_entry;
 int ikaslr_bench_init(struct proc_dir_entry *dir);
-int ikaslr_evalvuln_init(struct proc_dir_entry *dir);
 int ikaslr_detect_mark(const char *name, void *trap_at, void *copy_src, size_t size);
 bool ikaslr_detect_audit(unsigned long faulting, unsigned long *newp);
 void ikaslr_detect_stats(unsigned long *benign, unsigned long *gadget, unsigned long *triggers);

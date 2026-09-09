@@ -29,33 +29,3 @@ config IKASLR_DEBUG
 	help
 	  打开 I-KASLR 各阶段的诊断输出（区域边界、指针表、随机化时间分解等）。
 
-config IKASLR_EVAL_VULN
-	bool "I-KASLR evaluation-only vulnerable module (arbitrary kernel R/W)"
-	depends on IKASLR && IKASLR_DEBUG
-	help
-	  编译进一个**仅用于评估**的含漏洞接口，经 /proc/ikaslr/attack 向用户态
-	  暴露任意内核地址读与写两项原语（论文 §4.6.1 的"攻击者能力载体"）。
-
-	  它实例化威胁模型假设攻击者已具备的任意读写能力，用于在受控的 QEMU 环境
-	  中验证检测与随机化的响应。约束（§4.6.1）：只提供任意读写、不额外泄露布局、
-	  不提供代码执行、位于非随机化区域、不参与性能测量。
-
-	  ⚠ 这是一个**故意开的内核后门**。它把整个内核内存暴露给普通用户态进程，
-	  绝不能进入任何可部署的构建。加载时会污染内核（TAINT）。默认且必须为 N。
-
-	  If unsure, say N.
-
-config IKASLR_XOM_EPT
-	bool "I-KASLR x86 EPT-based execute-only memory (nested hypervisor)"
-	depends on IKASLR && X86_64
-	help
-	  第 4 章 x86 平台的只执行内存路径（论文 §4.5.1）。内核启动一层薄
-	  hypervisor 把自身降为 guest，用二级地址翻译（EPT）把代码物理页设为
-	  不可读；攻击者读代码页触发 EPT violation，被捕获并触发随机化。
-
-	  作用于物理页面，因而天然覆盖该页的全部虚拟映射，避免以虚存页权限实现
-	  XOM 的多重映射绕过。
-
-	  需要 CPU 支持 VMX+EPT，且在 QEMU 下需要开启嵌套虚拟化（kvm nested=Y）。
-	  这是一个精细的底层机制，分步实现（见 04-detection.md）。研究用途，
-	  默认 N。
