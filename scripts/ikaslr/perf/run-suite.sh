@@ -17,6 +17,12 @@ done
 run "lmbench lat_ctx"; lat_ctx -s 0 2 8 2>>"$D/lat_ctx.txt" || true
 run "lmbench lat_proc"; for k in fork exec shell; do lat_proc $k 2>>"$D/lat_proc.txt"||true; done
 
+# UnixBench（系统基准；UB_DIR 指向已 make 的 UnixBench 目录）
+if [ -n "${UB_DIR:-}" ] && [ -x "$UB_DIR/Run" ]; then
+    run "UnixBench"
+    ( cd "$UB_DIR" && ./Run -c 1 syscall pipe context1 spawn execl shell1 )         >"$D/unixbench.txt" 2>&1 || true
+fi
+
 # 中断/调度延迟
 run "cyclictest"; cyclictest -q -l 200000 -m -p 90 -i 200 -h 400 >"$D/cyclictest.txt" 2>&1 || true
 

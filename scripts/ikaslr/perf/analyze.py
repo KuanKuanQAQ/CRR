@@ -30,6 +30,8 @@ def main():
         "fio_randwrite_iops": lambda c: fio_iops(f"{root}/{c}/fio_randwrite-4k.json"),
         "cyclictest_max_us": lambda c: num(f"{root}/{c}/cyclictest.txt", r"Max:\s*(\d+)"),
         "netperf_stream_mbps": lambda c: num(f"{root}/{c}/net_stream.txt", r"\n\s*\d+\s+\d+\s+\d+\s+[\d.]+\s+([\d.]+)"),
+        "unixbench_syscall": lambda c: num(f"{root}/{c}/unixbench.txt", r"System Call Overhead\s+[\d.]+\s+([\d.]+)"),
+        "unixbench_pipe": lambda c: num(f"{root}/{c}/unixbench.txt", r"Pipe Throughput\s+[\d.]+\s+([\d.]+)"),
     }
     print(f"{'metric':<26}" + "".join(f"{c:>12}" for c in cfgs) + f"{'ovhd% vs base':>16}")
     print("-"*(26+12*len(cfgs)+16))

@@ -44,6 +44,7 @@
 | **nginx/apache** | 免费 | web 服务端 | `apt install nginx` |
 | **cyclictest** | 免费 | 中断/调度延迟（§6.5.3 关注项） | `apt install rt-tests` |
 | **stress-ng** | 免费 | 综合压力（SPEC 替代之一） | `apt install stress-ng` |
+| **UnixBench** | 免费(GPL) | 经典系统基准：syscall/pipe/进程创建/execl/shell（对内核开销敏感，§6.5.3） | `git clone https://github.com/kdlucas/byte-unixbench && cd UnixBench && make` |
 
 ### SPEC CPU2006 拿不到时的免费替代
 
@@ -129,6 +130,15 @@ bw_mem 256m rd wr                             # 内存带宽
 ```
 表格：行=各项，列=四档配置。**特别关注中断相关**——第3章推迟随机化影响中断返回
 路径、第4章检测在异常路径增开销。
+
+### UnixBench（系统基准，§6.5.3）
+经典系统吞吐基准，其中 `syscall`、`pipe`、`context1`、`spawn`、`execl`、`shell*`
+子项直接反映内核路径开销，最贴合跳板/检测的影响。
+```
+cd UnixBench && ./Run -c 1 syscall pipe context1 spawn execl shell1 shell8   # 单核
+./Run -c $(nproc)                                                            # 满核综合指数
+```
+报告各子项得分（相对 Base 的下降%）与总 index。
 
 ### cyclictest（中断/调度延迟，§6.5.3 补充）
 ```
