@@ -68,7 +68,8 @@ command -v cyclictest >/dev/null && { run cyclictest;
     cyclictest -q -l 200000 -m -p 90 -i 200 -h 400 >"$D/cyclictest.txt" 2>&1 || true; }
 
 # 计算负载（SPEC 替代；§6.5.4）
-command -v 7z >/dev/null       && { run 7z;       7z b            >"$D/7z.txt" 2>&1 || true; }
+SEVENZ="$(command -v 7z || command -v 7za || true)"   # openEuler p7zip 提供 7za
+[ -n "$SEVENZ" ]               && { run 7z;       "$SEVENZ" b     >"$D/7z.txt" 2>&1 || true; }
 command -v openssl >/dev/null  && { run openssl;  openssl speed -evp aes-256-gcm >"$D/openssl.txt" 2>&1 || true; }
 command -v sysbench >/dev/null && { run sysbench; sysbench cpu --threads="$(nproc)" --time=20 run >"$D/sysbench_cpu.txt" 2>&1 || true; }
 # SPEC CPU2006（若已装并 source shrc，取消注释）：

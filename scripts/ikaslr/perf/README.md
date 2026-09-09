@@ -9,7 +9,7 @@
 | 文件 | 作用 |
 | --- | --- |
 | `env.sh` | 公共配置：架构、配置矩阵、路径、触发间隔、编译器 pass 开关。**所有脚本 source 它**，改参数改这里或从环境传入。 |
-| `01-install-deps.sh` | 下载并安装全部基准（lmbench/unixbench/fio/netperf/…）与编译依赖。 |
+| `01-install-deps.sh` | 下载并安装全部基准与编译依赖。**自动识别包管理器**（apt / dnf / yum / zypper——Debian/Ubuntu 与 openEuler/RHEL/Fedora/openSUSE 都可）。 |
 | `02-build-kernels.sh` | 为每档配置编译一个内核（同一 defconfig，只 toggle IKASLR）。 |
 | `03-install-kernels.sh` | 把各档装进 `/boot` 并加入 GRUB 菜单（各档独立 `uname -r`）。 |
 | `04-boot-into.sh` | 用 `grub-reboot` 把下次启动设成某档并重启进入。 |
@@ -71,6 +71,17 @@ sudo ./05-run-suite.sh
 
 5. **只改 IKASLR**：各档从同一 defconfig 出发只 toggle IKASLR 相关 CONFIG，保证测的是
    随机化开销而非 config 噪声（02 已保证）。
+
+## 关于 openEuler / rpm 系
+
+`01-install-deps.sh` 会自动用 `dnf` 安装(而非 `apt`),包名已按 rpm 系映射
+(如 `libssl-dev`→`openssl-devel`、`linux-cpupower`→`kernel-tools`、`p7zip-full`→`p7zip`)。
+openEuler 仓库通常没有 `netperf` 和 `wrk`,脚本会**自动从源码编译**它们;若某些基准包
+(如 `sysbench`)仓库里也没有,可先启用 EPOL 源再重跑:
+```bash
+sudo dnf install -y epol-release && sudo dnf makecache   # 视 openEuler 版本而定
+```
+`7z` 在 openEuler 上叫 `7za`,`05-run-suite.sh` 已自动兼容。
 
 ## 常用可调参数（env.sh 或环境变量）
 
