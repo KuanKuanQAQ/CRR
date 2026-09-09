@@ -45,6 +45,13 @@ int ikaslr_whitelist_init(void);
 int ikaslr_pool_init(void);
 int ikaslr_fixup_init(void);
 void ikaslr_fill_traps(void *base, size_t len);
+
+/* 第 5 章 PA CFI（arm64）。*/
+struct ikaslr_fptr;
+void ikaslr_pacfi_create(struct ikaslr_fptr *f, void *func, u32 type_hash);
+void *ikaslr_pacfi_verify(struct ikaslr_fptr *f, int cs_id);
+void ikaslr_pacfi_finalize(struct ikaslr_fptr *f);
+void ikaslr_pacfi_cfi_stats(unsigned long *viol, unsigned long *hfi);
 int ikaslr_control_init(void);
 extern int ikaslr_rf_counter;
 int ikaslr_rf_general(int a);
