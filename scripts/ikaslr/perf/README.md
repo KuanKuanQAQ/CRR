@@ -15,6 +15,10 @@
 | `04-boot-into.sh` | 用 `grub-reboot` 把下次启动设成某档并重启进入。 |
 | `05-run-suite.sh` | 启动进某档后跑该档全部基准（绑频、定频触发随机化、收数据）。 |
 | `06-analyze.py` | 汇总各档结果为对比表（相对 Base 的开销%）。 |
+| `07-freq-sweep.sh` | **E9** 随机化频率敏感性：固定负载扫触发频率，出 §6.7.1 曲线数据。 |
+| `08-range-sweep.sh` | **E10** 随机化范围敏感性：按 `funcs.txt` 规模各编一档内核并安装，逐档测。 |
+| `09-attribution.sh` | **E12** 开销归因：perf 采样把开销拆回跳板/计数/白名单/检测/PA/XOM。 |
+| `10-compare-adelie-dbox.sh` | **E8** 与 Adelie/Dbox 同类负载对比（@20ms）。方法+文献数字见 `实现/11-related-comparison.md`。 |
 | `trigger-loop.sh` | 定频写 `/proc/ikaslr/trigger` 驱动随机化（被 05 调用）。 |
 | `fio/` | fio job 文件（存储负载）。 |
 | `funcs.txt` | 编译器 pass 的随机化函数名单（§0，真实测量时必填）。 |
@@ -48,6 +52,26 @@ sudo ./05-run-suite.sh
 # —— 汇总 ——
 ./06-analyze.py                       # 读 results/<arch>/，出四档对比表
 ```
+
+## 进阶实验（E8/E9/E10/E12）
+
+在四档端到端测完（05）之后，按需跑这几项——它们各自需要**已启动进相应档**：
+
+```bash
+# E9 频率敏感性（启动进 R 或 RD 后）：
+FREQS="0 1 5 20 100 500" sudo ./07-freq-sweep.sh
+
+# E10 范围敏感性（需编译器 pass + 足够大的 funcs.txt）：
+CRR_TRAMPOLINE=y IKASLR_FUNCS=大名单.txt SIZES="16 64 256 1024" sudo ./08-range-sweep.sh
+#   ...再逐个 04-boot-into.sh scope<N> + 05-run-suite.sh + 读 /proc/ikaslr/layout
+
+# E12 归因（启动进 R/RD/RDP 后）：
+sudo ./09-attribution.sh
+
+# E8 与 Adelie/Dbox 同类负载对比（@20ms；scoped 档与 built-in 档各一遍）：
+sudo ./10-compare-adelie-dbox.sh
+```
+对比对象的范围、开销与公平对比方法见 [`../../../Documentation/crr/实现/11-related-comparison.md`](../../../Documentation/crr/实现/11-related-comparison.md)。
 
 ## 真实测量必读（否则测出来的开销不反映真实防护）
 
@@ -88,6 +112,7 @@ sudo dnf install -y epol-release && sudo dnf makecache   # 视 openEuler 版本�
 ```bash
 ARCH=arm64 ./02-build-kernels.sh         # 目标架构（默认按本机）
 JOBS=64 ./02-build-kernels.sh            # 编译并行度
+LOCALMOD=1 ./02-build-kernels.sh         # 只编当前 lsmod 已加载的模块（快很多；仅本机语义）
 TRIGGER_MS=20 sudo ./05-run-suite.sh     # 随机化触发间隔（与 Adelie 对齐）
 SERVER_IP=10.0.0.2 sudo ./05-run-suite.sh# 带网络项（对端需跑 netserver/nginx）
 BENCH_DIR=... BUILD_ROOT=... RESULTS_DIR=...   # 各类路径

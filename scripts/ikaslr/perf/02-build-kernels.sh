@@ -38,6 +38,13 @@ for v in "${WANT[@]}"; do
     "$ROOT/scripts/config" --file "$O/.config" \
         --set-str LOCALVERSION "-ikaslr-$v" \
         $(variant_config_args "$v")
+    # 可选快速档：只保留当前 lsmod 里已加载的模块，编译模块数从几千降到几十，
+    # 大机器也能快很多。代价：只在**本机**语义正确（依赖当前 lsmod）；四档都从
+    # 同一 lsmod 出发做 localmodconfig，故彼此仍一致。跨机搬内核别用它。
+    if [ "${LOCALMOD:-0}" = 1 ]; then
+        echo "-- LOCALMOD=1：按当前 lsmod 裁剪模块（编译更快）"
+        yes '' | kbuild "$O" "${PASS_ARGS[@]}" LSMOD=/proc/modules localmodconfig >/dev/null 2>&1 || true
+    fi
     kbuild "$O" "${PASS_ARGS[@]}" olddefconfig >/dev/null
     echo "-- $v 的 IKASLR 相关配置："
     grep -E 'CONFIG_IKASLR' "$O/.config" || echo "   (IKASLR off)"
