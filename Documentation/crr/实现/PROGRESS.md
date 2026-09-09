@@ -55,7 +55,7 @@
 
 | ID | 步骤 | 状态 | 提交 | 备注 |
 | --- | --- | :-: | --- | --- |
-| S2.1 | x86 EPT 物理页级 XOM（嵌套 hypervisor，单核量身定制） | [~] | ✓ | S2.1a VMXON + **S2.1b-1 EPT/VMCS 已验证**；VMLAUNCH/XOM 待做 |
+| S2.1 | x86 EPT 物理页级 XOM（嵌套 hypervisor，单核量身定制） | [~] | ✓ | **VMLAUNCH self-guest 已验证**（a/b-1/b-2 全通过）；S2.1c XOM/S2.1d 持续运行待做 |
 | S2.2 | ARM 观察点 XOM（DBGWCR MASK、per-cpu、hw_breakpoint 协调） | [ ] | | 第4.5.2 节；并入 hw_breakpoint 模块；R-42 |
 | S2.3 | 多源检测（代码读取处理、执行试探 LBR 回溯、控制流异常） | [ ] | | 第4.4.3 节 |
 | S2.4 | 控制流审计（陷阱页重映射 + 入口/中部判据） | [q] | ✓ | 8 次压测通过；LBR 精确分类留 S2.3 |
@@ -111,7 +111,7 @@
 
 下一步顺序：**EPT 方案已简化为单核量身定制**（作者确认；多核由 watchpoint 承担，理由见 `04a-ept-single-core.md`）。范围：单核 + passthrough 一切 + 只处理 CPUID/EPT-violation + 只保护静态 .rand.text，约 500 行。
 
-→ S2.1b-1（EPT 页表 + VMCS 基础设施）已验证 → **S2.1b-2（完整 VMCS state + VMLAUNCH 降为 self-guest）** → S2.1c（.rand.text 设 X-only，读触发 EPT violation 被捕获）→ S2.5（violation 接控制流审计）→ S2.2（arm64 观察点，含多核，需真机）→ Phase 3。
+→ S2.1a/b-1/b-2 全部验证（**VMLAUNCH 把内核降为 self-guest 成功**）→ **S2.1c（.rand.text 设 EPT execute-only，guest 读触发 EPT violation）** → S2.1d（持续运行 + 测开销）→ S2.5（violation 接审计） → S2.1c（.rand.text 设 X-only，读触发 EPT violation 被捕获）→ S2.5（violation 接控制流审计）→ S2.2（arm64 观察点，含多核，需真机）→ Phase 3。
 
 > **稳定性基线**：连续 12 次启动全部通过（含 8 次用户态触发的随机化）。修复前约 3–4/12 失败。任何改动随机化布局的修改，都应重跑这个压力测试。
 
@@ -135,6 +135,7 @@
 - 2026-09-09：S1.10a LLVM pass 完成并运行验证；发现并修正两处会静默破坏不变式的坑（内联绕过跳板、改名不重定向调用者）。S1.10b GCC 插件源码就位但本机缺 plugin-dev 无法编译。
 - 2026-09-09：S0.4/S0.5 测量脚本（实测 IBT 等价类 38,180）。S4.1 跳板微开销测量：发现 wake_up 风暴并修正（224→133 ns），新增独立的 CONFIG_IKASLR_STATS，生产配置 102 ns/次；关键结论是开销在**计数**而非间接转移（2 ns）。
 - 2026-09-09：S0.6 CVE 可模块化统计脚本，**独立复现论文表 1-2**（可模块化 7299 vs 论文 7295，子系统分布亦吻合）。Phase 0 全部完成。
+- 2026-09-09：**S2.1b-2 VMLAUNCH 把内核降为 self-guest 成功**（一次通过，得益于先做全字段校验 S2.1b-2a）——EPT 路径最难的一关过了。VM exit reason=18 被捕获，无三重故障，全部 selftest+SMOKE 仍 PASS。
 - 2026-09-09：EPT 方案定为**单核量身定制**（passthrough + 只处理 CPUID/EPT-violation）。多核 EPT 的两个本质难点（物理页级临时开读的全局窗口、EPT TLB shootdown 一致性）写入 04a-ept-single-core.md，多核测量由 watchpoint 路径承担。
 - 2026-09-09：GCC 插件编译验证通过（结果与 LLVM 版一致）。D-EPT 定为嵌套 EPT。S2.1a VMXON/VMXOFF 往返验证通过——L1 内核能进入 VMX root 模式，嵌套虚拟化对受保护内核可用。
 - 2026-09-09：S2.4 控制流审计（陷阱页重映射 + 入口/中部偏移判据），8 次压测通过；LBR 精确来源分类留待 S2.3。

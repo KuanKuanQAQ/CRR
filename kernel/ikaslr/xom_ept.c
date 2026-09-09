@@ -52,6 +52,7 @@ static int ikaslr_vmclear(u64 pa);
 static u64 ept_pointer;
 static void *vmcs_region;
 static void ikaslr_setup_vmcs(void);
+static int ikaslr_vmlaunch_min(void);
 static unsigned long vmcs_fail_field;
 
 /* 确保 VMX 在 IA32_FEAT_CTL 中已启用（未锁定则由我们锁定并启用）。*/
@@ -145,11 +146,24 @@ static int __init ikaslr_ept_smoke(void)
 					rb);
 				/* S2.1b-2a：填满所有 VMCS 字段并校验（不 VMLAUNCH）。*/
 				ikaslr_setup_vmcs();
-				if (vmcs_fail_field)
+				if (vmcs_fail_field) {
 					pr_err("S2.1b-2a: VMWRITE failed at field %lx\n",
 					       vmcs_fail_field);
-				else
-					pr_info("S2.1b-2a OK: all VMCS fields written and valid\n");
+				} else {
+					pr_info("S2.1b-2a OK: all VMCS fields valid\n");
+					/* S2.1b-2b：VMLAUNCH 最小回路。*/
+					if (!ikaslr_vmlaunch_min()) {
+						u32 reason = ikaslr_vmread(VM_EXIT_REASON) & 0xffff;
+
+						pr_info("S2.1b-2b OK: VMLAUNCH entered self-guest; "
+							"caught VM exit reason=%u (18=VMCALL)\n",
+							reason);
+					} else {
+						pr_err("S2.1b-2b: VMLAUNCH failed, "
+						       "VM_INSTRUCTION_ERROR=%lu\n",
+						       ikaslr_vmread(VM_INSTRUCTION_ERROR));
+					}
+				}
 			} else {
 				pr_err("S2.1b: EPTP readback mismatch %llx != %llx\n",
 				       rb, ept_pointer);
@@ -453,4 +467,47 @@ static void ikaslr_setup_vmcs(void)
 	vmcs_w(GUEST_ACTIVITY_STATE, 0);
 	vmcs_w(GUEST_INTERRUPTIBILITY_INFO, 0);
 	vmcs_w(GUEST_PENDING_DBG_EXCEPTIONS, 0);
+}
+
+/*
+ * ===========================================================================
+ * S2.1b-2b：VMLAUNCH（最小验证）
+ * ===========================================================================
+ *
+ * 把内核降为 self-guest，guest 立即执行一条 VMCALL 触发 VM exit，随后干净退出。
+ * 这验证 VMCS state 正确、VMLAUNCH 可行、能进 guest 并捕获 exit——不追求让内核
+ * 主线持续在 guest 里运行（那需要完整的 exit/VMRESUME 循环，是 S2.1d 的工作）。
+ *
+ * 经典最小回路：GUEST_RIP/RSP 指向 vmlaunch 之后，guest "继续"执行到 1: 处的
+ * vmcall；HOST_RIP 指向 2:，VM exit 时 CPU 从那里以 host 状态继续。vmlaunch 失败
+ * （未进 guest）则执行其下一条 setna，由 fail 标志报告，可读 VM_INSTRUCTION_ERROR
+ * 诊断。
+ */
+static int ikaslr_vmlaunch_min(void)
+{
+	u8 fail = 0;
+
+	asm volatile (
+		"mov %%rsp, %%rax\n\t"
+		"vmwrite %%rax, %[grsp]\n\t"	/* GUEST_RSP = 当前 rsp */
+		"vmwrite %%rax, %[hrsp]\n\t"	/* HOST_RSP  = 同栈 */
+		"lea 1f(%%rip), %%rax\n\t"
+		"vmwrite %%rax, %[grip]\n\t"	/* GUEST_RIP = 1: */
+		"lea 2f(%%rip), %%rax\n\t"
+		"vmwrite %%rax, %[hrip]\n\t"	/* HOST_RIP  = 2: */
+		"vmlaunch\n\t"
+		"setna %[fail]\n\t"		/* 仅 vmlaunch 失败才执行到这 */
+		"jmp 3f\n\t"
+		"1:\n\t"			/* guest 从此继续（guest 模式） */
+		"vmcall\n\t"			/* 无条件 VM exit */
+		"2:\n\t"			/* VM exit 落此（host 模式，rsp 已恢复） */
+		"3:\n\t"
+		: [fail] "+r" (fail)
+		: [grsp] "r" ((unsigned long)GUEST_RSP),
+		  [hrsp] "r" ((unsigned long)HOST_RSP),
+		  [grip] "r" ((unsigned long)GUEST_RIP),
+		  [hrip] "r" ((unsigned long)HOST_RIP)
+		: "rax", "cc", "memory");
+
+	return fail ? -1 : 0;
 }

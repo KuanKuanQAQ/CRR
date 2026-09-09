@@ -27,7 +27,8 @@ hypervisor 把自身降为 guest，用 EPT 施加"内核自己关不掉的"页�
 | --- | --- | --- |
 | S2.1a | 进入/退出 VMX root 模式（VMXON/VMXOFF 往返） | ✓ 已验证 |
 | S2.1b-1 | EPT identity 页表 + VMCS 加载 + EPTP 写入校验 | ✓ 已验证 |
-| S2.1b-2 | 完整 host/guest state + controls + VMLAUNCH 降为 self-guest | 待做 |
+| S2.1b-2a | 填满并校验全部 VMCS 字段（不 VMLAUNCH） | ✓ 已验证 |
+| S2.1b-2b | VMLAUNCH 把内核降为 self-guest，捕获 VM exit | ✓ 已验证 |
 | S2.1c | EPT 把代码物理页设为不可读，读触发 EPT violation 被捕获 | 待做 |
 | S2.1d | 内存池划分 + 分配器适配 + 加载期页表切换 | 待做 |
 | S2.5 | EPT violation → 控制流审计 → 触发随机化 | 待做 |
@@ -65,12 +66,33 @@ ikaslr/ept: EPT identity map built: 512 GB, EPTP=3cf301e
 ikaslr/ept: S2.1b OK: VMCS loaded, EPTP written+verified (3cf301e)
 ```
 
-### S2.1b-2：VMLAUNCH（下一步，危险区）
+### S2.1b-2：VMLAUNCH（已验证）
 
-填完整 host/guest state（CR、段、GDTR/IDTR/TR、MSR）+ 最小 controls（passthrough，
-只 CPUID/EPT-violation exit）+ host entry 汇编 stub，然后 VMLAUNCH 把内核降为
-self-guest。VMCS 字段错即三重故障重启；VMLAUNCH 失败可读 VM-instruction error
-（VMCS 字段 0x4400）诊断迭代。
+**S2.1b-2a**：填满全部 host/guest/control 字段（约 55 个）并逐个校验 VMWRITE 成功。
+guest state = 当前内核状态的延续；controls 配成最小拦截（不拦中断/异常，启用 EPT）。
+先做这一步、不 VMLAUNCH，排除了字段编码/取值这一大类错误——事后证明这是 VMLAUNCH
+一次通过的关键。
+
+**S2.1b-2b**：最小 VMLAUNCH 回路。GUEST_RIP/RSP 指向 vmlaunch 之后，guest "继续"
+执行到一条 `vmcall`；HOST_RIP 指向 exit 落点，VM exit 时以 host 状态继续。实测：
+
+```
+ikaslr/ept: S2.1b-2b OK: VMLAUNCH entered self-guest;
+            caught VM exit reason=18 (18=VMCALL)
+```
+
+**内核成功把自身降为 self-guest、执行 guest 指令、捕获 VM exit，无三重故障，
+全部 selftest 与用户态 SMOKE 仍 PASS，单次启动无重启循环。** 这是 EPT 路径技术上
+最难的一关，一次通过（得益于 S2.1b-2a 先验证全字段合法）。
+
+VMLAUNCH 失败可读 VM_INSTRUCTION_ERROR（VMCS 字段 0x4400）诊断，不会崩。
+
+### S2.1c/S2.1d（下一步）
+
+- S2.1c：把 `.rand.text` 的 EPT 项从 1GB 大页拆细为 4KB 并设 execute-only（R=0,X=1），
+  guest 读它触发 EPT violation，验证物理页级 XOM 生效。
+- S2.1d：完整 exit/VMRESUME 循环（处理 CPUID 等），让内核主线**持续**在 guest 里
+  运行以测量开销；EPT violation 接第 4 章控制流审计（S2.5）。
 
 ## S2.2/S2.3/S2.5（待做）
 
