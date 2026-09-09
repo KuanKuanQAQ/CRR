@@ -10,10 +10,7 @@ set -uo pipefail
 
 # ---- 识别当前档 ----
 CFG="${1:-}"
-if [ -z "$CFG" ]; then
-    REL="$(uname -r)"
-    case "$REL" in *-ikaslr-*) CFG="${REL##*-ikaslr-}";; *) CFG=base;; esac
-fi
+[ -n "$CFG" ] || CFG="$(current_variant)"
 echo "== 当前档: $CFG   ($(uname -r))"
 
 D="$RESULTS_DIR/$ARCH/$CFG"; mkdir -p "$D"
@@ -30,9 +27,11 @@ LMBIN="$(ls -d "$BENCH_DIR"/lmbench/bin/* 2>/dev/null | head -1)"
 } > "$D/_env.txt"
 [ -r /proc/ikaslr/stats ] && cat /proc/ikaslr/stats > "$D/_ikaslr_stats_before.txt"
 
-# ---- 降噪：绑频、关 turbo ----
+# ---- 降噪：绑频、关 turbo（各平台旋钮不同，存在才写）----
 if command -v cpupower >/dev/null; then cpupower frequency-set -g performance >/dev/null 2>&1 || true; fi
-echo 1 > /sys/devices/system/cpu/intel_pstate/no_turbo 2>/dev/null || true
+write_if() { [ -w "$1" ] && printf '%s' "$2" > "$1" 2>/dev/null || true; }
+write_if /sys/devices/system/cpu/intel_pstate/no_turbo 1   # Intel pstate: 1=关 turbo
+write_if /sys/devices/system/cpu/cpufreq/boost 0           # AMD / acpi-cpufreq: 0=关 boost
 
 # ---- +R/+RD/+RDP：后台定频触发随机化 ----
 TRIG_PID=""

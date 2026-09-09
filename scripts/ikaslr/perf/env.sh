@@ -68,3 +68,12 @@ variant_is_single_core() { [ "$1" = RD ] && [ "$ARCH" = x86_64 ]; }
 variant_needs_trigger() { [ "$1" != base ]; }
 
 kbuild() { make -C "$ROOT" O="$1" ARCH="$ARCH" $CROSS "${@:2}"; }
+
+# 从 uname -r 解析当前档名，剥掉 git 描述后缀（-g<sha> / 尾部 '+'）。
+current_variant() {
+    local rel="${1:-$(uname -r)}" v
+    case "$rel" in
+        *-ikaslr-*) v="${rel##*-ikaslr-}"; v="${v%%-*}"; v="${v%+}"; echo "$v" ;;
+        *)          echo base ;;
+    esac
+}

@@ -10,7 +10,7 @@
 set -uo pipefail
 . "$(dirname "$0")/env.sh"
 
-REL="$(uname -r)"; CFG="${REL##*-ikaslr-}"
+REL="$(uname -r)"; CFG="$(current_variant "$REL")"
 export TRIGGER_MS=20                                  # 对齐 Adelie
 D="$RESULTS_DIR/$ARCH/compare/$CFG"; mkdir -p "$D"
 SCRATCH="${SCRATCH:-/var/tmp/ikaslr-scratch}"; mkdir -p "$SCRATCH"

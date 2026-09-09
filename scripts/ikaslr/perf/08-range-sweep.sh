@@ -25,7 +25,7 @@ for n in $SIZES; do
     echo "=================== 范围 $n 函数 -> $O ==================="
     kbuild "$O" CRR_TRAMPOLINE=n "$( [ "$ARCH" = x86_64 ] && echo x86_64_defconfig || echo defconfig)" >/dev/null
     # shellcheck disable=SC2046
-    "$ROOT/scripts/config" --file "$O/.config" --set-str LOCALVERSION "-ikaslr-scope$n" \
+    "$ROOT/scripts/config" --file "$O/.config" --set-str LOCALVERSION "-ikaslr-scope$n" --disable LOCALVERSION_AUTO \
         $(variant_config_args R)
     kbuild "$O" CRR_TRAMPOLINE=n olddefconfig >/dev/null
     [ "${LOCALMOD:-0}" = 1 ] && { yes '' | kbuild "$O" CRR_TRAMPOLINE=n LSMOD=/proc/modules localmodconfig >/dev/null 2>&1 || true; }

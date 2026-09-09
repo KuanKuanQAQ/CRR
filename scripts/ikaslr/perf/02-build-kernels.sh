@@ -36,7 +36,7 @@ for v in "${WANT[@]}"; do
     # LOCALVERSION 让每档有独立的 `uname -r`，从而 /boot 与 GRUB 各成一项。
     # shellcheck disable=SC2046
     "$ROOT/scripts/config" --file "$O/.config" \
-        --set-str LOCALVERSION "-ikaslr-$v" \
+        --set-str LOCALVERSION "-ikaslr-$v" --disable LOCALVERSION_AUTO \
         $(variant_config_args "$v")
     # 可选快速档：只保留当前 lsmod 里已加载的模块，编译模块数从几千降到几十，
     # 大机器也能快很多。代价：只在**本机**语义正确（依赖当前 lsmod）；四档都从

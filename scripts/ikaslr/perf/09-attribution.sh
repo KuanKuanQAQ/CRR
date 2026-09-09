@@ -9,7 +9,7 @@ set -uo pipefail
 . "$(dirname "$0")/env.sh"
 command -v perf >/dev/null || { echo "!! 需要 perf（apt: linux-perf / dnf: perf）"; exit 1; }
 
-REL="$(uname -r)"; CFG="${REL##*-ikaslr-}"
+REL="$(uname -r)"; CFG="$(current_variant "$REL")"
 DUR="${DUR:-20}"
 D="$RESULTS_DIR/$ARCH/attribution/$CFG"; mkdir -p "$D"
 echo "== 归因采样 @ $CFG ($REL)，$DUR s"

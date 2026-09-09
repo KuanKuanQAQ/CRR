@@ -10,7 +10,7 @@ set -uo pipefail
 
 [ -w /proc/ikaslr/trigger ] || { echo "!! 当前内核无 /proc/ikaslr/trigger，需先启动进 +R/+RD 档"; exit 1; }
 
-REL="$(uname -r)"; CFG="${REL##*-ikaslr-}"
+REL="$(uname -r)"; CFG="$(current_variant "$REL")"
 FREQS="${FREQS:-0 1 5 20 50 100 200 500 1000}"     # Hz；0=基线
 D="$RESULTS_DIR/$ARCH/freq-sweep/$CFG"; mkdir -p "$D"
 echo "== 频率扫描 @ $CFG ($REL)   频率(Hz): $FREQS"
