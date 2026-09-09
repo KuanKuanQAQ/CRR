@@ -18,9 +18,9 @@ GCFG=/boot/grub/grub.cfg; [ -r "$GCFG" ] || GCFG=/boot/grub2/grub.cfg
 # 找到含该 release 的 menuentry；若在 submenu 里，拼成 "子菜单>菜单项"。
 ENTRY="$(awk -F\' -v rel="$REL" '
     /^menuentry / { top=$2 }
-    /^submenu /   { sub=$2 }
+    /^submenu /   { smenu=$2 }
     /menuentry / && index($0, rel) {
-        if ($0 ~ /^[[:space:]]+menuentry/ && sub!="") print sub ">" $2;
+        if ($0 ~ /^[[:space:]]+menuentry/ && smenu!="") print smenu ">" $2;
         else print $2;
         exit
     }' "$GCFG")"
