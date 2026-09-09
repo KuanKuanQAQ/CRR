@@ -87,12 +87,39 @@ ikaslr/ept: S2.1b-2b OK: VMLAUNCH entered self-guest;
 
 VMLAUNCH 失败可读 VM_INSTRUCTION_ERROR（VMCS 字段 0x4400）诊断，不会崩。
 
-### S2.1c/S2.1d（下一步）
+### S2.1c：物理页级 XOM（已验证）
 
-- S2.1c：把 `.rand.text` 的 EPT 项从 1GB 大页拆细为 4KB 并设 execute-only（R=0,X=1），
-  guest 读它触发 EPT violation，验证物理页级 XOM 生效。
-- S2.1d：完整 exit/VMRESUME 循环（处理 CPUID 等），让内核主线**持续**在 guest 里
-  运行以测量开销；EPT violation 接第 4 章控制流审计（S2.5）。
+identity map 用 1GB 大页，保护单页必须逐级拆细：**1GB → PD(512×2MB) → PT(512×4KB)**，
+拆的同时把该区间其余部分照原样 identity 映射回去，否则 guest 会丢失同一 1GB 内其它
+内存的映射。目标页设 **R=0, W=0, X=1**（可执行、不可读）。
+
+先查 `IA32_VMX_EPT_VPID_CAP` 的 execute-only 能力位：不支持时 R=0,X=1 是非法组合，
+会得到 EPT misconfiguration（reason 49）而非 violation，所以要区分这两种结果。
+
+验证方式很直接：让 guest **先读被保护页再 vmcall**。XOM 生效则读被拦，永远到不了
+vmcall——exit reason 直接给出结论。实测：
+
+```
+EPT: page 40d6000 now execute-only (R=0,W=0,X=1)
+S2.1c OK: guest read of execute-only page trapped;
+          EPT violation gpa=40d6000 qual=1a1
+S2.1c: physical-page XOM is effective
+```
+
+`gpa` 与被保护页精确一致；`qual=0x1a1` 表示读访问且该页不可读。**第 4 章检测源一
+（代码读取捕获）的硬件机制由此打通。**
+
+> **踩到的坑**：第一次 VMLAUNCH 之后 VMCS 处于 launched 状态，再次 VMLAUNCH 会得到
+> `VM_INSTRUCTION_ERROR=4`（VMLAUNCH with non-clear VMCS）。需 `VMCLEAR` 把它写回并
+> 标为 clear（内容保留）、`VMPTRLD` 重新设为当前 VMCS，之后才能再次 VMLAUNCH；
+> 持续运行的形态里则应改用 **VMRESUME**。
+
+### S2.1d / S2.5（下一步）
+
+- S2.1d：完整 exit/VMRESUME 循环（处理 CPUID 等无条件 exit），让内核主线**持续**在
+  guest 里运行，以测量端到端开销与 EPT violation 处理延迟（§4.6.4）。
+- S2.5：EPT violation → 标记被探测函数 → 第 4 章控制流审计 → 触发随机化；
+  并把保护对象从测试页换成真正的 `.rand.text` / 当前 live 变体。
 
 ## S2.2/S2.3/S2.5（待做）
 

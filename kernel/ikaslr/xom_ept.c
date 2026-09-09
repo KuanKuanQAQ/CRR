@@ -34,6 +34,7 @@
 #include <asm/special_insns.h>
 #include <asm/io.h>
 #include <asm/vmx.h>
+#include <uapi/asm/vmx.h>
 
 #ifndef MSR_IA32_VMX_BASIC
 #define MSR_IA32_VMX_BASIC	0x00000480
@@ -49,10 +50,16 @@ static int ikaslr_vmcs_load(u32 rev);
 static int ikaslr_vmwrite(unsigned long field, unsigned long val);
 static unsigned long ikaslr_vmread(unsigned long field);
 static int ikaslr_vmclear(u64 pa);
+static int ikaslr_vmptrld(u64 pa);
 static u64 ept_pointer;
 static void *vmcs_region;
 static void ikaslr_setup_vmcs(void);
 static int ikaslr_vmlaunch_min(void);
+static bool ikaslr_ept_has_xo(void);
+static int ikaslr_ept_protect(unsigned long pa);
+static void ikaslr_ept_protect_free(void);
+static int ikaslr_vmlaunch_read_test(void *prot_va);
+static u64 *ept_pdpt;
 static unsigned long vmcs_fail_field;
 
 /* 确保 VMX 在 IA32_FEAT_CTL 中已启用（未锁定则由我们锁定并启用）。*/
@@ -88,6 +95,88 @@ static int ikaslr_vmxon(u64 pa)
 static void ikaslr_vmxoff(void)
 {
 	asm volatile ("vmxoff" ::: "cc", "memory");
+}
+
+/*
+ * S2.1b-2b + S2.1c：先跑最小 VMLAUNCH 回路，再把一页设为 execute-only 让 guest
+ * 读它，用 exit reason 判定物理页级 XOM 是否生效。
+ */
+static void ikaslr_ept_xom_test(void)
+{
+	void *page;
+	unsigned long pa;
+	u32 reason;
+
+	/* S2.1b-2b：最小回路（guest 只执行 vmcall）。*/
+	if (ikaslr_vmlaunch_min()) {
+		pr_err("S2.1b-2b: VMLAUNCH failed, VM_INSTRUCTION_ERROR=%lu\n",
+		       ikaslr_vmread(VM_INSTRUCTION_ERROR));
+		return;
+	}
+	reason = ikaslr_vmread(VM_EXIT_REASON) & 0xffff;
+	pr_info("S2.1b-2b OK: VMLAUNCH entered self-guest; exit reason=%u (%s)\n",
+		reason, reason == EXIT_REASON_VMCALL ? "VMCALL" : "?");
+
+	/* S2.1c：把一页设为 execute-only，再让 guest 读它。*/
+	if (!ikaslr_ept_has_xo()) {
+		pr_warn("S2.1c: CPU lacks EPT execute-only support; skipping\n");
+		return;
+	}
+	page = (void *)get_zeroed_page(GFP_KERNEL);
+	if (!page)
+		return;
+	*(u8 *)page = 0xc3;		/* 放一条 ret，代表"代码页" */
+	pa = virt_to_phys(page);
+
+	if (ikaslr_ept_protect(pa)) {
+		free_page((unsigned long)page);
+		return;
+	}
+
+	/*
+	 * 第一次 VMLAUNCH 之后 VMCS 处于 launched 状态，再次 VMLAUNCH 会得到
+	 * VM_INSTRUCTION_ERROR=4（VMLAUNCH with non-clear VMCS）——实测踩到。
+	 * VMCLEAR 把它写回并标为 clear（内容保留），VMPTRLD 重新设为当前 VMCS，
+	 * 之后才能再次 VMLAUNCH。字段重填一遍以确保 guest/host state 完好。
+	 */
+	{
+		u64 vpa = virt_to_phys(vmcs_region);
+
+		if (ikaslr_vmclear(vpa) || ikaslr_vmptrld(vpa)) {
+			pr_err("S2.1c: failed to re-arm VMCS\n");
+			ikaslr_ept_protect_free();
+			free_page((unsigned long)page);
+			return;
+		}
+		ikaslr_setup_vmcs();
+		if (vmcs_fail_field) {
+			pr_err("S2.1c: VMCS re-setup failed at %lx\n", vmcs_fail_field);
+			ikaslr_ept_protect_free();
+			free_page((unsigned long)page);
+			return;
+		}
+	}
+
+	if (ikaslr_vmlaunch_read_test(page)) {
+		pr_err("S2.1c: VMLAUNCH failed, VM_INSTRUCTION_ERROR=%lu\n",
+		       ikaslr_vmread(VM_INSTRUCTION_ERROR));
+	} else {
+		reason = ikaslr_vmread(VM_EXIT_REASON) & 0xffff;
+		if (reason == EXIT_REASON_EPT_VIOLATION) {
+			pr_info("S2.1c OK: guest read of execute-only page trapped; "
+				"EPT violation gpa=%lx qual=%lx\n",
+				ikaslr_vmread(GUEST_PHYSICAL_ADDRESS),
+				ikaslr_vmread(EXIT_QUALIFICATION));
+			pr_info("S2.1c: physical-page XOM is effective\n");
+		} else if (reason == EXIT_REASON_EPT_MISCONFIG) {
+			pr_err("S2.1c: EPT misconfiguration (reason 49) - bad entry\n");
+		} else {
+			pr_err("S2.1c: read was NOT trapped (reason=%u); XOM ineffective\n",
+			       reason);
+		}
+	}
+	ikaslr_ept_protect_free();
+	free_page((unsigned long)page);
 }
 
 /*
@@ -151,18 +240,7 @@ static int __init ikaslr_ept_smoke(void)
 					       vmcs_fail_field);
 				} else {
 					pr_info("S2.1b-2a OK: all VMCS fields valid\n");
-					/* S2.1b-2b：VMLAUNCH 最小回路。*/
-					if (!ikaslr_vmlaunch_min()) {
-						u32 reason = ikaslr_vmread(VM_EXIT_REASON) & 0xffff;
-
-						pr_info("S2.1b-2b OK: VMLAUNCH entered self-guest; "
-							"caught VM exit reason=%u (18=VMCALL)\n",
-							reason);
-					} else {
-						pr_err("S2.1b-2b: VMLAUNCH failed, "
-						       "VM_INSTRUCTION_ERROR=%lu\n",
-						       ikaslr_vmread(VM_INSTRUCTION_ERROR));
-					}
+					ikaslr_ept_xom_test();
 				}
 			} else {
 				pr_err("S2.1b: EPTP readback mismatch %llx != %llx\n",
@@ -214,7 +292,7 @@ late_initcall(ikaslr_ept_smoke);
 #define EPT_NR_1GB	512
 
 static u64 *ept_pml4;			/* 1 页 */
-static u64 *ept_pdpt;			/* 1 页，512 个 1GB 项 */
+/* ept_pdpt 前置声明于文件上方 */
 /* ept_pointer 前置声明于文件上方 */
 
 static int ikaslr_ept_build(void)
@@ -507,6 +585,118 @@ static int ikaslr_vmlaunch_min(void)
 		  [hrsp] "r" ((unsigned long)HOST_RSP),
 		  [grip] "r" ((unsigned long)GUEST_RIP),
 		  [hrip] "r" ((unsigned long)HOST_RIP)
+		: "rax", "cc", "memory");
+
+	return fail ? -1 : 0;
+}
+
+/*
+ * ===========================================================================
+ * S2.1c：把代码页在 EPT 中设为 execute-only（物理页级 XOM）
+ * ===========================================================================
+ *
+ * identity map 用的是 1GB 大页，要保护单个 4KB 页就必须逐级拆细：
+ *   1GB 大页 -> PD（512 个 2MB 大页） -> PT（512 个 4KB 页）
+ * 拆的时候必须把该区间的其余部分**照原样 identity 映射回去**，否则 guest 访问
+ * 同一 1GB 内的其它内存就会失去映射。
+ *
+ * 目标页的 EPT 项设为 R=0, W=0, X=1：可执行、不可读。guest 读它即产生
+ * EPT violation（exit reason 48），这正是第 4 章检测源一要捕获的信号。
+ *
+ * execute-only 需要 CPU 支持（IA32_VMX_EPT_VPID_CAP bit0）。不支持时 R=0,X=1
+ * 是非法组合，会得到 EPT misconfiguration（reason 49）而不是 violation，
+ * 因此先查能力位并如实报告。
+ */
+static u64 *ept_pd;		/* 覆盖被保护页所在的 1GB，512 个 2MB 项 */
+static u64 *ept_pt;		/* 覆盖被保护页所在的 2MB，512 个 4KB 项 */
+static unsigned long ept_prot_pa;	/* 被保护页的物理地址 */
+
+static bool ikaslr_ept_has_xo(void)
+{
+	u64 cap;
+
+	rdmsrl(MSR_IA32_VMX_EPT_VPID_CAP, cap);
+	return !!(cap & VMX_EPT_EXECUTE_ONLY_BIT);
+}
+
+/* 把物理地址 pa 所在的 4KB 页设为 execute-only。*/
+static int ikaslr_ept_protect(unsigned long pa)
+{
+	unsigned long g1 = pa >> 30;			/* 1GB 索引 */
+	unsigned long base1g = g1 << 30;
+	unsigned long i2m = (pa >> 21) & 511;		/* 该 1GB 内的 2MB 索引 */
+	unsigned long base2m = pa & ~((1UL << 21) - 1);
+	unsigned long i4k = (pa >> 12) & 511;
+	int i;
+
+	if (g1 >= EPT_NR_1GB)
+		return -ERANGE;
+
+	ept_pd = (u64 *)get_zeroed_page(GFP_KERNEL);
+	ept_pt = (u64 *)get_zeroed_page(GFP_KERNEL);
+	if (!ept_pd || !ept_pt)
+		return -ENOMEM;
+
+	/* 拆 1GB -> PD：该 1GB 内其余部分仍用 2MB 大页 identity 映射。*/
+	for (i = 0; i < 512; i++)
+		ept_pd[i] = (base1g + ((u64)i << 21)) | EPT_RWX | EPT_MT_WB | EPT_PS;
+
+	/* 拆该 2MB -> PT：其余 4KB 页照常 identity 映射。*/
+	for (i = 0; i < 512; i++)
+		ept_pt[i] = (base2m + ((u64)i << 12)) | EPT_RWX | EPT_MT_WB;
+
+	/* 目标页：execute-only（R=0, W=0, X=1）。*/
+	ept_pt[i4k] = (pa & PAGE_MASK) | EPT_X | EPT_MT_WB;
+
+	/* 挂回去：非叶项只有 RWX + 地址，没有内存类型/PS 位。*/
+	ept_pd[i2m] = virt_to_phys(ept_pt) | EPT_RWX;
+	ept_pdpt[g1] = virt_to_phys(ept_pd) | EPT_RWX;
+
+	ept_prot_pa = pa;
+	pr_info("EPT: page %lx now execute-only (R=0,W=0,X=1)\n", pa);
+	return 0;
+}
+
+static void ikaslr_ept_protect_free(void)
+{
+	if (ept_pd)
+		free_page((unsigned long)ept_pd);
+	if (ept_pt)
+		free_page((unsigned long)ept_pt);
+	ept_pd = ept_pt = NULL;
+}
+
+/*
+ * S2.1c 的 guest：先读被保护页，再 vmcall。
+ * XOM 生效 -> 读触发 EPT violation（reason 48），永远到不了 vmcall；
+ * XOM 失效 -> 读成功，落到 vmcall（reason 18）。exit reason 因此直接给出结论。
+ */
+static int ikaslr_vmlaunch_read_test(void *prot_va)
+{
+	u8 fail = 0;
+
+	asm volatile (
+		"mov %%rsp, %%rax\n\t"
+		"vmwrite %%rax, %[grsp]\n\t"
+		"vmwrite %%rax, %[hrsp]\n\t"
+		"lea 1f(%%rip), %%rax\n\t"
+		"vmwrite %%rax, %[grip]\n\t"
+		"lea 2f(%%rip), %%rax\n\t"
+		"vmwrite %%rax, %[hrip]\n\t"
+		"vmlaunch\n\t"
+		"setna %[fail]\n\t"
+		"jmp 3f\n\t"
+		"1:\n\t"			/* guest 开始执行 */
+		"movzbl (%[prot]), %%eax\n\t"	/* 读被保护页 -> 期望 EPT violation */
+		"vmcall\n\t"			/* 只有读成功才会到这 */
+		"2:\n\t"			/* VM exit 落点 */
+		"3:\n\t"
+		: [fail] "+r" (fail)
+		: [grsp] "r" ((unsigned long)GUEST_RSP),
+		  [hrsp] "r" ((unsigned long)HOST_RSP),
+		  [grip] "r" ((unsigned long)GUEST_RIP),
+		  [hrip] "r" ((unsigned long)HOST_RIP),
+		  [prot] "r" (prot_va)
 		: "rax", "cc", "memory");
 
 	return fail ? -1 : 0;
