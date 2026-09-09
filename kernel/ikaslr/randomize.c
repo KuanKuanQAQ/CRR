@@ -125,14 +125,27 @@ static int ikaslr_make_exec(void *base, unsigned long npages)
 	return set_memory_x((unsigned long)base, npages);
 }
 
-/* 单个变体所需的最大容量：各函数按 16 对齐 + 每个函数后一段随机间隙。*/
+/*
+ * 单个变体所需的最大容量，必须 >= ikaslr_plan() 任何一次排布的 used。
+ *
+ * plan 对每个函数消耗：对齐 cur 的填充（< IKASLR_FN_ALIGN）+ 原始 size +
+ * 一段随机间隙（< IKASLR_MAX_GAP）；开头一段随机间隙，结尾再对齐一次。
+ * 因此每个函数要预留 IKASLR_FN_ALIGN（覆盖对齐填充）+ ALIGN(size,16)（覆盖
+ * 原始 size）+ IKASLR_MAX_GAP（覆盖间隙），另加开头间隙与结尾对齐各一份。
+ *
+ * 早期版本按 ALIGN(size,16)+MAX_GAP 计，漏掉了每函数最多 15 字节的对齐填充：
+ * 函数少时被 PAGE_ALIGN 的整页余量掩盖，但函数数超过约 (PAGE_SIZE/16) 时
+ * plan 的 used 会超过 cap，memset/memcpy 就会写到分配之外。
+ */
 static unsigned long ikaslr_var_capacity(void)
 {
-	unsigned long cap = IKASLR_MAX_GAP;
+	unsigned long cap = IKASLR_MAX_GAP + IKASLR_FN_ALIGN;
 	int i;
 
 	for (i = 0; i < ikaslr_ntramp; i++)
-		cap += ALIGN(ikaslr_tbl[i]->size, IKASLR_FN_ALIGN) + IKASLR_MAX_GAP;
+		cap += IKASLR_FN_ALIGN +
+		       ALIGN(ikaslr_tbl[i]->size, IKASLR_FN_ALIGN) +
+		       IKASLR_MAX_GAP;
 	return PAGE_ALIGN(cap);
 }
 
@@ -213,6 +226,17 @@ static int ikaslr_prepare(struct ikaslr_variant *v)
 		return ret;
 
 	ikaslr_plan(v);
+	/*
+	 * 防御：排布结果绝不能超过分配容量，否则下面的 memset/memcpy 会越界写。
+	 * ikaslr_var_capacity() 已保证 used <= cap，这里在任何写之前再兜一次底，
+	 * 以免将来改动 plan/capacity 时静默越界。
+	 */
+	if (WARN_ONCE(v->used > v->cap,
+		      "ikaslr: layout used %lu > cap %lu (%d fns), aborting prepare\n",
+		      v->used, v->cap, ikaslr_ntramp)) {
+		ikaslr_make_exec(v->base, npages);
+		return -ENOSPC;
+	}
 	memset(v->base, 0, v->used);
 	v->poisoned = false;
 
@@ -425,13 +449,19 @@ int ikaslr_rerandomize(void)
 		for (i = 0; i < ikaslr_ntramp; i++) {
 			const u8 *want = ikaslr_tbl[i]->body;
 			const u8 *got = next->base + next->off[i];
+			size_t n = min_t(size_t, 8, ikaslr_tbl[i]->size);
 
-			if (memcmp(want, got, min_t(size_t, 8, ikaslr_tbl[i]->size))) {
-				pr_err("integrity: %s target=%px off=%lu content mismatch "
-				       "(want %02x%02x%02x%02x got %02x%02x%02x%02x)\n",
-				       ikaslr_tbl[i]->name, got, next->off[i],
-				       want[0], want[1], want[2], want[3],
-				       got[0], got[1], got[2], got[3]);
+			/*
+			 * 打印全部被比较的 n 个字节，而不是只打头 4 个。
+			 * 否则头 4 字节相同（例如 endbr64 f3 0f 1e fa）而第 5~8
+			 * 字节不同时，日志会显示成 "want ...==got ..." 的假象，
+			 * 让真实的不一致无法从日志里看出来。
+			 */
+			if (memcmp(want, got, n)) {
+				pr_err("integrity: %s target=%px off=%lu content mismatch over %zu B\n"
+				       "  want %*ph\n  got  %*ph\n",
+				       ikaslr_tbl[i]->name, got, next->off[i], n,
+				       (int)n, want, (int)n, got);
 			}
 		}
 	}
