@@ -75,13 +75,18 @@ sudo ./10-compare-adelie-dbox.sh
 
 ## 真实测量必读（否则测出来的开销不反映真实防护）
 
-1. **编译器 pass（§0）**：默认 `CRR_TRAMPOLINE=n` 只随机化内建的 3 个示例函数，开销偏小，
-   仅供跑通流程。真实测量要：
-   ```bash
-   # 编辑 funcs.txt 填入被测负载热路径上的内核函数
-   CRR_TRAMPOLINE=y ./02-build-kernels.sh
-   ```
-   需已按 `../llvm/` 构建好 LLVM 插件并让主 Makefile 找得到（见仓库 README）。
+1. **编译器 pass（§0）—— 不开就等于没随机化。** 进入随机化集只有两条路：手工标注
+   `IKASLR_RAND_FN`（只有 selftest.c / randfuncs.c 里的 3 个示例函数，且它们是
+   `IKASLR_DEBUG` 专属，性能档 DEBUG 关闭时**根本不编译**），或编译器 pass。因此：
+   - 默认 `./02-build-kernels.sh`（R/RD 档，pass off、DEBUG off）：随机化表为空，
+     **一个函数都不随机化**，+R/+RD 与 base 几乎无差别——仅供跑通流程，**测不出真实开销**。
+   - 真实测量必须开 pass 并填名单：
+     ```bash
+     # 1) 构建 LLVM 插件（见仓库根 README / tools/ikaslr/llvm），让主 Makefile 找得到
+     # 2) 编辑 funcs.txt 填入被测负载热路径上的真实内核函数（vfs_read、tcp_sendmsg …）
+     CRR_TRAMPOLINE=y ./02-build-kernels.sh
+     ```
+     这样名单里的真实函数才会被改造成"可迁移体 + 固定跳板"，benchmark 的热路径才真正走随机化代码。
 
 2. **降噪**：05 会自动 `governor=performance` + 关 turbo。延迟类（cyclictest）还应关深
    C-state：给 `/etc/default/grub` 的 `GRUB_CMDLINE_LINUX_DEFAULT` 加
