@@ -29,3 +29,14 @@ config IKASLR_DEBUG
 	help
 	  打开 I-KASLR 各阶段的诊断输出（区域边界、指针表、随机化时间分解等）。
 
+
+config IKASLR_PACFI
+	bool "I-KASLR: randomization-assisted ARM PA precise CFI (Chapter 5)"
+	depends on IKASLR && ARM64 && ARM64_PTR_AUTH_KERNEL
+	help
+	  第 5 章：以随机化打断 ARM 指针认证的上下文传播链，对非随机化区域施加
+	  精准 CFI。进入随机化区域的间接调用免 PA 验证（区域内地址不可预测天然安全），
+	  离开时在 fixed_out 跳板上强制 PA 验证 + 白名单；被多个调用点共享的高扇入
+	  函数在运行时识别并移入随机化区域，从而切断传播链。
+
+	  需要 CPU 支持 FEAT_PAuth（QEMU -cpu max 提供）。研究用途。
