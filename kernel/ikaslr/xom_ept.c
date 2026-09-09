@@ -33,6 +33,8 @@
 #include <asm/tlbflush.h>
 #include <asm/special_insns.h>
 #include <asm/io.h>
+
+#include "internal.h"
 #include <asm/vmx.h>
 #include <uapi/asm/vmx.h>
 
@@ -60,9 +62,14 @@ static int ikaslr_ept_protect(unsigned long pa);
 static void ikaslr_ept_protect_free(void);
 static int ikaslr_vmlaunch_read_test(void *prot_va);
 static void ikaslr_guest_workload(long iters);
+static void ikaslr_guest_reader(long reads);
+static volatile u8 *ikaslr_guest_read_target;
 static int ikaslr_vmlaunch_loop(void (*guest_entry)(long), long arg);
-static u64 ikaslr_cpuid_exits, ikaslr_resume_count, ikaslr_ept_viol_count;
-static u32 ikaslr_unhandled_reason;
+static volatile u64 ikaslr_cpuid_exits, ikaslr_resume_count, ikaslr_ept_viol_count;
+static volatile u32 ikaslr_unhandled_reason;
+static volatile u64 ikaslr_reads_detected, ikaslr_rerand_requested;
+static void ikaslr_ept_set_readable(bool readable);
+static void ikaslr_set_mtf(bool on);
 static u64 *ept_pdpt;
 static unsigned long vmcs_fail_field;
 
@@ -216,6 +223,42 @@ static void ikaslr_ept_xom_test(void)
 			       "unhandled_reason=%u\n", rc,
 			       ikaslr_vmread(VM_INSTRUCTION_ERROR),
 			       ikaslr_unhandled_reason);
+	}
+
+	/* S2.5：re-arm，保护一页，guest 反复读它，验证检测式 XOM 完整循环。*/
+	{
+		u64 vpa = virt_to_phys(vmcs_region);
+		void *cpage = (void *)get_zeroed_page(GFP_KERNEL);
+		long reads = 5;
+		int rc;
+
+		if (!cpage)
+			return;
+		*(u8 *)cpage = 0xc3;
+		if (ikaslr_ept_has_xo() && !ikaslr_ept_protect(virt_to_phys(cpage)) &&
+		    !ikaslr_vmclear(vpa) && !ikaslr_vmptrld(vpa)) {
+			ikaslr_setup_vmcs();
+			ikaslr_reads_detected = ikaslr_rerand_requested = 0;
+			ikaslr_ept_viol_count = 0;
+			ikaslr_unhandled_reason = 0;
+			ikaslr_guest_read_target = cpage;
+
+			rc = ikaslr_vmlaunch_loop(ikaslr_guest_reader, reads);
+
+			if (rc == 0)
+				pr_info("S2.5 OK: guest read protected page %ld times; "
+					"reads detected=%llu, reprotect cycles=%llu, "
+					"rerand-would-trigger=%llu; unhandled=%u\n",
+					reads, ikaslr_reads_detected,
+					ikaslr_ept_viol_count, ikaslr_rerand_requested,
+					ikaslr_unhandled_reason);
+			else
+				pr_err("S2.5: loop rc=%d err=%lu unhandled=%u\n", rc,
+				       ikaslr_vmread(VM_INSTRUCTION_ERROR),
+				       ikaslr_unhandled_reason);
+		}
+		ikaslr_ept_protect_free();
+		free_page((unsigned long)cpage);
 	}
 }
 
@@ -807,9 +850,30 @@ int ikaslr_vmexit_dispatch(struct ikaslr_gregs *r)
 		return 0;
 	}
 	case EXIT_REASON_EPT_VIOLATION:
-		/* S2.5 将在此标记被探测函数并触发随机化；本步先计数并停机。*/
+		/*
+		 * 捕获到对被保护代码页的读取（§4.4.3 检测源一）。
+		 * 记录为"被探测"、请求一次随机化（经推迟路径，安全），然后临时开读 +
+		 * 置 MTF，放行这一次读；MTF handler 再把页恢复为 execute-only。
+		 */
 		ikaslr_ept_viol_count++;
-		return 1;
+		ikaslr_reads_detected++;
+		/*
+		 * 注意：这里**不**内联调用随机化。整个 EPT 测试跑在 local_irq_save
+		 * 窗口内，而随机化的 set_memory_* 会经 IPI 做跨核 TLB flush，在关中断
+		 * 且持有 VMCS 的上下文里会破坏系统状态（实测导致随后 init 段错误）。
+		 * 检测在此记录，触发随机化交由正常上下文（部署形态 S2.1e）。
+		 */
+		ikaslr_rerand_requested++;	/* 记录"本应触发一次" */
+		ikaslr_ept_set_readable(true);
+		ikaslr_set_mtf(true);
+		ikaslr_resume_count++;
+		return 0;			/* 重执行出错的读，随后 MTF 触发 */
+	case EXIT_REASON_MONITOR_TRAP_FLAG:
+		/* 那一次读已放行；关掉 MTF，把页恢复 execute-only。*/
+		ikaslr_set_mtf(false);
+		ikaslr_ept_set_readable(false);
+		ikaslr_resume_count++;
+		return 0;
 	case EXIT_REASON_VMCALL:
 		return 1;			/* guest 主动结束 */
 	default:
@@ -832,6 +896,19 @@ static noinline void ikaslr_guest_workload(long iters)
 	for (i = 0; i < iters; i++)
 		asm volatile ("cpuid" : : "a"(0) : "rbx", "rcx", "rdx");
 	asm volatile ("vmcall");
+	/* 不返回 */
+}
+
+/* 供 S2.5 的 guest：读被保护页 arg 次（每次触发检测式 XOM 循环），再 vmcall。*/
+static volatile u8 *ikaslr_guest_read_target;
+static noinline void ikaslr_guest_reader(long reads)
+{
+	long i;
+	u8 sink = 0;
+
+	for (i = 0; i < reads; i++)
+		sink += ikaslr_guest_read_target[0];
+	asm volatile ("vmcall" : : "a"(sink));
 	/* 不返回 */
 }
 
@@ -900,3 +977,54 @@ static int ikaslr_vmlaunch_loop(void (*guest_entry)(long), long arg)
 		  "cc", "memory");
 	return rc;
 }
+
+/*
+ * ===========================================================================
+ * S2.5：EPT violation → 检测 → 触发随机化（检测式 XOM 的完整循环）
+ * ===========================================================================
+ *
+ * §4.4.3 检测源一的正确响应是"允许这一次读发生、但把它当信号"：
+ *   1. 读被保护代码页 -> EPT violation；
+ *   2. 记录被探测、请求随机化；临时把该页改为可读，并置 MTF（单步）；
+ *   3. VMRESUME -> 出错的读指令重执行、成功；紧接着 MTF 触发新的 VM exit；
+ *   4. MTF handler：清 MTF、把该页恢复为 execute-only。
+ * 于是攻击者只读到一次（随即被随机化使其过期），而合法读（kprobes 等）也不会被
+ * 阻断——正是"检测而非阻断"。
+ *
+ * 单核下 INVEPT 单上下文即可；多核要跨核 shootdown（见 04a-ept-single-core.md）。
+ */
+
+/* INVEPT 单上下文（type 1）。*/
+static void ikaslr_invept(void)
+{
+	struct { u64 eptp, gpa; } desc = { ept_pointer, 0 };
+
+	asm volatile ("invept %[desc], %[type]"
+		      : : [desc] "m" (desc), [type] "r" (1ul) : "cc", "memory");
+}
+
+/* 把被保护页的 EPT 权限在 execute-only 与 RWX 之间切换，并刷新 EPT TLB。*/
+static void ikaslr_ept_set_readable(bool readable)
+{
+	unsigned long i4k = (ept_prot_pa >> 12) & 511;
+
+	if (readable)
+		ept_pt[i4k] = (ept_prot_pa & PAGE_MASK) | EPT_RWX | EPT_MT_WB;
+	else
+		ept_pt[i4k] = (ept_prot_pa & PAGE_MASK) | EPT_X | EPT_MT_WB;
+	ikaslr_invept();
+}
+
+/* MTF：在 primary proc-based controls 里置/清 monitor-trap-flag 位。*/
+static void ikaslr_set_mtf(bool on)
+{
+	unsigned long v = ikaslr_vmread(CPU_BASED_VM_EXEC_CONTROL);
+
+	if (on)
+		v |= CPU_BASED_MONITOR_TRAP_FLAG;
+	else
+		v &= ~CPU_BASED_MONITOR_TRAP_FLAG;
+	ikaslr_vmwrite(CPU_BASED_VM_EXEC_CONTROL, v);
+}
+
+/* ikaslr_reads_detected / ikaslr_rerand_requested 前置声明于文件上方 */

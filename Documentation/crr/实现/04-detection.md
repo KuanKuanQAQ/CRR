@@ -31,6 +31,7 @@ hypervisor 把自身降为 guest，用 EPT 施加"内核自己关不掉的"页�
 | S2.1b-2b | VMLAUNCH 把内核降为 self-guest，捕获 VM exit | ✓ 已验证 |
 | S2.1c | .rand.text 页设 execute-only，guest 读触发 EPT violation | ✓ 已验证 |
 | S2.1d | exit/VMRESUME 循环，guest 跨多次 exit 持续运行 | ✓ 已验证 |
+| S2.5 | EPT violation → 检测 → MTF 放行一次读 → 重新保护 | ✓ 已验证 |
 | S2.1c | EPT 把代码物理页设为不可读，读触发 EPT violation 被捕获 | 待做 |
 | S2.1d | 内存池划分 + 分配器适配 + 加载期页表切换 | 待做 |
 | S2.5 | EPT violation → 控制流审计 → 触发随机化 | 待做 |
@@ -147,11 +148,43 @@ stack-protector panic。改为 HOST_RSP = 本函数当前 rsp，exit 处理落�
 `04a-ept-single-core.md`）。这是"用 QEMU+KVM 模拟裸机"这一方法在 VM-exit 密集
 测量上的固有局限，须如实写明。
 
-### S2.5（下一步）
+### S2.5：检测式 XOM 完整循环（已验证）
 
-EPT violation → 标记被探测函数 → 第 4 章控制流审计（detect.c，已实现）→ 触发随机化；
-并把保护对象从测试页换成真正的 `.rand.text` / 当前 live 变体。分发器里 EPT violation
-的分支已留好接入点。
+§4.4.3 检测源一的正确响应是"允许这一次读、但当作信号",用 MTF（Monitor Trap Flag）
+单步实现：
+
+1. guest 读被保护代码页 → EPT violation；
+2. handler 记录检测 → 临时把该页改为可读（改 EPT 项 + INVEPT）→ 置 MTF → VMRESUME；
+3. 出错的读指令重执行、成功；紧接着 MTF 触发新的 VM exit；
+4. MTF handler：清 MTF → 把该页恢复 execute-only（改 EPT 项 + INVEPT）→ VMRESUME。
+
+于是攻击者只读到一次（随即被随机化使其过期），合法读也不被阻断——"检测而非阻断"。
+实测 guest 读被保护页 5 次：
+
+```
+S2.5 OK: guest read protected page 5 times;
+         reads detected=5, reprotect cycles=5, rerand-would-trigger=5; unhandled=0
+```
+
+5 次读全部被捕获，每次都完成"放行一次 + 重新关上"的循环。
+
+**关键：触发随机化不在 VM exit handler 内联做。** 整个 EPT 测试跑在 `local_irq_save`
+窗口内，而随机化的 `set_memory_*` 会经 IPI 做跨核 TLB flush，在关中断且持有 VMCS
+的上下文里会破坏系统状态（实测导致随后 init 段错误）。因此 handler 只记录检测，
+触发随机化交由正常上下文——这也是部署形态（S2.1e）要处理的：内核持续运行在 guest
+下时，从 EPT violation 到随机化的触发需要跨越 host/guest 上下文，须谨慎协调。
+
+一个排错记录：跨 `static` 的 `ikaslr_vmlaunch_loop` 边界，编译器把 exit 计数器缓存在
+寄存器里（asm 内的 `call dispatch` 尽管有 memory clobber 却未被视为改写这些全局量），
+导致计数读回为 0。把计数器标 `volatile` 即修复。
+
+## 剩余：S2.1e（部署形态）/ S2.3（LBR）/ S2.2（arm64，需真机）
+
+- **S2.1e**：让内核主线**持续**运行在 guest 下（而非仅测试窗口），保护对象为真正的
+  `.rand.text` / live 变体，EPT violation 在正常上下文触发随机化。这是"能测真实负载
+  开销"的部署形态，也是本路径剩余的主要工程。
+- S2.3：用 LBR 精确分类 exit 来源（增强控制流审计，见 detect.c）。
+- S2.2：arm64 观察点路径（含多核，需真机）。
 
 ## S2.2/S2.3/S2.5（待做）
 

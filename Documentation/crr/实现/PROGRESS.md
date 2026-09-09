@@ -59,7 +59,7 @@
 | S2.2 | ARM 观察点 XOM（DBGWCR MASK、per-cpu、hw_breakpoint 协调） | [ ] | | 第4.5.2 节；并入 hw_breakpoint 模块；R-42 |
 | S2.3 | 多源检测（代码读取处理、执行试探 LBR 回溯、控制流异常） | [ ] | | 第4.4.3 节 |
 | S2.4 | 控制流审计（陷阱页重映射 + 入口/中部判据） | [q] | ✓ | 8 次压测通过；LBR 精确分类留 S2.3 |
-| S2.5 | 按需触发接到第3章随机化 | [ ] | | 第4.4.5 节 |
+| S2.5 | EPT violation → 检测 → MTF 重保护循环 | [q] | ✓ | guest 读被保护页 5 次全捕获，检测式 XOM 循环闭环 |
 | S2.6 | 评估用含漏洞模块（任意读写） | [q] | ✓ | QEMU 实测用户态经后门读到随机化区代码；严格 Kconfig 门 + TAINT |
 
 ## Phase 3 — 第5章：随机化辅助的 ARM PA 精准 CFI（ARM）
@@ -111,7 +111,7 @@
 
 下一步顺序：**EPT 方案已简化为单核量身定制**（作者确认；多核由 watchpoint 承担，理由见 `04a-ept-single-core.md`）。范围：单核 + passthrough 一切 + 只处理 CPUID/EPT-violation + 只保护静态 .rand.text，约 500 行。
 
-→ S2.1a/b-1/b-2 全部验证（**VMLAUNCH 把内核降为 self-guest 成功**）→ S2.1a/b/c/d 全部验证（**EPT XOM + exit/VMRESUME 循环打通**）→ **S2.5（EPT violation 接 detect.c 控制流审计 + 触发随机化；保护对象换成真正的 live 变体）** → S2.3（LBR）、S2.2（arm64 观察点，需真机）→ Phase 3 → S2.1c（.rand.text 设 X-only，读触发 EPT violation 被捕获）→ S2.5（violation 接控制流审计）→ S2.2（arm64 观察点，含多核，需真机）→ Phase 3。
+→ S2.1a/b-1/b-2 全部验证（**VMLAUNCH 把内核降为 self-guest 成功**）→ S2.1a/b/c/d + S2.5 全部验证（**检测式 XOM 完整循环闭环**）→ **S2.1e（内核主线持续运行在 guest 下的部署形态，测真实负载开销）** 或 **S2.2（arm64 观察点，需真机）/ Phase 3（PA CFI，需真机）**。x86 EPT 检测机制已完整验证，S2.1e 是部署工程。 → S2.1c（.rand.text 设 X-only，读触发 EPT violation 被捕获）→ S2.5（violation 接控制流审计）→ S2.2（arm64 观察点，含多核，需真机）→ Phase 3。
 
 > **稳定性基线**：连续 12 次启动全部通过（含 8 次用户态触发的随机化）。修复前约 3–4/12 失败。任何改动随机化布局的修改，都应重跑这个压力测试。
 
@@ -135,6 +135,7 @@
 - 2026-09-09：S1.10a LLVM pass 完成并运行验证；发现并修正两处会静默破坏不变式的坑（内联绕过跳板、改名不重定向调用者）。S1.10b GCC 插件源码就位但本机缺 plugin-dev 无法编译。
 - 2026-09-09：S0.4/S0.5 测量脚本（实测 IBT 等价类 38,180）。S4.1 跳板微开销测量：发现 wake_up 风暴并修正（224→133 ns），新增独立的 CONFIG_IKASLR_STATS，生产配置 102 ns/次；关键结论是开销在**计数**而非间接转移（2 ns）。
 - 2026-09-09：S0.6 CVE 可模块化统计脚本，**独立复现论文表 1-2**（可模块化 7299 vs 论文 7295，子系统分布亦吻合）。Phase 0 全部完成。
+- 2026-09-09：**S2.5 检测式 XOM 完整循环闭环**——guest 读被保护页触发 EPT violation，记录检测后用 MTF 单步放行这一次读、再恢复 execute-only；5 次读全捕获。触发随机化不在 VMX/关中断窗口内联（会 IPI 死锁/破坏），留正常上下文。修 volatile 计数缓存 bug。**第4章 EPT 检测路径整条链打通。**
 - 2026-09-09：**S2.1d exit/VMRESUME 循环打通**——guest 跑 10 万次 CPUID 跨 10 万次 VM exit，全部处理无 panic。修 HOST_RSP 栈 bug。**重要发现：嵌套虚拟化下 VM exit 开销被 L0 放大约 10 倍(18279 cyc/exit)，论文里 VM-exit 密集的绝对开销数字须标注环境或裸机复测。**
 - 2026-09-09：**S2.1c 物理页级 XOM 验证成功**——EPT 拆页(1GB→2MB→4KB)后把页设为 execute-only，guest 读它触发 EPT violation(gpa 精确匹配，qual=0x1a1 读访问)。第4章检测源一的硬件机制打通。踩到 VMLAUNCH-with-non-clear-VMCS(err=4)，需 VMCLEAR+VMPTRLD 重置。
 - 2026-09-09：**S2.1b-2 VMLAUNCH 把内核降为 self-guest 成功**（一次通过，得益于先做全字段校验 S2.1b-2a）——EPT 路径最难的一关过了。VM exit reason=18 被捕获，无三重故障，全部 selftest+SMOKE 仍 PASS。
