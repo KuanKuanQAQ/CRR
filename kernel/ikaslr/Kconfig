@@ -30,6 +30,20 @@ config IKASLR_DEBUG
 	  打开 I-KASLR 各阶段的诊断输出（区域边界、指针表、随机化时间分解等）。
 
 
+config IKASLR_XOM_EPT
+	bool "I-KASLR: x86 EPT execute-only memory for leak detection (Chapter 4)"
+	depends on IKASLR && X86_64
+	help
+	  第 4 章 x86 路径：内核自举为嵌套 hypervisor，用 EPT 把随机化区域设为
+	  只执行内存（R=0,W=0,X=1）。攻击者对随机化代码的读探测触发 EPT violation，
+	  经 MTF 单步"放行一次读"后重新加保护，从而检测泄漏尝试。
+
+	  仅单核（多核 EPT 的物理页全局开窗与 INVEPT shootdown 问题见设计文档；
+	  多核场景由 arm64 观察点方案覆盖）。带此配置的内核用于性能测试的 +RD 档时，
+	  须以 nr_cpus=1 启动，且对比的其它档也须 nr_cpus=1（见 10-perf-plan.md §2）。
+
+	  需要 CPU 支持 VMX 且 BIOS 已开启虚拟化。研究用途。
+
 config IKASLR_PACFI
 	bool "I-KASLR: randomization-assisted ARM PA precise CFI (Chapter 5)"
 	depends on IKASLR && ARM64 && ARM64_PTR_AUTH_KERNEL

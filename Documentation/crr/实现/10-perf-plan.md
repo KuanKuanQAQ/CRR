@@ -1,7 +1,7 @@
 # I-KASLR 性能开销完整测试方案（裸机部署）
 
 面向作者在**两台真机**（x86-64 一台、arm64 一台）上**裸机**部署测试。方法：同一台机器、
-同一 rootfs、同一套 benchmark，**只换内核 + 重启**做 A/B。配套脚本在 `scripts/ikaslr/perf/`。
+同一 rootfs、同一套 benchmark，**只换内核 + 重启**做 A/B。**一键脚本与用法见 [`scripts/ikaslr/perf/README.md`](../../../scripts/ikaslr/perf/README.md)**（01 装依赖 → 02 编内核 → 03 装 GRUB → 04 选档重启 → 05 跑测 → 06 汇总）。
 
 > **为什么裸机（而非 QEMU）**：本仓库开发期的性能数字取自 QEMU（x86 EPT 走嵌套虚拟化，
 > VM exit 开销被放大约 10 倍；arm64 走 TCG 纯模拟，绝对时间无意义）。**那些不是论文最终
@@ -64,7 +64,7 @@
 
 - **关键纪律：四档之间只能差 IKASLR 相关 CONFIG。** 同一份 base `.config`，只 toggle
   `IKASLR*` 开关，编译器/CONFIG_HZ/mitigations/base-KASLR 全部保持一致——否则测的是 config
-  噪声不是随机化开销。配置生成：`scripts/ikaslr/perf/gen-configs.sh`。
+  噪声不是随机化开销。配置生成：`02-build-kernels.sh`（据 `env.sh` 的矩阵，各档只 toggle IKASLR）。
 - **+R 的定频驱动**：`trigger-loop.sh <间隔ms>` 从用户态定时写 `/proc/ikaslr/trigger`，间隔取
   与 Adelie 相同值（如 20 ms）便于同台对比；正文写明该值（§6.5.1 R-62）。
 - **x86 XOM 是单核机制**：+RD(x86) 内核只在单核成立。做 XOM 开销对比时，**所有参与对比的档
@@ -81,7 +81,7 @@
 ```
 一次性准备（在正常内核下）：
   1. apt 装全部 benchmark（§1）；git clone + make LMBench / UnixBench。
-  2. 为配置矩阵每档编译一个内核（gen-configs.sh + 编译器 pass，见 §0），
+  2. 为配置矩阵每档编译一个内核（`02-build-kernels.sh`，编译器 pass 见 §0），
      make modules_install install —— 装进本机 /boot，各档一个 GRUB 菜单项。
   3. 记录每个内核的 GRUB entry 名（menuentry id），供 grub-reboot 脚本化选择。
   4. 造独占 scratch 分区/文件给 fio（§5 E7）。
@@ -90,10 +90,10 @@
   5. grub-reboot "<该档 entry>" && reboot     # 指定下次启动进哪个内核
   6. 起来后 uname -a / dmesg | grep ikaslr 确认进对了内核、机制已启用。
   7. +R/+RD/+RDP：后台起 trigger-loop.sh <间隔> 让随机化真在跑。
-  8. run-suite.sh <config>  ——  收集 /results/<arch>/<config>/ 原始数据。
+  8. `05-run-suite.sh` —— 自动识别当前档，收集 results/<arch>/<config>/ 原始数据。
   9. 跑完回到 host 环境，换下一档，回到第 5 步。
 所有档跑完：
- 10. analyze.py 汇总成四档对比表/图。
+ 10. `06-analyze.py` 汇总成四档对比表。
 ```
 
 **测量纪律（裸机比 VM 更敏感，务必执行）**：
@@ -212,7 +212,7 @@ done
 ## 6. 数据采集与分析
 
 - 原始数据落 `/results/<arch>/<config>/<test>.txt`。
-- `scripts/ikaslr/perf/analyze.py` 解析各工具输出，出：四档对比表、开销柱状图、
+- `scripts/ikaslr/perf/06-analyze.py` 解析各工具输出，出：四档对比表、开销柱状图、
   频率敏感性折线、范围敏感性曲线。
 - 每项 ≥5 次，报中位数 + 四分位/置信区间。
 - E12 归因（§6.9）：用 `perf` 采样把端到端开销拆回来源（跳板间接跳转、计数、白名单、
