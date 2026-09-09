@@ -59,6 +59,10 @@ static bool ikaslr_ept_has_xo(void);
 static int ikaslr_ept_protect(unsigned long pa);
 static void ikaslr_ept_protect_free(void);
 static int ikaslr_vmlaunch_read_test(void *prot_va);
+static void ikaslr_guest_workload(long iters);
+static int ikaslr_vmlaunch_loop(void (*guest_entry)(long), long arg);
+static u64 ikaslr_cpuid_exits, ikaslr_resume_count, ikaslr_ept_viol_count;
+static u32 ikaslr_unhandled_reason;
 static u64 *ept_pdpt;
 static unsigned long vmcs_fail_field;
 
@@ -177,6 +181,42 @@ static void ikaslr_ept_xom_test(void)
 	}
 	ikaslr_ept_protect_free();
 	free_page((unsigned long)page);
+
+	/* S2.1d：re-arm VMCS，跑受控 guest workload，验证 exit/VMRESUME 循环并测开销。*/
+	{
+		u64 vpa = virt_to_phys(vmcs_region);
+		long iters = 100000;
+		u64 c0, c1;
+		int rc;
+
+		if (ikaslr_vmclear(vpa) || ikaslr_vmptrld(vpa)) {
+			pr_err("S2.1d: re-arm failed\n");
+			return;
+		}
+		ikaslr_setup_vmcs();
+		if (vmcs_fail_field) {
+			pr_err("S2.1d: VMCS re-setup failed at %lx\n", vmcs_fail_field);
+			return;
+		}
+		ikaslr_cpuid_exits = ikaslr_resume_count = 0;
+		ikaslr_unhandled_reason = 0;
+
+		c0 = rdtsc();
+		rc = ikaslr_vmlaunch_loop(ikaslr_guest_workload, iters);
+		c1 = rdtsc();
+
+		if (rc == 0)
+			pr_info("S2.1d OK: guest ran %ld CPUIDs across %llu VM exits, "
+				"%llu cycles total (%llu cyc/exit); unhandled=%u\n",
+				iters, ikaslr_cpuid_exits, c1 - c0,
+				ikaslr_cpuid_exits ? (c1 - c0) / ikaslr_cpuid_exits : 0,
+				ikaslr_unhandled_reason);
+		else
+			pr_err("S2.1d: loop failed rc=%d, VM_INSTRUCTION_ERROR=%lu, "
+			       "unhandled_reason=%u\n", rc,
+			       ikaslr_vmread(VM_INSTRUCTION_ERROR),
+			       ikaslr_unhandled_reason);
+	}
 }
 
 /*
@@ -700,4 +740,163 @@ static int ikaslr_vmlaunch_read_test(void *prot_va)
 		: "rax", "cc", "memory");
 
 	return fail ? -1 : 0;
+}
+
+/*
+ * ===========================================================================
+ * S2.1d：exit / VMRESUME 循环 —— guest 跨多次 VM exit 持续运行
+ * ===========================================================================
+ *
+ * 设计：HOST_RIP 指向 launch asm 块里的 exit 处理段，HOST_RSP 指向一个专用退出栈。
+ * 每次 VM exit CPU 都回到该处（host 状态、退出栈）：把 guest GPR 压到退出栈上，
+ * 调用 C 分发器处理，然后恢复 GPR 并 VMRESUME 回 guest。guest 有自己的栈，与退出
+ * 栈分离，因此 exit 处理不扰动 guest 栈。
+ *
+ * 配置为最小拦截（pin-based/异常位图为 0），故中断与异常由 guest 内核自己的 IDT
+ * 处理、不 exit。持续运行中会 exit 的只有无条件指令：CPUID、XSETBV，以及我们要的
+ * EPT violation。分发器逐一处理并前进 GUEST_RIP，其余 reason 一律停机上报。
+ *
+ * 本步用一个受控 guest workload（若干次 CPUID + 读）把循环跑通并测开销；让内核
+ * 主线永久运行在 guest 下是部署形态（S2.1e / 后续），风险更高，单列。
+ */
+
+/* guest 退出时保存的通用寄存器（单核、关中断，静态即可）。*/
+struct ikaslr_gregs {
+	u64 rax, rbx, rcx, rdx, rsi, rdi, rbp;
+	u64 r8, r9, r10, r11, r12, r13, r14, r15;
+};
+
+/* 计数器前置声明于文件上方 */
+
+static void ikaslr_advance_rip(void)
+{
+	unsigned long len = ikaslr_vmread(VM_EXIT_INSTRUCTION_LEN);
+	unsigned long rip = ikaslr_vmread(GUEST_RIP);
+
+	ikaslr_vmwrite(GUEST_RIP, rip + len);
+}
+
+/*
+ * VM exit 分发器（由 launch asm 段调用，参数为退出栈上保存的 guest GPR）。
+ * 返回 0 = VMRESUME 回 guest；1 = 停机退出循环。
+ */
+int ikaslr_vmexit_dispatch(struct ikaslr_gregs *r);
+int ikaslr_vmexit_dispatch(struct ikaslr_gregs *r)
+{
+	u32 reason = ikaslr_vmread(VM_EXIT_REASON) & 0xffff;
+
+	switch (reason) {
+	case EXIT_REASON_CPUID: {
+		u32 a = r->rax, c = r->rcx, eax, ebx, ecx, edx;
+
+		asm volatile ("cpuid"
+			      : "=a"(eax), "=b"(ebx), "=c"(ecx), "=d"(edx)
+			      : "a"(a), "c"(c));
+		r->rax = eax; r->rbx = ebx; r->rcx = ecx; r->rdx = edx;
+		ikaslr_cpuid_exits++;
+		ikaslr_advance_rip();
+		ikaslr_resume_count++;
+		return 0;
+	}
+	case EXIT_REASON_XSETBV: {
+		u32 ecx = r->rcx, eax = r->rax, edx = r->rdx;
+
+		asm volatile ("xsetbv" : : "a"(eax), "c"(ecx), "d"(edx));
+		ikaslr_advance_rip();
+		ikaslr_resume_count++;
+		return 0;
+	}
+	case EXIT_REASON_EPT_VIOLATION:
+		/* S2.5 将在此标记被探测函数并触发随机化；本步先计数并停机。*/
+		ikaslr_ept_viol_count++;
+		return 1;
+	case EXIT_REASON_VMCALL:
+		return 1;			/* guest 主动结束 */
+	default:
+		ikaslr_unhandled_reason = reason;
+		return 1;
+	}
+}
+
+/* guest 栈（受控 workload 使用；host 退出处理用本函数 C 栈，见 vmlaunch_loop）。*/
+static u8 ikaslr_guest_stack[8192] __aligned(16);
+
+/*
+ * 受控 guest workload：做 iters 次 CPUID（每次都会 VM exit → 分发 → resume），
+ * 借此把 exit/VMRESUME 循环跑满，然后 vmcall 结束。纯计算 + CPUID，不触发别的 exit。
+ */
+static noinline void ikaslr_guest_workload(long iters)
+{
+	long i;
+
+	for (i = 0; i < iters; i++)
+		asm volatile ("cpuid" : : "a"(0) : "rbx", "rcx", "rdx");
+	asm volatile ("vmcall");
+	/* 不返回 */
+}
+
+/*
+ * 启动 guest 并驱动 exit/VMRESUME 循环，直到分发器决定停机。
+ * 返回 0 成功（正常停机），-1 = VMLAUNCH 失败，-2 = VMRESUME 失败。
+ */
+static int ikaslr_vmlaunch_loop(void (*guest_entry)(long), long arg)
+{
+	int rc = 0;
+
+	/* RSP/RIP 字段先在 C 里用现成的 vmwrite 写好（字段须为寄存器操作数）。*/
+	ikaslr_vmwrite(GUEST_RSP,
+		       (unsigned long)&ikaslr_guest_stack[sizeof(ikaslr_guest_stack) - 16]);
+	ikaslr_vmwrite(GUEST_RIP, (unsigned long)guest_entry);
+	/*
+	 * HOST_RSP 必须 = 本函数当前的 rsp（不能用独立退出栈）：VM exit 时 CPU 把
+	 * rsp 设为 HOST_RSP，若指向别的栈，停机后返回本函数就带着错误的 rsp，
+	 * 触发 stack-protector（实测踩到）。设为当前 rsp 后，每次 exit 落在本函数
+	 * 栈帧之下，停机时把 15 个已压的 GPR 弹掉即回到正确 rsp。guest 有独立的
+	 * guest_stack，故不与之冲突。
+	 */
+
+	asm volatile (
+		/* HOST_RSP = 当前 rsp。*/
+		"mov %[hrsp], %%rdx\n\t"
+		"vmwrite %%rsp, %%rdx\n\t"
+		/* HOST_RIP = 1f（exit 处理段）。*/
+		"lea 1f(%%rip), %%rax\n\t"
+		"mov %[hrip], %%rdx\n\t"
+		"vmwrite %%rax, %%rdx\n\t"
+		/* guest 从 GUEST_RIP 开始时 rdi = 此刻的 rdi，故把 arg 放进 rdi。*/
+		"mov %[arg], %%rdi\n\t"
+		"vmlaunch\n\t"
+		"jmp 3f\n\t"			/* VMLAUNCH 失败 */
+
+		"1:\n\t"			/* 每次 VM exit 回到这（host 状态，退出栈）*/
+		"push %%r15\n\t push %%r14\n\t push %%r13\n\t push %%r12\n\t"
+		"push %%r11\n\t push %%r10\n\t push %%r9\n\t push %%r8\n\t"
+		"push %%rbp\n\t push %%rdi\n\t push %%rsi\n\t push %%rdx\n\t"
+		"push %%rcx\n\t push %%rbx\n\t push %%rax\n\t"
+		"mov %%rsp, %%rdi\n\t"		/* &gregs（rax 在最低地址）*/
+		"call ikaslr_vmexit_dispatch\n\t"
+		"test %%eax, %%eax\n\t"
+		"jnz 2f\n\t"			/* 停机 */
+		"pop %%rax\n\t pop %%rbx\n\t pop %%rcx\n\t pop %%rdx\n\t"
+		"pop %%rsi\n\t pop %%rdi\n\t pop %%rbp\n\t pop %%r8\n\t"
+		"pop %%r9\n\t pop %%r10\n\t pop %%r11\n\t pop %%r12\n\t"
+		"pop %%r13\n\t pop %%r14\n\t pop %%r15\n\t"
+		"vmresume\n\t"
+		"movl $-2, %[rc]\n\t"		/* VMRESUME 失败 */
+		"jmp 4f\n\t"
+
+		"2:\n\t"			/* 正常停机：丢弃保存的 GPR，返回 0 */
+		"add $120, %%rsp\n\t"		/* 15 * 8 = 120 */
+		"jmp 4f\n\t"
+		"3:\n\t"
+		"movl $-1, %[rc]\n\t"
+		"4:\n\t"
+		: [rc] "+m" (rc)
+		: [hrip] "i" ((unsigned long)HOST_RIP),
+		  [hrsp] "i" ((unsigned long)HOST_RSP),
+		  [arg] "m" (arg)
+		: "rax", "rbx", "rcx", "rdx", "rsi", "rdi", "rbp",
+		  "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15",
+		  "cc", "memory");
+	return rc;
 }

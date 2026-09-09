@@ -29,6 +29,8 @@ hypervisor 把自身降为 guest，用 EPT 施加"内核自己关不掉的"页�
 | S2.1b-1 | EPT identity 页表 + VMCS 加载 + EPTP 写入校验 | ✓ 已验证 |
 | S2.1b-2a | 填满并校验全部 VMCS 字段（不 VMLAUNCH） | ✓ 已验证 |
 | S2.1b-2b | VMLAUNCH 把内核降为 self-guest，捕获 VM exit | ✓ 已验证 |
+| S2.1c | .rand.text 页设 execute-only，guest 读触发 EPT violation | ✓ 已验证 |
+| S2.1d | exit/VMRESUME 循环，guest 跨多次 exit 持续运行 | ✓ 已验证 |
 | S2.1c | EPT 把代码物理页设为不可读，读触发 EPT violation 被捕获 | 待做 |
 | S2.1d | 内存池划分 + 分配器适配 + 加载期页表切换 | 待做 |
 | S2.5 | EPT violation → 控制流审计 → 触发随机化 | 待做 |
@@ -114,12 +116,42 @@ S2.1c: physical-page XOM is effective
 > 标为 clear（内容保留）、`VMPTRLD` 重新设为当前 VMCS，之后才能再次 VMLAUNCH；
 > 持续运行的形态里则应改用 **VMRESUME**。
 
-### S2.1d / S2.5（下一步）
+### S2.1d：exit / VMRESUME 循环（已验证）
 
-- S2.1d：完整 exit/VMRESUME 循环（处理 CPUID 等无条件 exit），让内核主线**持续**在
-  guest 里运行，以测量端到端开销与 EPT violation 处理延迟（§4.6.4）。
-- S2.5：EPT violation → 标记被探测函数 → 第 4 章控制流审计 → 触发随机化；
-  并把保护对象从测试页换成真正的 `.rand.text` / 当前 live 变体。
+HOST_RIP 指向 launch asm 块里的 exit 处理段，每次 VM exit CPU 回到那里（host 状态），
+把 guest GPR 压栈、调 C 分发器、恢复 GPR、VMRESUME。配置为最小拦截（中断/异常不
+exit，由 guest 内核自己的 IDT 处理），持续运行中只有无条件指令 exit：CPUID、XSETBV
+（模拟后前进 GUEST_RIP）与 EPT violation。
+
+实测：受控 guest workload 跑 **10 万次 CPUID、跨 10 万次 VM exit**，全部处理，
+`unhandled=0`，栈干净，selftest+SMOKE 全 PASS，无 panic：
+
+```
+S2.1d OK: guest ran 100000 CPUIDs across 100000 VM exits,
+          1827935060 cycles total (18279 cyc/exit); unhandled=0
+```
+
+**踩到的坑**：HOST_RSP 若指向独立退出栈，停机返回本函数时会带着错误的 rsp，触发
+stack-protector panic。改为 HOST_RSP = 本函数当前 rsp，exit 处理落在函数栈帧之下、
+停机时弹掉即可。
+
+### ⚠ 重要 caveat：嵌套虚拟化下 VM exit 开销被放大约 10 倍
+
+**18279 cyc/exit 是嵌套虚拟化环境下的数字，不代表裸机。** 我们的 L1 hypervisor 每
+触发一次 VM exit，都要被 L0 的 KVM 拦截并模拟（L0 要处理 L1 的 VMRESUME/exit），
+因此比真正裸机上的 CPUID exit（约 1–2k cycles）贵约一个数量级。
+
+对论文的影响：**§4.6.4 / §6.5 中一切"每次 EPT violation / VM exit 开销"的绝对数字，
+若取自 QEMU+KVM 嵌套环境，都是悲观值**，应当明确标注测量环境，或在裸机上复测。
+这也再次说明观察点路径的价值：它不经虚拟化，开销数字直接可用（呼应
+`04a-ept-single-core.md`）。这是"用 QEMU+KVM 模拟裸机"这一方法在 VM-exit 密集
+测量上的固有局限，须如实写明。
+
+### S2.5（下一步）
+
+EPT violation → 标记被探测函数 → 第 4 章控制流审计（detect.c，已实现）→ 触发随机化；
+并把保护对象从测试页换成真正的 `.rand.text` / 当前 live 变体。分发器里 EPT violation
+的分支已留好接入点。
 
 ## S2.2/S2.3/S2.5（待做）
 
