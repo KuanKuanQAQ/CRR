@@ -183,8 +183,88 @@ void ikaslr_pacfi_finalize(struct ikaslr_fptr *f)
 	f->finalized = true;
 }
 
+/*
+ * ===========================================================================
+ * S3.4：跳板处的分区 PA 验证（论文 §5.4.4）
+ * ===========================================================================
+ *
+ * 按控制流方向差异化处理：
+ *   进入随机化区域（fixed_in）：**免 PA 验证**——区域内地址不可预测，即便攻击者
+ *     篡改了函数指针也无法使其指向区域内某个特定 gadget，随机化已提供保护。
+ *   离开随机化区域（fixed_out）：**强制 PA 验证 + 白名单**——目标在非随机化区域，
+ *     地址已知固定。
+ *
+ * 开销下降的来源：只有跨区域（fixed_out）的间接转移需要 PA，进入随机化区域的
+ * 一概免验。§5.6.3 的"PA 验证次数下降"即由此而来，比例取决于随机化范围。
+ */
+static atomic_long_t pacfi_in_skipped;	/* fixed_in 免验的次数 */
+static atomic_long_t pacfi_out_verified;/* fixed_out 施加 PA 验证的次数 */
+
+void ikaslr_pacfi_partition_stats(unsigned long *in_skipped,
+				  unsigned long *out_verified)
+{
+	*in_skipped = atomic_long_read(&pacfi_in_skipped);
+	*out_verified = atomic_long_read(&pacfi_out_verified);
+}
+
+/* fixed_in：进入随机化区域，免 PA。仅计数（说明"这一类调用不验证"）。*/
+void ikaslr_pacfi_in(void)
+{
+	atomic_long_inc(&pacfi_in_skipped);
+}
+
+/*
+ * fixed_out：离开随机化区域。对目标施加 PA 验证 + 白名单（§5.4.4）。
+ * signed_target 为调用点以其唯一上下文签名的目标指针；expected 为合法原始地址。
+ * 返回可调用地址；验证失败返回 NULL（V4-B 劫持被拒）。
+ */
+void *ikaslr_pacfi_out(u64 signed_target, int cs_id, void *expected)
+{
+	u64 authed;
+
+	atomic_long_inc(&pacfi_out_verified);
+
+	/* PA 验证：目标必须以本调用点上下文正确签名。*/
+	authed = ikaslr_pac_auth(signed_target, ikaslr_ctx_callsite(cs_id));
+	if (authed != (u64)expected) {
+		atomic_long_inc(&pacfi_violations);
+		return NULL;
+	}
+	/* 白名单：目标必须是编译期登记的合法跨区域目标（§3.5.2，复用第 3 章）。*/
+	if (!ikaslr_whitelist_ok(expected)) {
+		atomic_long_inc(&pacfi_violations);
+		return NULL;
+	}
+	return expected;
+}
+
+/*
+ * ===========================================================================
+ * S3.5：高扇入函数迁入随机化区域（论文 §5.5.3）
+ * ===========================================================================
+ *
+ * 识别出的高扇入函数移入随机化区域后，其地址不可预测、天然不可劫持，因此**不再
+ * 参与 PA 验证**——这一点已由 ikaslr_pacfi_verify() 的 high_fanin 提前返回实现：
+ * 传播链在此被切断，两侧调用点各自保有唯一上下文。
+ *
+ * 物理迁移（在随机化区域分配、复制函数体、生成跳板、纳入变体池）复用第 3 章的
+ * 随机化机制；此处提供逻辑登记，把函数标记为"已迁入、免 PA"。真实系统里由编译器
+ * 为高扇入函数生成 fixed_in/fixed_out（S3.1 的 pass 扩展）。
+ */
+void ikaslr_pacfi_migrate(struct ikaslr_fptr *f)
+{
+	if (!f->high_fanin) {
+		f->high_fanin = true;	/* 强制迁移（阈值可由 S5.5.3 调整）*/
+		atomic_long_inc(&pacfi_highfanin);
+	}
+	/* 迁入后 verify() 走 high_fanin 分支免 PA；物理迁移见第 3 章。*/
+}
+
 #ifdef CONFIG_IKASLR_DEBUG
+static void __init ikaslr_pacfi_ident_test(void);
+static void __init ikaslr_pacfi_partition_test(void);
 static void ikaslr_pacfi_dummy(void) { }
+IKASLR_WHITELIST(ikaslr_pacfi_dummy);  /* fixed_out 白名单需要它 */
 
 /* S3.2/S3.3：高扇入识别与定稿。CS 用小整数 id 代表不同调用点。*/
 static void __init ikaslr_pacfi_ident_test(void)
@@ -254,10 +334,48 @@ static void __init ikaslr_pacfi_ident_test(void)
 	ikaslr_pacfi_cfi_stats(&v1, &h1);
 	pr_info("ident: PASS - claim, high-fanin x2 (%lu->%lu), CFI violation (%lu->%lu), "
 		"finalize+unique-context\n", h0, h1, v0, v1);
+
+	ikaslr_pacfi_partition_test();
+}
+
+/* S3.4：分区验证——fixed_in 免验、fixed_out 验证 + 白名单。*/
+static void __init ikaslr_pacfi_partition_test(void)
+{
+	unsigned long in0, out0, in1, out1, v0, v1;
+	u64 sig;
+	void *r;
+	int cs = 55;
+
+	unsigned long hh;
+
+	ikaslr_pacfi_partition_stats(&in0, &out0);
+	ikaslr_pacfi_cfi_stats(&v0, &hh);
+
+	/* 10 次进入随机化区域：免 PA。*/
+	{ int i; for (i = 0; i < 10; i++) ikaslr_pacfi_in(); }
+
+	/* fixed_out：合法签名目标通过。*/
+	sig = ikaslr_pac_sign((u64)ikaslr_pacfi_dummy, ikaslr_ctx_callsite(cs));
+	r = ikaslr_pacfi_out(sig, cs, (void *)ikaslr_pacfi_dummy);
+	if (r != (void *)ikaslr_pacfi_dummy) {
+		pr_err("partition: FAIL legit fixed_out rejected\n");
+		return;
+	}
+	/* fixed_out：篡改目标被拒（V4-B）。*/
+	r = ikaslr_pacfi_out(sig ^ (0x4UL << 56), cs, (void *)ikaslr_pacfi_dummy);
+	if (r != NULL) {
+		pr_err("partition: FAIL tampered fixed_out accepted\n");
+		return;
+	}
+
+	ikaslr_pacfi_partition_stats(&in1, &out1);
+	ikaslr_pacfi_cfi_stats(&v1, &hh);
+	pr_info("partition: PASS - fixed_in skipped PA %lu times, fixed_out verified %lu times "
+		"(1 legit + 1 rejected); into-region calls need no PA\n",
+		in1 - in0, out1 - out0);
 }
 
 /* S3.1 探针：验证 PAC 在本环境（含 QEMU TCG）确实工作。*/
-static void __init ikaslr_pacfi_ident_test(void);
 static int __init ikaslr_pacfi_probe(void)
 {
 	u64 p = (u64)&ikaslr_pacfi_probe;	/* 一个真实的内核代码地址 */
