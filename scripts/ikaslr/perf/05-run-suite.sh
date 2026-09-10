@@ -27,6 +27,22 @@ LMBIN="$(ls -d "$BENCH_DIR"/lmbench/bin/* 2>/dev/null | head -1)"
 } > "$D/_env.txt"
 [ -r /proc/ikaslr/stats ] && cat /proc/ikaslr/stats > "$D/_ikaslr_stats_before.txt"
 
+# ---- 合理性自检：非 base 档必须真的有函数被随机化 ----
+# 若为 0，多半是内核编译时没开 CRR_TRAMPOLINE=y / 没给 IKASLR_FUNCS，
+# 这时四档等价，测出来的"开销"没有意义。
+if [ "$CFG" != base ]; then
+    NF=$(awk '/^functions/{print $2}' /proc/ikaslr/stats 2>/dev/null || echo 0)
+    echo "== 随机化函数数: ${NF:-0}"
+    if [ "${NF:-0}" -le 3 ]; then
+        cat <<'W'
+!! 随机化函数数 <= 3：只有内建示例函数，没有真实内核函数被随机化。
+   本档数据不可用于性能结论。请用 CRR_TRAMPOLINE=y + IKASLR_FUNCS 重编内核
+   （见 02-build-kernels.sh）。
+W
+    fi
+    echo "randomized_functions=${NF:-0}" >> "$D/_env.txt"
+fi
+
 # ---- 降噪：绑频、关 turbo（各平台旋钮不同，存在才写）----
 if command -v cpupower >/dev/null; then cpupower frequency-set -g performance >/dev/null 2>&1 || true; fi
 write_if() { [ -w "$1" ] && printf '%s' "$2" > "$1" 2>/dev/null || true; }
