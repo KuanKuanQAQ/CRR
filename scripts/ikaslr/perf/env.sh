@@ -30,6 +30,11 @@ else
     VARIANTS=(base R RD RDP)
 fi
 
+# Rg 档：与 R 完全相同，只多开 CONFIG_IKASLR_STATS。**不参与开销对比**，
+# 只用来测每个负载的跨区域调用频度 G（enters/outs 计数需要 STATS）。
+# 统计本身实测只值 1.0~1.6 ns/次（见 实验/E3-A），因此 Rg 的吞吐与 R 相差约 2%，
+# 用它测 G 是足够的。用法： ./02-build-kernels.sh Rg && ... && ./05-run-suite.sh Rg
+
 # 编译并行度
 JOBS="${JOBS:-$(nproc)}"
 
@@ -37,8 +42,18 @@ JOBS="${JOBS:-$(nproc)}"
 #   CRR_TRAMPOLINE=y + IKASLR_FUNCS=名单   （真实测量）
 #   CRR_TRAMPOLINE=n                        （仅功能占位，四档等价，勿用于性能数据）
 CRR_TRAMPOLINE="${CRR_TRAMPOLINE:-y}"
-# 默认用 S1（32 个 VFS 核心函数）。规模见 ../../../Documentation/crr/实现/15-scope-selection.md
-IKASLR_FUNCS="${IKASLR_FUNCS:-$ROOT/scripts/ikaslr/funcs/s1-vfs.txt}"
+# 默认用 S3（483 个函数，fs/+block/+net/core/+mm/）——第 6 章的默认范围。
+# 规模与选取理由见 ../../../Documentation/crr/实现/15-scope-selection.md
+IKASLR_FUNCS="${IKASLR_FUNCS:-$ROOT/scripts/ikaslr/funcs/s3-full.txt}"
+
+# **Base 档用空名单，而不是关掉插件。**
+# 清单 §0.1 的纪律是"四档之间只允许差 IKASLR 相关 CONFIG，编译器全部一致"。
+# 若 Base 干脆不加 -fpass-plugin，两档的编译流水线就不同，测出来的差额里会混着
+# "加载插件本身"的影响。空名单则插件照样加载、一个函数都不改造。
+IKASLR_FUNCS_BASE="${IKASLR_FUNCS_BASE:-$ROOT/scripts/ikaslr/funcs/empty.txt}"
+
+# 某一档该用哪份名单
+variant_funcs() { [ "$1" = base ] && echo "$IKASLR_FUNCS_BASE" || echo "$IKASLR_FUNCS"; }
 
 # **编译器必须是 clang**：-fpass-plugin 是 clang 特性。本机若无 ld.lld，
 # 用 CC=clang + GNU binutils 即可（LLVM=1 会因缺 ld.lld 失败）。
@@ -80,6 +95,8 @@ variant_config_args() {
                   echo "--enable IKASLR --disable IKASLR_STATS"   # arm 的检测走观察点
               fi ;;
         RDP)  echo "--enable IKASLR --disable IKASLR_STATS --enable IKASLR_PACFI" ;;
+        # Rg：与 R 相同，只多开 STATS。仅用于测 G，见上面 VARIANTS 处的说明。
+        Rg)   echo "--enable IKASLR --enable IKASLR_STATS --disable IKASLR_DEBUG" ;;
         *)    echo "unknown variant: $1" >&2; return 1 ;;
     esac
 }
@@ -90,12 +107,15 @@ variant_is_single_core() { [ "$1" = RD ] && [ "$ARCH" = x86_64 ]; }
 # 该档是否需要后台定频触发随机化
 variant_needs_trigger() { [ "$1" != base ]; }
 
+# 每档跑几遍（清单 §0.4：每项 >=5 次，报中位数 + 四分位）
+REPEAT="${REPEAT:-5}"
+
 kbuild() { make -C "$ROOT" O="$1" ARCH="$ARCH" CC="$IKASLR_CC" $CROSS "${@:2}"; }
 
 # 传给每次 make 的 pass 参数（主 Makefile 的插件检查对任意目标都会触发）
-ikaslr_pass_args() {
+ikaslr_pass_args() {   # $1=档名（可省，省则用全局 IKASLR_FUNCS）
     if [ "$CRR_TRAMPOLINE" = y ]; then
-        echo "CRR_TRAMPOLINE=y IKASLR_FUNCS=$IKASLR_FUNCS"
+        echo "CRR_TRAMPOLINE=y IKASLR_FUNCS=$(variant_funcs "${1:-R}")"
     else
         echo "CRR_TRAMPOLINE=n"
     fi

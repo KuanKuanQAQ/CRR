@@ -35,6 +35,8 @@
 #include <linux/atomic.h>
 #include <linux/ptrace.h>
 
+#include <linux/ktime.h>
+
 #include "internal.h"
 
 #define IKASLR_MAX_PROBED	16
@@ -124,8 +126,44 @@ int ikaslr_detect_mark(const char *name, void *trap_at, void *copy_src,
  * faulting 是触发陷阱的地址；成功处理则把 *newp 设为应重定向到的副本地址并返回
  * true，同时按判据决定是否触发随机化。
  */
+/*
+ * 审计路径的处理时长统计（E4-A）。
+ *
+ * 分两条计：**放行**（落在入口，整函数调用，不触发随机化）与**判为 gadget**
+ * （落在中部，放行到副本并触发随机化）。两者成本结构不同——后者多一次
+ * ikaslr_request_rerandomize()，而那一次在原子上下文里可能是"就地做完"也可能是
+ * "推迟"，差着几个数量级。合在一起报会把分布压成一个没有意义的平均值。
+ *
+ * 只记 count/总和/最大值，不留样本数组：这条路径在异常上下文里执行，
+ * 不能分配内存，也不该在这里做排序。分位数由用户态多次采样差分得到。
+ */
+static atomic_long_t audit_benign_ns, audit_benign_max;
+static atomic_long_t audit_gadget_ns, audit_gadget_max;
+
+static void audit_record(atomic_long_t *sum, atomic_long_t *max, u64 ns)
+{
+	long m;
+
+	atomic_long_add(ns, sum);
+	do {
+		m = atomic_long_read(max);
+		if ((long)ns <= m)
+			break;
+	} while (atomic_long_cmpxchg(max, m, ns) != m);
+}
+
+void ikaslr_detect_latency(unsigned long *b_ns, unsigned long *b_max,
+			   unsigned long *g_ns, unsigned long *g_max)
+{
+	*b_ns = atomic_long_read(&audit_benign_ns);
+	*b_max = atomic_long_read(&audit_benign_max);
+	*g_ns = atomic_long_read(&audit_gadget_ns);
+	*g_max = atomic_long_read(&audit_gadget_max);
+}
+
 bool ikaslr_detect_audit(unsigned long faulting, unsigned long *newp)
 {
+	u64 t0 = ktime_get_ns();
 	int i;
 
 	for (i = 0; i < nprobed; i++) {
@@ -140,11 +178,15 @@ bool ikaslr_detect_audit(unsigned long faulting, unsigned long *newp)
 		if (off == 0) {
 			/* 落在入口：正常的整函数调用/跳转。放行，不触发。*/
 			atomic_long_inc(&audit_benign);
+			audit_record(&audit_benign_ns, &audit_benign_max,
+				     ktime_get_ns() - t0);
 		} else {
 			/* 落在中部：gadget 使用模式。放行到副本，同时触发随机化。*/
 			atomic_long_inc(&audit_gadget);
 			atomic_long_inc(&audit_triggers);
 			ikaslr_request_rerandomize();
+			audit_record(&audit_gadget_ns, &audit_gadget_max,
+				     ktime_get_ns() - t0);
 		}
 		return true;
 	}

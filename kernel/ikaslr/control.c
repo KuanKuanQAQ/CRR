@@ -45,6 +45,17 @@ static int ikaslr_stats_show(struct seq_file *m, void *v)
 		seq_printf(m, "audit_benign       %lu\n", ab);
 		seq_printf(m, "audit_gadget       %lu\n", ag);
 		seq_printf(m, "audit_triggers     %lu\n", at);
+		{
+			unsigned long bn, bm, gn, gm;
+
+			ikaslr_detect_latency(&bn, &bm, &gn, &gm);
+			/* 累计纳秒与最大值；平均值由 用户态 除以对应计数得到，
+			 * 分位数靠多次采样差分——见 perf/13-detect-cost.sh。*/
+			seq_printf(m, "audit_benign_ns    %lu\n", bn);
+			seq_printf(m, "audit_benign_max   %lu\n", bm);
+			seq_printf(m, "audit_gadget_ns    %lu\n", gn);
+			seq_printf(m, "audit_gadget_max   %lu\n", gm);
+		}
 	}
 
 	seq_printf(m, "functions          %d\n", ikaslr_nr_funcs());

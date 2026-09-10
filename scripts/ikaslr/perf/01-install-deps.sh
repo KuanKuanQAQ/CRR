@@ -36,13 +36,19 @@ pm_refresh() {
 
 # ---- 按发行版给出包名（同一件东西在两派里名字不同）----
 if [ "$PM" = apt ]; then
-    BUILD_PKGS=(build-essential bc bison flex libssl-dev libelf-dev ncurses-dev)
+    # clang 是硬需求：-fpass-plugin 是 clang 特性，gcc 编不出随机化内核。
+    # linux-tools-* 提供 perf（E12 归因要用）。
+    BUILD_PKGS=(build-essential bc bison flex libssl-dev libelf-dev ncurses-dev
+                clang llvm lld python3-pyelftools
+                "linux-tools-common" "linux-tools-$(uname -r)" "linux-tools-generic")
     BENCH_PKGS=(git wget curl fio iperf3 nginx rt-tests stress-ng sysbench
                 p7zip-full openssl numactl linux-cpupower cpufrequtils)
     NETPERF_PKG=netperf; WRK_PKG=wrk
 else
     # dnf/yum/zypper（openEuler 等）
-    BUILD_PKGS=(make gcc bc bison flex elfutils-libelf-devel openssl-devel
+    # clang 是硬需求（见上）；perf 在 openEuler 里就叫 perf。
+    BUILD_PKGS=(clang llvm lld perf python3-pyelftools
+                make gcc bc bison flex elfutils-libelf-devel openssl-devel
                 ncurses-devel perl dwarves)
     BENCH_PKGS=(git wget curl fio iperf3 nginx rt-tests stress-ng sysbench
                 p7zip openssl numactl kernel-tools)
@@ -128,3 +134,37 @@ ls "$BENCH_DIR"/lmbench/bin/*/lat_syscall >/dev/null 2>&1 && echo "  [x] lmbench
 [ -x "$BENCH_DIR/byte-unixbench/UnixBench/Run" ] && echo "  [x] unixbench" || echo "  [ ] unixbench"
 echo
 echo "== 完成。基准位于 $BENCH_DIR"
+
+# ---------------------------------------------------------------------------
+# 收尾自查：把"装完了没有"变成一句话，而不是让操作者到 05 跑一半才发现缺东西。
+# ---------------------------------------------------------------------------
+echo
+echo "================= 依赖自查 ================="
+miss=0
+chk() {   # chk <命令> <说明> <是否必需>
+    if command -v "$1" >/dev/null 2>&1; then
+        printf "  ✅ %-14s %s\n" "$1" "$2"
+    else
+        printf "  %s %-14s %s\n" "$([ "$3" = must ] && echo '❌' || echo '⚠ ')" "$1" "$2"
+        [ "$3" = must ] && miss=$((miss+1))
+    fi
+}
+chk clang        "编随机化内核（-fpass-plugin 是 clang 特性，gcc 不行）" must
+chk fio          "E7 存储"                                              must
+chk lat_syscall  "LMBench（若缺，检查 PATH 是否含 bin 目录）"            must
+chk cyclictest   "E3 中断与调度延迟"                                     must
+chk netperf      "E6 网络（还需对端起 netserver）"                       opt
+chk wrk          "E6 HTTP 吞吐"                                          opt
+chk perf         "E12 归因"                                              opt
+chk sysbench     "计算负载"                                              opt
+python3 -c 'import elftools' 2>/dev/null \
+    && printf "  ✅ %-14s %s\n" pyelftools "静态分析脚本要用" \
+    || printf "  ⚠  %-14s %s\n" pyelftools "缺：pip install pyelftools"
+
+echo
+if [ "$miss" -gt 0 ]; then
+    echo "!! 还缺 $miss 个**必需**依赖，先补齐再往下做（见 00-RUNBOOK.md §2）。"
+    exit 1
+fi
+echo "必需依赖齐了。下一步： ./02-build-kernels.sh   （见 00-RUNBOOK.md §3）"
+

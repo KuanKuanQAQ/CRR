@@ -9,8 +9,10 @@
 #  1. 各档从**同一份 defconfig** 出发，只 toggle IKASLR 相关 CONFIG；
 #  2. `ikaslr_mandatory_config` 的那几项**四档一律相同**——它们是"代码可搬移"
 #     的前提（retpoline / BTI / unwinder），不是可选项；
-#  3. **所有档用同一份 IKASLR_FUNCS**，否则范围与机制两个变量混在一起，
+#  3. **所有非 base 档用同一份 IKASLR_FUNCS**，否则范围与机制两个变量混在一起，
 #     E12 归因失效（见 实现/15-scope-selection.md §3.3）。
+#  4. **base 档用空名单而不是关掉插件**——四档的编译流水线必须一致，
+#     见 env.sh 里 IKASLR_FUNCS_BASE 的说明。
 set -euo pipefail
 . "$(dirname "$0")/env.sh"
 
@@ -30,7 +32,10 @@ if [ "$CRR_TRAMPOLINE" = y ] && [ ! -f "$ROOT/tools/ikaslr/llvm/libIKaslrPass.so
 fi
 
 echo ">> 编译器 : $IKASLR_CC"
-echo ">> 随机化范围: $IKASLR_FUNCS ($(grep -vc '^#' "$IKASLR_FUNCS" 2>/dev/null || echo 0) 个函数)"
+NFUNCS=$(grep -vc '^#' "$IKASLR_FUNCS" 2>/dev/null) || NFUNCS=0
+echo ">> 随机化范围: $IKASLR_FUNCS ($NFUNCS 个函数)"
+echo ">> base 档名单: $IKASLR_FUNCS_BASE (空，仅为保持编译流水线一致)"
+[ "$NFUNCS" -gt 0 ] || { echo "!! 名单为空，非 base 档不会有任何函数被随机化"; exit 1; }
 
 defconfig_target() { [ "$ARCH" = x86_64 ] && echo x86_64_defconfig || echo defconfig; }
 IMG=$([ "$ARCH" = x86_64 ] && echo bzImage || echo Image)
@@ -40,7 +45,7 @@ for v in "${WANT[@]}"; do
     echo "=================== 编 $v -> $O ==================="
     mkdir -p "$O"
     # shellcheck disable=SC2046
-    kbuild "$O" $(ikaslr_pass_args) "$(defconfig_target)" >/dev/null
+    kbuild "$O" $(ikaslr_pass_args "$v") "$(defconfig_target)" >/dev/null
 
     # LOCALVERSION 让每档有独立的 `uname -r`，从而 /boot 与 GRUB 各成一项。
     # shellcheck disable=SC2046
@@ -52,10 +57,10 @@ for v in "${WANT[@]}"; do
     if [ "${LOCALMOD:-0}" = 1 ]; then
         echo "-- LOCALMOD=1：按当前 lsmod 裁剪模块（编译更快）"
         # shellcheck disable=SC2046
-        yes '' | kbuild "$O" $(ikaslr_pass_args) LSMOD=/proc/modules localmodconfig >/dev/null 2>&1 || true
+        yes '' | kbuild "$O" $(ikaslr_pass_args "$v") LSMOD=/proc/modules localmodconfig >/dev/null 2>&1 || true
     fi
     # shellcheck disable=SC2046
-    kbuild "$O" $(ikaslr_pass_args) olddefconfig >/dev/null
+    kbuild "$O" $(ikaslr_pass_args "$v") olddefconfig >/dev/null
 
     echo "-- $v 的关键配置："
     grep -E 'CONFIG_IKASLR' "$O/.config" || echo "   (IKASLR off)"
@@ -64,7 +69,7 @@ for v in "${WANT[@]}"; do
     # 编译输出留一份：pass 会把"这个函数不能随机化"的原因打到 stderr，
     # 下面据此生成 $O/ikaslr-skipped.txt。
     # shellcheck disable=SC2046
-    kbuild "$O" $(ikaslr_pass_args) -j"$JOBS" "$IMG" modules 2>&1 | tee "$O/build.log"
+    kbuild "$O" $(ikaslr_pass_args "$v") -j"$JOBS" "$IMG" modules 2>&1 | tee "$O/build.log"
     [ "${PIPESTATUS[0]}" = 0 ] || { echo "!! $v 编译失败，见 $O/build.log"; exit 1; }
 
     if [ "$v" != base ] && [ "$CRR_TRAMPOLINE" = y ]; then
@@ -100,6 +105,7 @@ cat <<NEXT
 
 全部完成。下一步： sudo ./03-install-kernels.sh ${WANT[*]}
 
-提醒：四档必须用**同一份** IKASLR_FUNCS。当前用的是
-  $IKASLR_FUNCS
+提醒：非 base 档必须用**同一份** IKASLR_FUNCS。当前用的是
+  $IKASLR_FUNCS  ($NFUNCS 个函数)
+base 档用空名单 $IKASLR_FUNCS_BASE —— 插件照样加载，但一个函数都不改造。
 NEXT

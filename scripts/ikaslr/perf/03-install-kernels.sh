@@ -16,9 +16,9 @@ for v in "${WANT[@]}"; do
     echo "=================== 安装 $v ==================="
     # CRR_TRAMPOLINE 透传：主 Makefile 的插件检查对 modules_install/install 同样触发。
     # shellcheck disable=SC2046
-    kbuild "$O" $(ikaslr_pass_args) -j"$JOBS" modules_install  # /lib/modules/<rel>
+    kbuild "$O" $(ikaslr_pass_args "$v") -j"$JOBS" modules_install  # /lib/modules/<rel>
     # shellcheck disable=SC2046
-    kbuild "$O" $(ikaslr_pass_args) install                    # /boot + initramfs + grub 钩子
+    kbuild "$O" $(ikaslr_pass_args "$v") install                    # /boot + initramfs + grub 钩子
     REL="$(cat "$O/include/config/kernel.release")"
     echo "== $v 已装： $REL"
 done

@@ -76,6 +76,9 @@ int ikaslr_bench_init(struct proc_dir_entry *dir);
 int ikaslr_detect_mark(const char *name, void *trap_at, void *copy_src, size_t size);
 bool ikaslr_detect_audit(unsigned long faulting, unsigned long *newp);
 void ikaslr_detect_stats(unsigned long *benign, unsigned long *gadget, unsigned long *triggers);
+/* 审计路径的处理时长（E4-A）：放行与判为 gadget 两条分开计。*/
+void ikaslr_detect_latency(unsigned long *b_ns, unsigned long *b_max,
+			   unsigned long *g_ns, unsigned long *g_max);
 
 /* 把落在已退役变体中的地址映射到当前变体的对应位置。异常上下文中调用。*/
 bool ikaslr_fixup_addr(unsigned long addr, unsigned long *newp);
