@@ -211,6 +211,9 @@ def main():
     ap.add_argument("--refs", nargs="+", help="到哪里数引用（默认全树 '**/*.o'）")
     ap.add_argument("--top", type=int, default=0, help="只取引用数最高的 N 个（0=全部）")
     ap.add_argument("--out", help="写出 funcs.txt")
+    ap.add_argument("--dump-excluded", metavar="目录",
+                    help="把被排除的函数按原因分别写成 <目录>/<原因>.txt，"
+                         "用于给出完整清单（实现/18-不可随机化清单.md）")
     ap.add_argument("--exclude-soft", action="store_true",
                     help="连同 __ex_table/__bug_table/__jump_table/alternatives "
                          "一起排除（这些默认已放行，运行时有对应处理；"
@@ -243,6 +246,18 @@ def main():
     print(f"引用扫描目标文件  : {len(ref_files)}")
     print(f"定义的函数        : {len(defined)}")
     print(f"因不可搬移被排除  : {len(bad)}  ({len(bad)*100/max(len(defined),1):.1f}%)")
+    if args.dump_excluded:
+        os.makedirs(args.dump_excluded, exist_ok=True)
+        by_reason = {}
+        for fn, why in bad.items():
+            by_reason.setdefault(why, []).append(fn)
+        for why, fns in by_reason.items():
+            slug = re.sub(r"[^A-Za-z0-9_.-]+", "-", why)[:60].strip("-")
+            path = os.path.join(args.dump_excluded, slug + ".txt")
+            with open(path, "w") as fh:
+                fh.write(f"# 排除原因: {why}\n# 共 {len(fns)} 个\n")
+                fh.write("\n".join(sorted(fns)) + "\n")
+            print(f"    -> {path}  ({len(fns)} 个)")
     for r, n in sorted(reasons.items(), key=lambda x: -x[1]):
         print(f"    {n:>5}  {r}")
     print(f"可搬移（合格）    : {len(eligible)}")

@@ -1,6 +1,9 @@
 # I-KASLR 随机化函数名单（gen_funcs.py 生成）
 # 候选范围: fs/*.o block/*.o net/core/*.o mm/*.o
-# 已按实测可搬移性筛选，按被引用次数降序；共 483 个（已剔除编译期跳过与实测不可搬移的函数）
+# 共 496 个。其中 13 个是 2026-09-10 修正 verify_movable 的假阳性后加回的：
+#   get_pfnblock_flags_mask is_vmalloc_addr kvmalloc_node __p4d_alloc p4d_clear_bad page_vma_mapped_walk pgd_clear_bad __pud_alloc __vmalloc vmalloc vmalloc_to_page vmap vzalloc
+#   它们含 static_cpu_has()，映像里有跳进 .altinstr_aux 的 jmp，但那条 jmp
+#   会被 apply_alternatives() 在启动时改写掉，而变体是在那之后从母本复制的。
 seq_puts
 __brelse
 __folio_put
@@ -484,3 +487,16 @@ xattr_full_name
 __legitimize_mnt
 __netif_napi_del
 __next_mem_range
+get_pfnblock_flags_mask
+is_vmalloc_addr
+kvmalloc_node
+__p4d_alloc
+p4d_clear_bad
+page_vma_mapped_walk
+pgd_clear_bad
+__pud_alloc
+__vmalloc
+vmalloc
+vmalloc_to_page
+vmap
+vzalloc

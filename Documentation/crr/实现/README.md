@@ -51,6 +51,8 @@
 - `10-perf-plan.md`　裸机性能测试方案
 - `11-related-comparison.md`　与 Adelie/Dbox 等的对比数据与方法
 - `12-got-codemodel-results.md`　共享 GOT 与代码模型（T1–T5）
+- **`18-不可随机化清单.md`　哪些内核函数不能被随机化的完整清单**(逐类给出全名单,
+  并把"已解决"与"仍不行"分开;全树 9.6%,且**全部来自 per-CPU**)
 - `14-code-model-and-unmovable.md`　代码模型实现设计 + **哪些内核代码不能随机化**（实测）
 - `15-scope-selection.md`　**随机化对象怎么选、为什么**（名单在 `scripts/ikaslr/funcs/`）
 - `16-position-independence.md`　**函数体位置无关改造怎么做通的**（x86/arm64 全过程、

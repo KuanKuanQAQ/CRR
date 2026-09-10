@@ -5,6 +5,15 @@
 判据（见 Documentation/crr/实现/16-position-independence.md §8）：
 函数体内不得存在**指向区域外的 PC 相对引用**，否则一搬就错。
 
+**一个例外（2026-09-10 加）**：被 `.altinstructions` 覆盖的指令在启动时会被
+`apply_alternatives()` 就地改写，改写之后原来的 PC 相对引用就不存在了。最典型的是
+x86 的 `static_cpu_has()`：它先 `jmp` 进 `.altinstr_aux`（一个独立的节），那边测
+CPU 特性再跳回函数体；启动时这条 `jmp` 会被换成 nop 或一条**函数内部**的跳转。
+
+而变体是从**映像母本**复制的，复制发生在 alternatives 应用**之后**，所以变体里
+根本没有那条跳出去的 jmp。把它算作违规是**假阳性**——实测 13 个 vmalloc/页表族的
+函数因此被错误排除，单独随机化它们后 3/3 干净启动、自测与压力测试全过。
+
   x86-64 : 任何 `(%rip)`；任何 `call/jmp <绝对地址>` 且目标在区域外
   AArch64: 任何 `adrp`；任何 `bl/b <绝对地址>` 且目标在区域外
            （`ldr xN, <区域内地址>` 是随函数搬移的字面量池，合法）
@@ -24,6 +33,41 @@ import argparse
 import re
 import subprocess
 import sys
+
+
+def alt_patched_sites(vmlinux, nm):
+    """返回 .altinstructions 覆盖的原始指令地址集合。
+
+    这些位置在启动时会被 apply_alternatives() 就地改写，因此映像里它们当前的
+    PC 相对引用不代表运行时的样子。struct alt_instr 见 arch/x86/include/asm/
+    alternative.h：s32 instr_offset + s32 repl_offset + u32 ft_flags + u8 + u8，
+    __packed，共 14 字节；instr_offset 是相对**该字段自身地址**的偏移。
+    """
+    try:
+        from elftools.elf.elffile import ELFFile
+    except ImportError:
+        return set()          # 没装 pyelftools 就退回旧行为（会有假阳性）
+    syms = nm_syms(vmlinux, nm)
+    s, e = syms.get("__alt_instructions"), syms.get("__alt_instructions_end")
+    if not s or not e or e <= s:
+        return set()
+    with open(vmlinux, "rb") as f:
+        elf = ELFFile(f)
+        blob = None
+        for sec in elf.iter_sections():
+            a = sec["sh_addr"]
+            if a and a <= s < a + sec["sh_size"]:
+                blob = sec.data()[s - a:e - a]
+                break
+    if not blob:
+        return set()
+    import struct
+    SZ = 14
+    out = set()
+    for i in range(len(blob) // SZ):
+        off = struct.unpack_from("<i", blob, i * SZ)[0]
+        out.add(s + i * SZ + off)
+    return out
 
 
 def nm_syms(vmlinux, nm):
@@ -48,6 +92,7 @@ def main():
         nm, objdump = "nm", "objdump"
 
     syms = nm_syms(args.vmlinux, nm)
+    alt = alt_patched_sites(args.vmlinux, nm)
     if "__rand_text_start" not in syms:
         sys.exit("没有 __rand_text_start：这个映像没启用 I-KASLR？")
     lo, hi = syms["__rand_text_start"], syms["__rand_text_end"]
@@ -59,6 +104,7 @@ def main():
     cur = None
     bad = {}          # 函数 -> [(原因, 指令)]
     nfunc = 0
+    nalt = 0          # 被 alternatives 覆盖、启动时会被改写掉的，不算违规
     for ln in out.splitlines():
         m = re.match(r"^([0-9a-f]+) <(\S+)>:", ln)
         if m:
@@ -67,6 +113,8 @@ def main():
             continue
         if not cur or "\t" not in ln:
             continue
+        m = re.match(r"^\s*([0-9a-f]+):", ln)
+        insn_addr = int(m.group(1), 16) if m else None
         insn = ln.split("\t")[-1].strip()
 
         why = None
@@ -84,10 +132,20 @@ def main():
                 m2 = re.match(r"^(bl|b)\s+([0-9a-f]{6,})", insn)
                 if m2 and not (lo <= int(m2.group(2), 16) < hi):
                     why = "到区域外的直接分支"
+        if why and insn_addr in alt:
+            # 这条指令启动时会被 apply_alternatives() 改写掉，届时这个引用就不存在了。
+            nalt += 1
+            why = None
         if why:
             bad.setdefault(cur, []).append((why, insn))
 
     print(f"随机化区域 [{lo:#x},{hi:#x})  {hi - lo} B，函数体 {nfunc} 个")
+    if nalt:
+        print(f"  （放行 {nalt} 处被 .altinstructions 覆盖的引用——启动时会被改写掉，"
+              f"见文件头说明）")
+    if not alt:
+        print("  ⚠ 没读到 .altinstructions（缺 pyelftools？）——"
+              "static_cpu_has() 一类会被误报为不可搬移")
     if not bad:
         print("✅ 全部可搬移：无指向区域外的 PC 相对引用")
         return 0
