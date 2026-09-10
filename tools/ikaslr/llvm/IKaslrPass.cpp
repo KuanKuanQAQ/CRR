@@ -292,6 +292,24 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
         Work.push_back(&I);
 
     for (Instruction *I : Work) {
+      // PHI 要特殊处理：不能在 PHI 之前插指令（PHI 必须连续位于块首），
+      // 取值必须在**对应的前驱块**里物化。否则生成的是非法 IR，
+      // 实测会让后端在指令选择阶段直接段错误
+      // （'X86 DAG->DAG Instruction Selection' on @register_filesystem_body）。
+      if (auto *PN = dyn_cast<PHINode>(I)) {
+        for (unsigned n = 0; n < PN->getNumIncomingValues(); ++n) {
+          auto *C = dyn_cast<Constant>(PN->getIncomingValue(n));
+          if (!C || !refsGlobal(C))
+            continue;
+          if (auto *GV = dyn_cast<GlobalValue>(C))
+            if (GV->getName().startswith("__ikaslr_"))
+              continue;
+          IRBuilder<> PB(PN->getIncomingBlock(n)->getTerminator());
+          PN->setIncomingValue(n, rebuildAbs(PB, C));
+        }
+        continue;
+      }
+
       auto *CB = dyn_cast<CallBase>(I);
 
       // **内联汇编整条跳过**：它的操作数可能带 "i"（立即数）一类约束，

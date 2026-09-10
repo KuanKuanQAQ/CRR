@@ -21,7 +21,6 @@ kmem_cache_create
 seq_lseek
 path_put
 kstrdup
-kvmalloc_node
 __free_pages
 single_release
 netdev_info
@@ -42,7 +41,6 @@ unlock_buffer
 generic_file_llseek
 skb_push
 seq_put_decimal_ull_width
-is_vmalloc_addr
 unregister_pernet_subsys
 __mod_node_page_state
 simple_read_from_buffer
@@ -101,7 +99,6 @@ blk_queue_flag_clear
 d_instantiate
 user_path_at_empty
 filemap_write_and_wait_range
-vmalloc
 __page_file_index
 bdev_getblk
 dev_addr_mod
@@ -113,7 +110,6 @@ path_get
 skb_ensure_writable
 kstrdup_const
 rtnl_trylock
-vzalloc
 __alloc_percpu_gfp
 blk_mq_unfreeze_queue
 dma_pool_alloc
@@ -157,7 +153,6 @@ blk_mq_freeze_queue
 d_drop
 fasync_helper
 filp_close
-get_pfnblock_flags_mask
 kmemdup_nul
 skb_checksum
 clear_nlink
@@ -240,11 +235,9 @@ kmem_cache_create_usercopy
 locks_lock_inode_wait
 netdev_state_change
 next_online_pgdat
-proto_register
 rtnl_register_module
 seq_release_private
 skb_copy
-vmap
 __f_unlock_pos
 bio_init
 blk_queue_max_discard_sectors
@@ -254,13 +247,11 @@ eventfd_ctx_put
 file_modified
 filemap_dirty_folio
 init_special_inode
-linkwatch_fire_event
 locks_init_lock
 memory_read_from_buffer
 mempool_create
 mempool_free_slab
 netdev_core_stats_inc
-netif_device_attach
 register_netdev
 set_page_dirty
 skb_release_head_state
@@ -269,7 +260,6 @@ PageHuge
 __fs_parse
 __scm_destroy
 __sk_mem_reclaim
-__vmalloc
 alloc_large_system_hash
 bdev_open_by_dev
 blk_mq_end_request
@@ -295,21 +285,18 @@ file_path
 file_update_time
 hugetlb_vma_unlock_read
 kern_mount
-kmem_cache_free_bulk
 kstrndup
 pipe_lock
 rtnetlink_send
 set_capacity_and_notify
 simple_attr_write
 simple_lookup
-sk_filter_trim_cap
 sk_setup_caps
 submit_bio_wait
 unregister_blkdev
 vm_normal_page
 __SCT__tp_func_rss_stat
 __bio_release_pages
-__p4d_alloc
 alloc_chrdev_region
 bioset_init
 blkdev_issue_discard
@@ -321,9 +308,7 @@ dev_get_by_name_rcu
 dev_load
 dev_set_mtu
 filemap_add_folio
-huge_pte_offset
 init_pseudo
-netif_schedule_queue
 seq_read_iter
 set_blocksize
 simple_attr_read
@@ -332,7 +317,6 @@ skb_set_owner_w
 stream_open
 submit_bh
 truncate_inode_pages_final
-__pud_alloc
 __register_chrdev
 __seq_open_private
 __sk_mem_schedule
@@ -363,7 +347,6 @@ netdev_run_todo
 netif_set_real_num_rx_queues
 put_filesystem
 seq_put_hex_ll
-set_pfnblock_flags_mask
 sock_kfree_s
 sock_no_mmap
 sock_no_socketpair
@@ -377,7 +360,6 @@ __pmd_alloc
 __sk_dst_check
 __skb_ext_put
 __skb_gso_segment
-__sock_gen_cookie
 alloc_file_pseudo
 bh_uptodate_or_lock
 bio_set_pages_dirty
@@ -433,7 +415,6 @@ blk_mq_quiesce_queue
 blk_mq_tagset_busy_iter
 blk_queue_io_min
 blk_queue_logical_block_size
-check_move_unevictable_folios
 d_lookup
 dev_change_flags
 dev_disable_lro
@@ -458,10 +439,8 @@ net_ns_get_ownership
 noop_dirty_folio
 noop_fsync
 notify_change
-p4d_clear_bad
 pagecache_isize_extended
 put_pages_list
-release_pages
 sget_fc
 simple_pin_fs
 simple_setattr
@@ -472,7 +451,6 @@ truncate_pagecache
 vfs_parse_fs_string
 vfsgid_in_group_p
 vm_mmap
-vma_alloc_folio
 xattr_full_name
 __pte_offset_map
 __vfs_getxattr
@@ -495,7 +473,6 @@ cdev_device_add
 d_move
 datagram_poll
 filemap_remove_folio
-folio_add_lru_vma
 folio_add_new_anon_rmap
 folio_copy
 fs_context_for_reconfigure
@@ -512,4 +489,3 @@ neigh_resolve_output
 neigh_sysctl_unregister
 netdev_drivername
 netif_set_real_num_tx_queues
-nr_free_buffer_pages
