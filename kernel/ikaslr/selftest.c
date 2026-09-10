@@ -320,10 +320,19 @@ static int __init test_fixed_out(void)
 		ikaslr_whitelist_count(), inside_before, inside_mid,
 		inside_after, r, ikaslr_whitelist_rejects());
 
-	if (inside_mid != inside_before - 1 || inside_after != inside_before) {
+	/*
+	 * inside 计数是**纯观测量**，只在 CONFIG_IKASLR_STATS 下维护
+	 * （阻断协议用的是 ikaslr_active，与它无关）。因此生产档
+	 * IKASLR_STATS=n 时它恒为 0，不能据此断言——否则正是 §3.6.3 要测的
+	 * 那一档配置会误报 FAIL。
+	 */
+	if (IS_ENABLED(CONFIG_IKASLR_STATS) &&
+	    (inside_mid != inside_before - 1 || inside_after != inside_before)) {
 		pr_err("FAIL(fixed_out): inside accounting wrong\n");
 		return -EINVAL;
 	}
+	if (!IS_ENABLED(CONFIG_IKASLR_STATS))
+		pr_info("fixed_out: inside accounting not checked (IKASLR_STATS=n)\n");
 	if (r != 42) {
 		pr_err("FAIL(fixed_out): external call returned %d\n", r);
 		return -EINVAL;

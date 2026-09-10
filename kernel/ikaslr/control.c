@@ -63,6 +63,14 @@ static int ikaslr_stats_show(struct seq_file *m, void *v)
 	seq_puts(m, "\n");
 	seq_printf(m, "rounds             %lu\n", rounds);
 	seq_printf(m, "critical_path_ns   %llu\n", last_ns);
+	{
+		u64 w, u, r;
+
+		ikaslr_rand_phases(&w, &u, &r);
+		seq_printf(m, "  cp_wait_ns       %llu\n", w);
+		seq_printf(m, "  cp_update_ns     %llu\n", u);
+		seq_printf(m, "  cp_remap_ns      %llu\n", r);
+	}
 	seq_printf(m, "prepare_ns         %llu\n", prep_ns);
 	seq_printf(m, "variants_ready     %d\n", nready);
 	seq_printf(m, "rounds_missed      %lu\n", missed);

@@ -88,6 +88,8 @@ static DEFINE_SPINLOCK(ikaslr_pool_lock);	/* 保护变体状态迁移 */
 static atomic_t ikaslr_in_progress = ATOMIC_INIT(0);
 
 static u64 ikaslr_last_ns;		/* 关键路径耗时（不含准备） */
+/* 关键路径三段分解（E3-3／E3-7）：等待活跃集合清空 / 更新 target 槽 / 改映射到陷阱镜像 */
+static u64 ikaslr_wait_ns, ikaslr_update_ns, ikaslr_remap_ns;
 static u64 ikaslr_last_prep_ns;		/* 一次变体准备的耗时 */
 static unsigned long ikaslr_rounds;
 static unsigned long ikaslr_no_ready;	/* 因无就绪变体而错过的次数 */
@@ -96,6 +98,13 @@ void ikaslr_rand_stats(u64 *last_ns, unsigned long *rounds)
 {
 	*last_ns = READ_ONCE(ikaslr_last_ns);
 	*rounds = READ_ONCE(ikaslr_rounds);
+}
+
+void ikaslr_rand_phases(u64 *wait_ns, u64 *update_ns, u64 *remap_ns)
+{
+	*wait_ns = READ_ONCE(ikaslr_wait_ns);
+	*update_ns = READ_ONCE(ikaslr_update_ns);
+	*remap_ns = READ_ONCE(ikaslr_remap_ns);
 }
 
 void ikaslr_pool_stats(u64 *prep_ns, unsigned long *missed, int *nready)
@@ -410,7 +419,11 @@ static int ikaslr_retire_trap(struct ikaslr_variant *v)
 	unsigned long npages = v->cap >> PAGE_SHIFT;
 
 	if (v->trap_base && !v->trapped) {
-		if (!ikaslr_remap(v->base, v->trap_pg, npages)) {
+		u64 tr = ktime_get_ns();
+		int rc = ikaslr_remap(v->base, v->trap_pg, npages);
+
+		WRITE_ONCE(ikaslr_remap_ns, ktime_get_ns() - tr);
+		if (!rc) {
 			v->trapped = true;
 			return 0;
 		}
@@ -530,8 +543,13 @@ int ikaslr_rerandomize(void)
 	}
 
 	/* 阻断入口并等待活跃集合变空。*/
-	ikaslr_block_region();
-	ret = ikaslr_wait_region_empty(IKASLR_WAIT_MS);
+	{
+		u64 tw = ktime_get_ns();
+
+		ikaslr_block_region();
+		ret = ikaslr_wait_region_empty(IKASLR_WAIT_MS);
+		WRITE_ONCE(ikaslr_wait_ns, ktime_get_ns() - tw);
+	}
 	if (ret) {
 		ikaslr_unblock_region();
 		pr_warn_ratelimited("region not empty within %d ms, skipping round\n",
@@ -543,9 +561,15 @@ int ikaslr_rerandomize(void)
 	 * 唯一的代码索引更新：每函数一个 target 槽。
 	 * 更新量与这些函数有多少调用点无关（需求 D1）。
 	 */
-	for (i = 0; i < ikaslr_ntramp; i++)
-		ikaslr_update_target(ikaslr_tbl[i], next->base + next->off[i]);
-	smp_wmb();
+	{
+		u64 tu = ktime_get_ns();
+
+		for (i = 0; i < ikaslr_ntramp; i++)
+			ikaslr_update_target(ikaslr_tbl[i],
+					     next->base + next->off[i]);
+		smp_wmb();
+		WRITE_ONCE(ikaslr_update_ns, ktime_get_ns() - tu);
+	}
 
 	/*
 	 * 调试用完整性自检：切换之后，每个 target 指向处的开头若干字节必须与
