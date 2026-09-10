@@ -105,6 +105,8 @@ def analyze(obj, include_funcs=False):
 
     refs = defaultdict(set)
     got_relocs = 0
+    data_sites = 0
+    call_sites = 0
     cur_sec = None
     for line in run(["readelf", "-rW", obj]).splitlines():
         m = re.match(r"Relocation section '(\S+)'", line)
@@ -136,7 +138,14 @@ def analyze(obj, include_funcs=False):
             got_relocs += 1
 
         sym = by_name.get(symname)
-        if not include_funcs and classify(symname, sym, rtype, secs) != "data":
+        kind = classify(symname, sym, rtype, secs)
+        # 站点计数：arm64 上一次全局数据引用 = adrp+add 对，只按 adrp(PG_HI21)/x86 记一次
+        if kind == "data" and rtype in ("R_AARCH64_ADR_PREL_PG_HI21",
+                                        "R_X86_64_PC32", "R_X86_64_32S", "R_X86_64_64"):
+            data_sites += 1
+        if rtype in ("R_AARCH64_CALL26", "R_AARCH64_JUMP26", "R_X86_64_PLT32"):
+            call_sites += 1
+        if not include_funcs and kind != "data":
             continue  # 外部函数不进 GOT（§3.4.3 优化一）
 
         # 归属到包含该 offset 的函数
@@ -153,7 +162,7 @@ def analyze(obj, include_funcs=False):
             owner = cur_sec  # 落不到具体函数时按节记，保持可归属
         refs[owner].add(dedup_key(symname, sym, obj, addend))
 
-    return refs, got_relocs, sum(len(v) for v in funcs_in_sec.values())
+    return refs, got_relocs, sum(len(v) for v in funcs_in_sec.values()), data_sites, call_sites
 
 
 def dedup_key(name, sym, obj, addend=0):
@@ -190,9 +199,11 @@ def main():
         sys.exit("没有匹配到 .o 文件")
 
     all_refs, per_func_total, nfunc, got_relocs = {}, 0, 0, 0
+    tot_data_sites = tot_call_sites = 0
     shared = set()
     for obj in files:
-        refs, g, nf = analyze(obj, args.include_funcs)
+        refs, g, nf, ds, cs = analyze(obj, args.include_funcs)
+        tot_data_sites += ds; tot_call_sites += cs
         got_relocs += g
         nfunc += nf
         for fn, s in refs.items():
@@ -215,6 +226,11 @@ def main():
     print(f"shared_total   (全局共享)  : {shared_total:>8} 项  "
           f"= {shared_total*8/1024:.1f} KB")
     print(f"dedup_ratio    (去重率)    : {ratio*100:.2f}%")
+    print()
+    print(f"全局数据引用**站点**数     : {tot_data_sites:>8}  "
+          f"（共享 GOT 下每站点多一次 load）")
+    print(f"外部调用站点数             : {tot_call_sites:>8}  "
+          f"（arm64 上须改为经跳板/间接跳转）")
     if fns_with_refs:
         print(f"每函数平均引用不同全局数据 : {per_func_total/fns_with_refs:.2f}")
 
