@@ -43,4 +43,11 @@
 - `01-overview.md`　实现总览与代码地图
 - `03-randomization.md` / `04-detection.md` / `05-pa-cfi.md`　各章实现细节（中文）
 - `06-experiments.md`　实验代码使用说明
+- **`实验/`　每个实验一个文档**（目的/配置/步骤/原始数据/判据/发现），
+  索引见 [`实验/README.md`](实验/README.md)
+- `10-perf-plan.md`　裸机性能测试方案
+- `11-related-comparison.md`　与 Adelie/Dbox 等的对比数据与方法
+- `12-got-codemodel-results.md`　共享 GOT 与代码模型（T1–T5）
+- `14-code-model-and-unmovable.md`　代码模型实现设计 + **哪些内核代码不能随机化**（实测）
+- `15-scope-selection.md`　**随机化对象怎么选、为什么**（名单在 `scripts/ikaslr/funcs/`）
 - 代码落点：`kernel/ikaslr/`（运行时）、`scripts/ikaslr/`（实验脚本）、`tools/ikaslr/`（LLVM pass 桩与接口）

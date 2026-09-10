@@ -1,0 +1,19 @@
+# I-KASLR 随机化函数名单（gen_funcs.py 生成）
+# 候选范围: fs/*.o block/*.o net/core/*.o mm/*.o
+# 已按实测可搬移性筛选，按被引用次数降序；共 16 个（E10 范围扫描）
+seq_printf
+seq_puts
+__brelse
+dput
+kvfree
+rtnl_unlock
+rtnl_is_locked
+folio_unlock
+free_pages
+__pskb_pull_tail
+kmemdup
+netdev_err
+rtnl_lock
+seq_putc
+skb_trim
+net_ratelimit
