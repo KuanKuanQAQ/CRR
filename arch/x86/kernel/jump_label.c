@@ -6,6 +6,7 @@
  *
  */
 #include <linux/jump_label.h>
+#include <linux/ikaslr.h>
 #include <linux/memory.h>
 #include <linux/uaccess.h>
 #include <linux/module.h>
@@ -79,6 +80,36 @@ __jump_label_patch(struct jump_entry *entry, enum jump_label_type type)
 	return (struct jump_label_patch){.code = code, .size = size};
 }
 
+
+/*
+ * I-KASLR：随机化区域内的静态键，代码已不在链接期地址上。返回 true 表示这条
+ * 已经由本函数处理完，调用方不要再走原来的改写。
+ *
+ * 三件事：
+ *   1. 把同一段字节打到**映像母本**与所有 READY 变体上。母本是 ikaslr_prepare()
+ *      复制的唯一源头；不打母本，下一轮随机化就会把这次开关悄悄退回旧状态，
+ *      而且不会有任何报错。
+ *   2. 把改写落到当前变体上——那一份正在执行，用 text_poke_bp 的原子序列。
+ *   3. 整个过程与随机化切换互斥。否则"译出变体地址"与"真正 text_poke"之间
+ *      若插进一轮随机化，补丁会打进已退役变体的陷阱页里。
+ *
+ * jlp.code 对每一份副本都相同：JMP 的偏移是"目标标号 − 本指令"，两者同属一个
+ * 函数、随函数整体搬移，差值不变。正因为如此静态键与本方案相容；而静态调用点
+ * （.static_call_sites）写的是指向区域外的 call rel32，偏移随函数位置而变，
+ * 与"函数体内不得有指向区域外的 PC 相对引用"直接冲突——那类函数不进随机化范围
+ * （见 scripts/ikaslr/gen_funcs.py 的硬约束）。
+ */
+static bool ikaslr_jump_label_patch(struct jump_entry *entry,
+				   const struct jump_label_patch *jlp)
+{
+	unsigned long addr = jump_entry_code(entry);
+
+	if (!IS_ENABLED(CONFIG_IKASLR) || likely(!ikaslr_image_to_live(addr)))
+		return false;
+	ikaslr_patch_code(addr, jlp->code, jlp->size);
+	return true;
+}
+
 static __always_inline void
 __jump_label_transform(struct jump_entry *entry,
 		       enum jump_label_type type,
@@ -98,10 +129,14 @@ __jump_label_transform(struct jump_entry *entry,
 	 * always nop being the 'currently valid' instruction
 	 */
 	if (init || system_state == SYSTEM_BOOTING) {
+		if (ikaslr_jump_label_patch(entry, &jlp))
+			return;
 		text_poke_early((void *)jump_entry_code(entry), jlp.code, jlp.size);
 		return;
 	}
 
+	if (ikaslr_jump_label_patch(entry, &jlp))
+		return;
 	text_poke_bp((void *)jump_entry_code(entry), jlp.code, jlp.size, NULL);
 }
 
@@ -135,7 +170,15 @@ bool arch_jump_label_transform_queue(struct jump_entry *entry,
 
 	mutex_lock(&text_mutex);
 	jlp = __jump_label_patch(entry, type);
-	text_poke_queue((void *)jump_entry_code(entry), jlp.code, jlp.size, NULL);
+	/*
+	 * 随机化区域内的条目**不进批处理队列**：排队与 text_poke_finish() 之间
+	 * 隔着一段不可控的时间，期间可能发生若干轮随机化，队列里记的变体地址
+	 * 早就失效了。改走逐条路径，译地址与改写之间由 ikaslr_patch_begin/end
+	 * 互斥，没有可插入的窗口。这类条目数量很少，不批处理不影响整体开销。
+	 */
+	if (!ikaslr_jump_label_patch(entry, &jlp))
+		text_poke_queue((void *)jump_entry_code(entry), jlp.code,
+				jlp.size, NULL);
 	mutex_unlock(&text_mutex);
 	return true;
 }

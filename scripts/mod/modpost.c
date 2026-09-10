@@ -798,9 +798,19 @@ static void check_section(const char *modname, struct elf_info *elf,
 #define TEXT_SECTIONS ".text", ".text.*", ".sched.text", \
 		".kprobes.text", ".cpuidle.text", ".noinstr.text", \
 		".ltext", ".ltext.*"
+/*
+ * I-KASLR 的两个代码段（CONFIG_IKASLR）：
+ *   .rand.text.*   随机化函数体，运行期整体搬移
+ *   .tramp.text.*  固定地址跳板
+ * 它们是货真价实的可执行代码，只是名字不在 ".text*" 之下。不列进来的话，
+ * 函数体里的 __ex_table 条目会被判成"异常表指向非文本段"，而报这条错误的
+ * default_mismatch_handler() 在 __ex_table 里找不到 fromsym 时会解引用空指针，
+ * 于是 modpost 直接段错误、什么都不打印（实测）。
+ */
 #define OTHER_TEXT_SECTIONS ".ref.text", ".head.text", ".spinlock.text", \
 		".fixup", ".entry.text", ".exception.text", \
-		".coldtext", ".softirqentry.text"
+		".coldtext", ".softirqentry.text", \
+		".rand.text", ".rand.text.*", ".tramp.text", ".tramp.text.*"
 
 #define INIT_SECTIONS      ".init.*"
 
@@ -829,9 +839,16 @@ enum mismatch {
  * @mismatch: Type of mismatch.
  */
 struct sectioncheck {
-	const char *fromsec[20];
-	const char *bad_tosec[20];
-	const char *good_tosec[20];
+	/*
+	 * 24 而不是 20：ALL_TEXT_SECTIONS 里多了 I-KASLR 的 .rand.text 与
+	 * .tramp.text 共四项，原来的 20 装不下（gcc 只报
+	 * "excess elements in array initializer"
+	 * 警告，随后 good_tosec 少了结尾的 NULL，match() 越界读到野指针，
+	 * modpost 段错误——实测就是这样炸的）。
+	 */
+	const char *fromsec[24];
+	const char *bad_tosec[24];
+	const char *good_tosec[24];
 	enum mismatch mismatch;
 };
 

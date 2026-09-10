@@ -5,6 +5,7 @@
 
 #include <linux/bitfield.h>
 #include <linux/extable.h>
+#include <linux/ikaslr.h>
 #include <linux/uaccess.h>
 
 #include <asm/asm-extable.h>
@@ -56,7 +57,7 @@ ex_handler_load_unaligned_zeropad(const struct exception_table_entry *ex,
 	return true;
 }
 
-bool fixup_exception(struct pt_regs *regs)
+static bool __fixup_exception(struct pt_regs *regs)
 {
 	const struct exception_table_entry *ex;
 
@@ -75,4 +76,25 @@ bool fixup_exception(struct pt_regs *regs)
 	}
 
 	BUG();
+}
+
+/*
+ * I-KASLR：与 x86 同理（见 arch/x86/mm/extable.c 的同名包装）。查表用的键已在
+ * kernel/extable.c 里换算过，这里只需把表项给出的 fixup 地址换算回当前变体。
+ */
+bool fixup_exception(struct pt_regs *regs)
+{
+	bool in_rand = ikaslr_live_to_image(instruction_pointer(regs)) != 0;
+
+	if (!__fixup_exception(regs))
+		return false;
+
+	if (unlikely(in_rand)) {
+		unsigned long live =
+			ikaslr_image_to_live(instruction_pointer(regs));
+
+		if (live)
+			instruction_pointer_set(regs, live);
+	}
+	return true;
 }

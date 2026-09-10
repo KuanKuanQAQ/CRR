@@ -3,6 +3,7 @@
 #include <linux/uaccess.h>
 #include <linux/sched/debug.h>
 #include <linux/bitfield.h>
+#include <linux/ikaslr.h>
 #include <xen/xen.h>
 
 #include <asm/fpu/api.h>
@@ -230,8 +231,9 @@ int ex_get_fixup_type(unsigned long ip)
 	return e ? FIELD_GET(EX_DATA_TYPE_MASK, e->data) : EX_TYPE_NONE;
 }
 
-int fixup_exception(struct pt_regs *regs, int trapnr, unsigned long error_code,
-		    unsigned long fault_addr)
+static int __fixup_exception(struct pt_regs *regs, int trapnr,
+			     unsigned long error_code,
+			     unsigned long fault_addr)
 {
 	const struct exception_table_entry *e;
 	int type, reg, imm;
@@ -307,6 +309,30 @@ int fixup_exception(struct pt_regs *regs, int trapnr, unsigned long error_code,
 extern unsigned int early_recursion_flag;
 
 /* Restricted version used during very early boot */
+/*
+ * I-KASLR：出错指令落在随机化变体里时，处理函数会把 regs->ip 置成**映像里**的
+ * fixup 地址（因为表项记的就是链接期地址，见 kernel/extable.c 里的键换算）。
+ * 这里把它换算回当前变体——fixup 标号与出错指令同属一个函数，因此几乎总在区域内。
+ *
+ * 整套做法的好处是 __ex_table 本身完全不动：那张表按地址排序、用二分查找，
+ * 每轮随机化都重排的代价完全无法接受。见 实现/17-implementation-current.md §3.7。
+ */
+int fixup_exception(struct pt_regs *regs, int trapnr, unsigned long error_code,
+		    unsigned long fault_addr)
+{
+	bool in_rand = ikaslr_live_to_image(regs->ip) != 0;
+	int ret;
+
+	ret = __fixup_exception(regs, trapnr, error_code, fault_addr);
+	if (ret && unlikely(in_rand)) {
+		unsigned long live = ikaslr_image_to_live(regs->ip);
+
+		if (live)
+			regs->ip = live;
+	}
+	return ret;
+}
+
 void __init early_fixup_exception(struct pt_regs *regs, int trapnr)
 {
 	/* Ignore early NMIs. */

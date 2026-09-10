@@ -9,9 +9,19 @@
      · per-CPU 访问（`current`/`this_cpu_*`）—— `%gs:<常量偏移>`，**不可回避**
      · `BUG()`/`WARN()`（DEBUG_BUGVERBOSE 用 `"i"(__FILE__)`）
      · 静态键（`arch_static_branch` 用 `"i"(key)`）
-  B. 以代码地址为键的旁表（搬移后表项失效）
-     · `__ex_table` —— 失配是**正确性错误**（本该 fixup 的异常变成 oops）
-     · `__bug_table` / `__jump_table` / `.altinstructions` / `.smp_locks` —— 功能退化
+  B. 以代码地址为键、且**必须写回代码**的旁表
+     · `.static_call_sites` / `__mcount_loc` —— 写进去的是指向区域外的
+       `call rel32`，偏移随函数位置而变，与"函数体内不得有指向区域外的 PC 相对
+       引用"这条不变式直接冲突，**无解**，只能排除。
+
+  已不再是约束的（2026-09-10 起，见 `实现/17-implementation-current.md` §3.7）：
+     · `__ex_table` / `__bug_table` —— 改为在**查表时换算地址**（变体地址 ->
+       映像链接期地址），表本身一个字节都不用改。
+     · `__jump_table` —— 静态键的 JMP 偏移是"目标标号 − 本指令"，两者同属一个
+       函数、随函数整体搬移，差值不变；运行期开关由 jump_label 钩子同时打到
+       映像母本与各变体上。
+     · `.altinstructions` / `.smp_locks` —— 在启动时一次性施加到映像母本上，
+       而变体**始终从母本复制**，因此变体天然带着已打好的补丁。
 
 因此本工具从目标文件的重定位里**实测**每个函数是否触碰上述构造，只输出干净的，
 并按"被引用次数"降序（引用越多，D1 索引收敛越显著，见 E3-1）。
@@ -28,16 +38,20 @@ import subprocess
 import sys
 from collections import defaultdict
 
-# 硬约束：命中即排除
+# 硬约束：命中即排除。
+# 只剩下"必须把指向区域外的 PC 相对调用写回代码里"的那两个——那与位置无关性
+# 不相容，没有办法。其余地址键旁表已由运行时的地址换算/母本传播处理，见模块注释。
 HARD = {
-    "__ex_table": "异常修正表（搬移后 fixup 失配＝正确性错误）",
-    "__bug_table": "BUG()/WARN()（\"i\"(__FILE__) 与绝对寻址不容）",
-    "__jump_table": "静态键（\"i\"(key) 与绝对寻址不容）",
+    ".static_call_sites": "静态调用点（写回的是指向区域外的 call rel32）",
+    "__mcount_loc": "ftrace 插桩点（写回的是指向 __fentry__ 的 call rel32）",
 }
-# 软约束：默认也排除，可用 --allow-soft 放行
+# 软约束：默认放行，可用 --exclude-soft 重新排除（用于对照实验）
 SOFT = {
-    ".altinstructions": "alternatives 运行时改写",
-    ".smp_locks": "SMP 锁前缀改写",
+    "__ex_table": "异常修正表（已由 fixup_exception 的地址换算处理）",
+    "__bug_table": "BUG()/WARN()（已由 report_bug 的地址换算处理）",
+    "__jump_table": "静态键（已由 jump_label 钩子处理）",
+    ".altinstructions": "alternatives（启动时打在母本上，变体从母本复制）",
+    ".smp_locks": "SMP 锁前缀（同上）",
 }
 CALL = {"R_X86_64_PLT32", "R_AARCH64_CALL26", "R_AARCH64_JUMP26"}
 PTR = {"R_X86_64_64", "R_AARCH64_ABS64"}
@@ -85,14 +99,14 @@ def owner(per_sec, secs, sec_name, off):
     return lst[0][2] if len(lst) == 1 else None
 
 
-def analyze_scope(obj, allow_soft):
+def analyze_scope(obj, exclude_soft):
     """返回 (本文件定义的函数集, 被排除的函数->原因, percpu 命中集)。"""
     secs = sections(obj)
     per_sec, sym_sec = symbols(obj)
     defined = {n for lst in per_sec.values() for _, _, n in lst}
     bad = {}
     cur = None
-    bad_secs = dict(HARD) if allow_soft else {**HARD, **SOFT}
+    bad_secs = {**HARD, **SOFT} if exclude_soft else dict(HARD)
 
     for ln in run(["readelf", "-rW", obj]).splitlines():
         m = re.match(r"Relocation section '(\S+)'", ln)
@@ -181,8 +195,10 @@ def main():
     ap.add_argument("--refs", nargs="+", help="到哪里数引用（默认全树 '**/*.o'）")
     ap.add_argument("--top", type=int, default=0, help="只取引用数最高的 N 个（0=全部）")
     ap.add_argument("--out", help="写出 funcs.txt")
-    ap.add_argument("--allow-soft", action="store_true",
-                    help="放行 alternatives/smp_locks 这类软约束函数")
+    ap.add_argument("--exclude-soft", action="store_true",
+                    help="连同 __ex_table/__bug_table/__jump_table/alternatives "
+                         "一起排除（这些默认已放行，运行时有对应处理；"
+                         "本开关用于做\"若不处理旁表能随机化多少\"的对照）")
     args = ap.parse_args()
 
     scope_files = expand(args.build_dir, args.scope)
@@ -192,7 +208,7 @@ def main():
 
     defined, bad = set(), {}
     for o in scope_files:
-        d, b = analyze_scope(o, args.allow_soft)
+        d, b = analyze_scope(o, args.exclude_soft)
         defined |= d
         bad.update(b)
 

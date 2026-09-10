@@ -169,6 +169,27 @@ int ikaslr_whitelist_count(void);
 void ikaslr_out_enter(void *target);
 void ikaslr_out_leave(void);
 
+/*
+ * 地址键旁表的换算（§3.5.6）。__ex_table / __bug_table / __jump_table 这些表
+ * 在链接期把"某条指令的地址"编码进表项，而表项位于固定地址。函数体一搬走，
+ * 键就失配。处理方式不是改表，而是换算查表用的地址：
+ *
+ *   查表前  ikaslr_live_to_image()   变体内地址 -> 映像链接期地址
+ *   查到后  ikaslr_image_to_live()   表给出的地址 -> 当前变体内地址
+ *
+ * 两者都在"不属于随机化区域"时返回 0，调用点据此走原路径。
+ */
+unsigned long ikaslr_live_to_image(unsigned long addr);
+unsigned long ikaslr_image_to_live(unsigned long addr);
+
+/*
+ * 把一次运行期代码改写（静态键的开关等）施加到所有还会被执行的副本上：
+ * 映像母本、READY 变体、当前 LIVE 变体。image_addr 必须是**映像**地址。
+ * 只能在可睡眠上下文调用。返回 0 表示已完整施加。
+ */
+int ikaslr_patch_code(unsigned long image_addr, const void *opcode, size_t len);
+
+
 #else  /* !CONFIG_IKASLR */
 
 static inline void ikaslr_enter(void) { }
@@ -180,6 +201,10 @@ static inline bool ikaslr_whitelist_ok(void *target) { return true; }
 static inline int ikaslr_whitelist_count(void) { return 0; }
 static inline void ikaslr_out_enter(void *target) { }
 static inline void ikaslr_out_leave(void) { }
+static inline unsigned long ikaslr_live_to_image(unsigned long a) { return 0; }
+static inline unsigned long ikaslr_image_to_live(unsigned long a) { return 0; }
+static inline int ikaslr_patch_code(unsigned long a, const void *o,
+				    size_t l) { return 0; }
 
 #endif /* CONFIG_IKASLR */
 

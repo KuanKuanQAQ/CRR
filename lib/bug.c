@@ -44,6 +44,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/bug.h>
+#include <linux/ikaslr.h>
 #include <linux/sched.h>
 #include <linux/rculist.h>
 #include <linux/ftrace.h>
@@ -214,6 +215,19 @@ enum bug_trap_type report_bug(unsigned long bugaddr, struct pt_regs *regs)
 {
 	enum bug_trap_type ret;
 	bool rcu = false;
+	unsigned long img;
+
+	/*
+	 * I-KASLR：BUG()/WARN() 的陷阱指令若位于随机化变体里，__bug_table 查不到
+	 * ——表项记的是映像里的链接期地址。换算回映像地址再查即可。
+	 *
+	 * 只改本地的 bugaddr，不动 regs：调用方跨过 ud2/brk 的动作用的是真实的
+	 * regs->ip，必须保持不变。附带的好处是日志里报出来的地址是映像地址，
+	 * kallsyms 能解析成函数名，而变体地址解析不出来。
+	 */
+	img = ikaslr_live_to_image(bugaddr);
+	if (unlikely(img))
+		bugaddr = img;
 
 	rcu = warn_rcu_enter();
 	ret = __report_bug(bugaddr, regs);

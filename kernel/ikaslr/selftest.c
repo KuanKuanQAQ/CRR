@@ -593,6 +593,154 @@ static int __init test_cf_audit(void)
 	return 0;
 }
 
+
+/*
+ * S1.12：以代码地址为键的旁表在迁移后仍然有效（§3.7）。
+ *
+ * 三件事分开验：
+ *   A 地址换算本身是双向一致的；
+ *   B __ex_table —— 函数体内的取值异常，搬移之后仍能被修正成 -EFAULT 而不是 oops；
+ *   C __jump_table —— 静态键的开关不仅当轮生效，还要**跨随机化轮次保持**。
+ *
+ * C 的第 4 步是本测试真正的要害：新变体是从**映像母本**复制的，如果运行期的
+ * 静态键改写只打到了当前变体上，下一轮随机化就会把开关悄悄退回旧状态，而且
+ * 不会有任何报错。只有母本也被打上，这一步才会通过。
+ */
+static int __init test_sidetables(void)
+{
+	unsigned long probe, live, back;
+	unsigned long bad_kaddr;
+	void *guard_page;
+	int i, r, round;
+
+	/* ---- A. 换算往返 ---- */
+	for (i = 0; i < ikaslr_nr_funcs(); i++) {
+		if (!ikaslr_tbl[i]->size)
+			continue;
+		probe = (unsigned long)ikaslr_tbl[i]->body +
+			ikaslr_tbl[i]->size / 2;
+		live = ikaslr_image_to_live(probe);
+		if (!live) {
+			pr_err("FAIL(sidetab): image_to_live(%s+%zu) = 0\n",
+			       ikaslr_tbl[i]->name, ikaslr_tbl[i]->size / 2);
+			return -EINVAL;
+		}
+		back = ikaslr_live_to_image(live);
+		if (back != probe) {
+			pr_err("FAIL(sidetab): round trip %s: %lx -> %lx -> %lx\n",
+			       ikaslr_tbl[i]->name, probe, live, back);
+			return -EINVAL;
+		}
+	}
+	/* 区域外的地址必须两边都返回 0，否则会误伤普通异常路径。*/
+	if (ikaslr_live_to_image((unsigned long)&test_sidetables) ||
+	    ikaslr_image_to_live((unsigned long)&test_sidetables)) {
+		pr_err("FAIL(sidetab): non-region address translated\n");
+		return -EINVAL;
+	}
+
+#if IS_ENABLED(CONFIG_X86_64)
+	if (ikaslr_nr_funcs() < 3) {
+		pr_info("sidetab: randfuncs not built, skipping B/C\n");
+		return 0;
+	}
+
+	/* ---- B. __ex_table ---- */
+	/*
+	 * 出错地址必须是**内核**地址。用用户地址（比如 0）是不行的：开了 SMAP 的
+	 * 机器上，内核态访问用户地址且 AC=0 时，do_user_addr_fault() 会直接
+	 * page_fault_oops()，**根本不查异常表**——arch/x86/mm/fault.c 里那段的注释
+	 * 就写着 "get_kernel_nofault() will not get here"。实测踩过。
+	 *
+	 * vmalloc 区每块分配之后跟着一个保护页，那就是现成的、可移植的
+	 * "合法内核地址但一定不可读"。
+	 */
+	guard_page = vmalloc(PAGE_SIZE);
+	if (!guard_page) {
+		pr_info("sidetab/ex: no memory, skipping\n");
+		goto jump_test;
+	}
+	bad_kaddr = (unsigned long)guard_page + PAGE_SIZE;
+
+	for (round = 0; round < 3; round++) {
+		unsigned long good = (unsigned long)&ikaslr_rf_counter;
+
+		r = ikaslr_rf_nofault(good);
+		if (r < 0) {
+			pr_err("FAIL(sidetab/ex): round %d: valid address faulted\n",
+			       round);
+			vfree(guard_page);
+			return -EINVAL;
+		}
+		/*
+		 * 取保护页必然缺页。没有正确的异常表条目，这一下就是 oops 而不是
+		 * 返回值——所以这条断言"能跑到"本身就是结论的一半。
+		 */
+		r = ikaslr_rf_nofault(bad_kaddr);
+		if (r != -EFAULT) {
+			pr_err("FAIL(sidetab/ex): round %d: got %d, want -EFAULT\n",
+			       round, r);
+			vfree(guard_page);
+			return -EINVAL;
+		}
+		ikaslr_defer_flush();
+		if (ikaslr_rerandomize()) {
+			pr_err("FAIL(sidetab/ex): rerandomize failed\n");
+			vfree(guard_page);
+			return -EINVAL;
+		}
+		ikaslr_defer_flush();
+	}
+	vfree(guard_page);
+	pr_info("sidetab/ex: PASS - fixup still applies after %d relocations\n",
+		round);
+
+jump_test:
+	/* ---- C. __jump_table ---- */
+	if (ikaslr_rf_branch() != 0) {
+		pr_err("FAIL(sidetab/jump): key starts enabled?\n");
+		return -EINVAL;
+	}
+	static_branch_enable(&ikaslr_rf_key);
+	if (ikaslr_rf_branch() != 1) {
+		pr_err("FAIL(sidetab/jump): enable did not take effect\n");
+		return -EINVAL;
+	}
+	/* 要害：新变体从母本复制，开关必须跟着过去。*/
+	for (round = 0; round < 3; round++) {
+		ikaslr_defer_flush();
+		if (ikaslr_rerandomize()) {
+			pr_err("FAIL(sidetab/jump): rerandomize failed\n");
+			return -EINVAL;
+		}
+		ikaslr_defer_flush();
+		if (ikaslr_rf_branch() != 1) {
+			pr_err("FAIL(sidetab/jump): key lost after relocation %d "
+			       "(master copy not patched)\n", round);
+			return -EINVAL;
+		}
+	}
+	static_branch_disable(&ikaslr_rf_key);
+	if (ikaslr_rf_branch() != 0) {
+		pr_err("FAIL(sidetab/jump): disable did not take effect\n");
+		return -EINVAL;
+	}
+	ikaslr_defer_flush();
+	if (!ikaslr_rerandomize()) {
+		ikaslr_defer_flush();
+		if (ikaslr_rf_branch() != 0) {
+			pr_err("FAIL(sidetab/jump): key re-enabled itself\n");
+			return -EINVAL;
+		}
+	}
+	pr_info("sidetab/jump: PASS - static key survives relocation both ways\n");
+#else
+	/* randfuncs.o 目前只在 x86_64 上构建，arm64 暂无 B/C 的素材。*/
+	pr_info("sidetab: round-trip PASS; B/C need randfuncs (x86_64 only)\n");
+#endif
+	return 0;
+}
+
 static int __init ikaslr_selftest_init(void)
 {
 	int ret;
@@ -629,8 +777,11 @@ static int __init ikaslr_selftest_init(void)
 	ret = test_cf_audit();
 	if (ret)
 		return ret;
+	ret = test_sidetables();
+	if (ret)
+		return ret;
 
-	pr_info("PASS: dispatch + tracking + block + rerand + defer + fixed_out + stale-return\n");
+	pr_info("PASS: dispatch + tracking + block + rerand + defer + fixed_out + stale-return + sidetables\n");
 	return 0;
 }
 /* 在 core 的 late_initcall 之后运行，确保 target 槽已初始化。*/

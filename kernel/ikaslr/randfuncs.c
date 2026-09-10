@@ -38,6 +38,8 @@
 #include <linux/ikaslr.h>
 #include <linux/kernel.h>
 #include <linux/printk.h>
+#include <linux/jump_label.h>
+#include <linux/uaccess.h>
 
 #include "internal.h"
 
@@ -70,6 +72,72 @@ IKASLR_TRAMP_FN(int, ikaslr_rf_general, int a)
 
 	ikaslr_enter();
 	ret = IKASLR_TARGET(ikaslr_rf_general)(a);
+	ikaslr_leave();
+	return ret;
+}
+
+/*
+ * ---- 地址键旁表的验证素材（§3.7）----
+ *
+ * 下面两个随机化函数各自在**函数体内部**留下一条以代码地址为键的旁表条目：
+ * 一条 __ex_table、一条 __jump_table。它们搬走之后，表项记的仍是映像里的
+ * 链接期地址，因此必须靠运行时的地址换算/母本传播才能继续工作。
+ * selftest.c 的 test_sidetables() 就靠调用它们来验证那套机制真的生效——
+ * 光看压力测试不算数，那只能碰运气命中。
+ */
+
+/* 静态键：分支落在 ikaslr_rf_branch 体内，__jump_table 条目也指向那里。*/
+DEFINE_STATIC_KEY_FALSE(ikaslr_rf_key);
+
+/*
+ * 含 __jump_table 条目的随机化函数。
+ * 静态键与本方案相容的原因：JMP 的偏移是"目标标号 − 本指令"，两者同属本函数、
+ * 随函数整体搬移，差值不变；运行期开关由 arch 的 jump_label 钩子同时打到
+ * 映像母本与各变体上。
+ */
+IKASLR_RAND_FN(int, ikaslr_rf_branch, void)
+{
+	if (static_branch_unlikely(&ikaslr_rf_key))
+		return 1;
+	return 0;
+}
+
+IKASLR_TRAMP_FN(int, ikaslr_rf_branch, void)
+{
+	int ret;
+
+	ikaslr_enter();
+	ret = IKASLR_TARGET(ikaslr_rf_branch)();
+	ikaslr_leave();
+	return ret;
+}
+
+/*
+ * 含 __ex_table 条目的随机化函数：对给定地址做一次不会 oops 的取值。
+ *
+ * 用 arch 的 __get_kernel_nofault 而不是通用的 get_kernel_nofault()：后者是对
+ * copy_from_kernel_nofault() 的函数调用，异常表条目落在**那个**函数里，测不到
+ * 我们想测的东西。前者是内联汇编，出错指令与 fixup 标号都在本函数体内。
+ *
+ * 传一个不可读的地址进来时必须返回 -EFAULT（而不是 oops）：这要求 fixup_exception
+ * 能用换算回映像的地址查到表项，再把表给出的 fixup 地址换算回当前变体。
+ */
+IKASLR_RAND_FN(int, ikaslr_rf_nofault, unsigned long addr)
+{
+	unsigned long v;
+
+	__get_kernel_nofault(&v, (unsigned long *)addr, unsigned long, bad);
+	return (int)(v & 1);
+bad:
+	return -EFAULT;
+}
+
+IKASLR_TRAMP_FN(int, ikaslr_rf_nofault, unsigned long addr)
+{
+	int ret;
+
+	ikaslr_enter();
+	ret = IKASLR_TARGET(ikaslr_rf_nofault)(addr);
 	ikaslr_leave();
 	return ret;
 }

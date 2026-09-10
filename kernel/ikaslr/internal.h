@@ -7,6 +7,7 @@
 #define _KERNEL_IKASLR_INTERNAL_H
 
 #include <linux/ikaslr.h>
+#include <linux/jump_label.h>
 
 /* 跳板表（初始化后有效）。*/
 extern struct ikaslr_tramp **ikaslr_tbl;
@@ -30,6 +31,7 @@ int ikaslr_active_count(void);
 struct ikaslr_stats {
 	unsigned long enters;	/* 累计进入次数 */
 	unsigned long backoffs;	/* 因阻断而回退重试的次数 */
+	unsigned long forced;	/* 不可睡上下文里放弃等待、硬进入的次数 */
 	int	      max_active;/* 观察到的最大并发数 */
 };
 void ikaslr_get_stats(struct ikaslr_stats *out);
@@ -61,6 +63,10 @@ int ikaslr_control_init(void);
 extern int ikaslr_rf_counter;
 int ikaslr_rf_general(int a);
 int ikaslr_rf_helper(int x);
+/* 旁表验证素材（randfuncs.c）：分别含一条 __jump_table / __ex_table 条目。*/
+DECLARE_STATIC_KEY_FALSE(ikaslr_rf_key);
+int ikaslr_rf_branch(void);
+int ikaslr_rf_nofault(unsigned long addr);
 struct proc_dir_entry;
 int ikaslr_bench_init(struct proc_dir_entry *dir);
 int ikaslr_detect_mark(const char *name, void *trap_at, void *copy_src, size_t size);

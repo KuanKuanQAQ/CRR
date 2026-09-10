@@ -26,6 +26,15 @@
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/mutex.h>
+#include <linux/delay.h>
+#ifdef CONFIG_X86
+#include <asm/text-patching.h>
+#endif
+#ifdef CONFIG_ARM64
+#include <asm/patching.h>
+#include <asm/insn.h>
+#endif
 #include <linux/random.h>
 #include <linux/set_memory.h>
 #include <linux/cacheflush.h>
@@ -129,6 +138,12 @@ void ikaslr_pool_stats(u64 *prep_ns, unsigned long *missed, int *nready)
  * 顺序很重要：不能在页面仍可执行时直接加写权限，否则会出现 W+X，内核的 CPA
  * 会报 "W^X violation"。因此写之前先去掉执行权限，写完之后先只读再加回执行。
  */
+/*
+ * 串行化"准备一个变体"与"把运行期代码改写打到母本/READY 变体上"。
+ * 见 ikaslr_patch_shadows() 的注释。
+ */
+static DEFINE_MUTEX(ikaslr_prep_lock);
+
 static int ikaslr_make_writable(void *base, unsigned long npages)
 {
 	int ret = set_memory_nx((unsigned long)base, npages);
@@ -298,6 +313,9 @@ static int ikaslr_prepare(struct ikaslr_variant *v)
 	unsigned long npages = v->cap >> PAGE_SHIFT;
 	u64 t0 = ktime_get_ns();
 	int i, ret;
+
+	/* 与 ikaslr_patch_shadows() 互斥：本函数从母本复制，那边改写母本。*/
+	guard(mutex)(&ikaslr_prep_lock);
 
 	/*
 	 * 若该变体退役时被重指到陷阱影像（trapped），先把 base 的页表项指回它自己的
@@ -477,6 +495,199 @@ bool ikaslr_fixup_addr(unsigned long addr, unsigned long *newp)
 	}
 	return false;
 }
+
+/*
+ * ---- 地址键旁表的换算原语（§3.5.6）----
+ *
+ * 内核里有若干**以代码地址为键**的旁表：__ex_table（异常修正）、__bug_table
+ * （BUG/WARN）、__jump_table（静态键）等。它们都在链接期把"某条指令的地址"编码
+ * 进表项，而表项本身位于固定地址的只读数据段里。函数体一搬走，键就对不上了。
+ *
+ * 处理方式不是去改表，而是**换算查表用的地址**：
+ *   查表前  ikaslr_live_to_image()  把变体内地址换回映像里的链接期地址
+ *   查到后  ikaslr_image_to_live()  把表给出的地址换算到当前变体
+ *
+ * 这样旁表一个字节都不用改，也就没有"随机化时要重排序 __ex_table"的问题——
+ * 那张表是按地址排好序、用二分查找的，每轮重排的代价完全无法接受。
+ * 代价只是两次换算，且只发生在**确实落在随机化区域**的那些查询上。
+ *
+ * 不能这样处理的是需要**改写代码**的旁表（静态调用点 .static_call_sites、
+ * ftrace 的 __mcount_loc）：它们写进去的是 `call rel32`，目标在区域外，
+ * 偏移随函数位置而变——这与"函数体内不得有指向区域外的 PC 相对引用"这条
+ * 不变式直接冲突，因此这类函数本来就不能进入随机化范围，见
+ * scripts/ikaslr/gen_funcs.py 的硬约束。
+ */
+
+/* 变体内地址 -> 映像里的链接期地址。不在当前变体内返回 0。*/
+unsigned long ikaslr_live_to_image(unsigned long addr)
+{
+	struct ikaslr_variant *live = READ_ONCE(ikaslr_live);
+	unsigned long base, delta;
+	int f;
+
+	if (!live)
+		return 0;
+	base = (unsigned long)live->base;
+	/* 绝大多数查询都在这两条比较上被挡掉，因此这条路径对普通异常没有代价。*/
+	if (addr < base || addr >= base + live->used)
+		return 0;
+
+	delta = addr - base;
+	for (f = 0; f < ikaslr_ntramp; f++) {
+		unsigned long fo = live->off[f];
+
+		if (delta >= fo && delta < fo + ikaslr_tbl[f]->size)
+			return (unsigned long)ikaslr_tbl[f]->body + (delta - fo);
+	}
+	return 0;	/* 落在函数之间的随机间隙里 */
+}
+EXPORT_SYMBOL_GPL(ikaslr_live_to_image);
+
+/* 映像里的链接期地址 -> 当前变体内地址。不在随机化区域内返回 0。*/
+unsigned long ikaslr_image_to_live(unsigned long addr)
+{
+	struct ikaslr_variant *live = READ_ONCE(ikaslr_live);
+	int f;
+
+	if (!live || addr < (unsigned long)__rand_text_start ||
+	    addr >= (unsigned long)__rand_text_end)
+		return 0;
+
+	for (f = 0; f < ikaslr_ntramp; f++) {
+		unsigned long b = (unsigned long)ikaslr_tbl[f]->body;
+
+		if (addr >= b && addr < b + ikaslr_tbl[f]->size)
+			return (unsigned long)live->base + live->off[f] +
+			       (addr - b);
+	}
+	return 0;
+}
+EXPORT_SYMBOL_GPL(ikaslr_image_to_live);
+
+/*
+ * 往只读内核代码里写一小段字节。两处目标都是只读的：映像母本在 .text（
+ * mark_rodata_ro 之后 RO），READY 变体是 RO+X。因此必须走架构自己的代码改写
+ * 通道，不能直接 memcpy。
+ *
+ * x86 的 text_poke() 要求调用方持有 text_mutex —— jump label 的两个改写点
+ * （__jump_label_transform / arch_jump_label_transform_queue）都已经持有。
+ */
+static int ikaslr_poke(void *addr, const void *opcode, size_t len)
+{
+#if defined(CONFIG_X86)
+	return IS_ERR_OR_NULL(text_poke(addr, opcode, len)) ? -EFAULT : 0;
+#elif defined(CONFIG_ARM64)
+	/* arm64 的静态键就是一条 32 位指令（B 或 NOP）。*/
+	if (len != AARCH64_INSN_SIZE)
+		return -EINVAL;
+	return aarch64_insn_patch_text_nosync(addr, *(const u32 *)opcode);
+#else
+	return -ENOSYS;
+#endif
+}
+
+/*
+ * 取得/释放"此刻不会发生随机化切换"的独占权。复用随机化自己的 in_progress 标志：
+ * 改写代码的一方先把它占住，ikaslr_rerandomize() 抢不到就返回 -EBUSY 跳过本轮。
+ * 只能在可睡眠上下文调用。
+ */
+static void ikaslr_patch_begin(void)
+{
+	while (atomic_cmpxchg(&ikaslr_in_progress, 0, 1) != 0)
+		cond_resched();
+}
+
+static void ikaslr_patch_end(void)
+{
+	atomic_set(&ikaslr_in_progress, 0);
+}
+
+/* 为让改动在当前执行的那一份上生效而尝试切换变体的次数。*/
+#define IKASLR_PATCH_TRIES 8
+
+/*
+ * 把一次运行期代码改写（静态键的开关等）施加到所有还会被执行的副本上（§3.5.6）。
+ * image_addr 是映像地址。只能在可睡眠上下文调用。
+ *
+ * 分两步，各自的理由都不显然：
+ *
+ * 1. **映像母本 + 所有 READY 变体**。母本非打不可：ikaslr_prepare() 始终从母本
+ *    复制（见该函数注释，以 live 为源会与退役填陷阱的工作项竞态）。只打当前变体
+ *    的话，下一轮随机化新变体从母本复制，这次改动就悄无声息地丢了——静态键退回
+ *    旧状态，而且不报任何错。这两类副本都没有在执行，直接改写即安全。
+ *
+ * 2. **当前 LIVE 那一份不去改它，而是换掉它**：触发一次随机化，切到一个上一步
+ *    已经打过补丁的 READY 变体上。
+ *
+ *    为什么不直接改 LIVE：
+ *      · x86 的 text_poke_bp() 用不了——它把待改写地址存成**相对 _stext 的 s32
+ *        偏移**（struct text_poke_loc.rel_addr），而变体在 vmalloc 区、与 _stext
+ *        相距几十 TB，偏移直接溢出。实测 text_poke_bp_batch() 在
+ *        `movslq (%r12,%rbx),%rax` 之后拿到截断地址并缺页。
+ *      · 退而求其次的"阻断入口 + 等区域变空再直接改写"也不行：范围一大（实测
+ *        S3 的 483 个函数覆盖 VFS/mm/net）就等不到空，而等待期间整个区域被阻断，
+ *        系统反而卡住。
+ *    换一份则完全绕开这两点：新变体是**从未被执行过的新内存**，既没有交叉改写
+ *    代码的一致性问题，也不需要广播 sync_core。而且复用的是已经充分验证过的
+ *    切换路径，没有第二套静默期实现。
+ */
+int ikaslr_patch_code(unsigned long image_addr, const void *opcode, size_t len)
+{
+	unsigned long b = 0, off;
+	int f, i, tries;
+
+	if (!ikaslr_ntramp)
+		return 0;
+
+	for (f = 0; f < ikaslr_ntramp; f++) {
+		b = (unsigned long)ikaslr_tbl[f]->body;
+		if (image_addr >= b && image_addr + len <= b + ikaslr_tbl[f]->size)
+			break;
+	}
+	if (f == ikaslr_ntramp)
+		return 0;	/* 不在随机化区域内，或跨了函数边界 */
+	off = image_addr - b;
+
+	/*
+	 * 第一步要与随机化切换互斥：否则某个 READY 变体可能正好在我们改写它的
+	 * 同时被提升为 LIVE，那就变成了对正在执行的代码做非原子改写。
+	 */
+	ikaslr_patch_begin();
+	mutex_lock(&ikaslr_prep_lock);
+	if (ikaslr_poke((void *)image_addr, opcode, len))
+		pr_warn_ratelimited("patch master at %px failed\n",
+				    (void *)image_addr);
+	for (i = 0; i < IKASLR_NR_VARIANTS; i++) {
+		struct ikaslr_variant *v = &ikaslr_vars[i];
+
+		if (READ_ONCE(v->state) != VAR_READY)
+			continue;
+		if (ikaslr_poke(v->base + v->off[f] + off, opcode, len))
+			pr_warn_ratelimited("patch ready variant %px failed\n",
+					    v->base);
+	}
+	mutex_unlock(&ikaslr_prep_lock);
+	ikaslr_patch_end();
+
+	if (!READ_ONCE(ikaslr_live))
+		return 0;	/* 尚未启用变体池：母本就是执行中的那一份 */
+
+	/* 第二步：切到带着本次改动的变体上。*/
+	for (tries = 0; tries < IKASLR_PATCH_TRIES; tries++) {
+		if (!ikaslr_rerandomize())
+			return 0;
+		msleep(20);	/* 让补充变体的工作队列跑完再试 */
+	}
+
+	/*
+	 * 母本已经打上，因此下一次随机化成功时会带上这次改动；只是当前这一份
+	 * 还是旧的。如实报告，不要假装成功。
+	 */
+	pr_warn("live variant not switched for patch at %px; takes effect on next rerandomization\n",
+		(void *)image_addr);
+	return -EBUSY;
+}
+EXPORT_SYMBOL_GPL(ikaslr_patch_code);
 
 /* 后台：把一个变体准备成 READY。*/
 static void ikaslr_refill_work_fn(struct work_struct *w)

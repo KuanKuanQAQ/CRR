@@ -7,6 +7,7 @@
 #include <linux/ftrace.h>
 #include <linux/memory.h>
 #include <linux/extable.h>
+#include <linux/ikaslr.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/init.h>
@@ -54,6 +55,21 @@ struct exception_table_entry *search_kernel_exception_table(unsigned long addr)
 const struct exception_table_entry *search_exception_tables(unsigned long addr)
 {
 	const struct exception_table_entry *e;
+	unsigned long img;
+
+	/*
+	 * I-KASLR：地址若落在某个随机化变体里，表里是查不到的——__ex_table 的键是
+	 * 映像里的链接期地址。换算回去再查即可，表本身一个字节都不用改。
+	 *
+	 * 换算放在**这里**而不是只放在 fixup_exception()：除了它，还有若干处只判
+	 * "有没有表项"的调用方（x86/arm64 缺页路径里"内核代码访问用户内存"的检查、
+	 * kprobes 的可探测性判断）。放在入口一处覆盖全部。
+	 * 表项给出的 fixup **地址**还需要换算回变体，那一步在各架构的
+	 * fixup_exception() 里做。
+	 */
+	img = ikaslr_live_to_image(addr);
+	if (unlikely(img))
+		addr = img;
 
 	e = search_kernel_exception_table(addr);
 	if (!e)
