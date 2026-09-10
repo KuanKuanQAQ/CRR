@@ -23,6 +23,7 @@
 #include <asm/sections.h>
 #include <linux/set_memory.h>
 #include <linux/vmalloc.h>
+#include <linux/kprobes.h>
 
 #include "internal.h"
 #include <linux/errno.h>
@@ -774,6 +775,93 @@ jump_test:
 	return 0;
 }
 
+
+#if IS_ENABLED(CONFIG_KPROBES) && IS_ENABLED(CONFIG_X86_64)
+static int ikaslr_kp_hits;
+
+static int ikaslr_kp_pre(struct kprobe *p, struct pt_regs *regs)
+{
+	ikaslr_kp_hits++;
+	return 0;
+}
+
+/*
+ * E3-C / R-67：kprobes 与本机制能否共存。
+ *
+ * 结论是**分两种情况**，这正是要测出来的：
+ *
+ *   探**跳板**（`fn`）        —— 跳板在固定地址、永不搬移，kprobe 照常工作，
+ *                                随机化前后都命中。
+ *   探**函数体**（`fn_body`） —— kallsyms 给出的是**映像里的**链接期地址，而执行
+ *                                发生在变体里；探针装在了一份首次随机化后就被置 NX、
+ *                                再也不会执行的代码上，因此**一次都不会命中**，
+ *                                而且 register_kprobe 会成功返回 —— 是**静默失效**。
+ *
+ * 静默失效比报错更糟：使用者以为探针生效了。因此这一条必须在正文写清楚。
+ */
+static int __init test_kprobes_coexist(void)
+{
+	static struct kprobe kp_tramp = {
+		.symbol_name = "ikaslr_st_add", .pre_handler = ikaslr_kp_pre,
+	};
+	static struct kprobe kp_body = {
+		.symbol_name = "ikaslr_st_add_body", .pre_handler = ikaslr_kp_pre,
+	};
+	int h0, h1, h2, ret;
+
+	/* ---- 一、探跳板 ---- */
+	ret = register_kprobe(&kp_tramp);
+	if (ret) {
+		pr_info("kprobes: 无法探跳板(%d)，跳过\n", ret);
+		return 0;
+	}
+	ikaslr_kp_hits = 0;
+	ikaslr_st_add(1, 2);
+	h0 = ikaslr_kp_hits;
+
+	ikaslr_defer_flush();
+	if (ikaslr_rerandomize()) {
+		unregister_kprobe(&kp_tramp);
+		pr_err("FAIL(kprobes): rerandomize failed\n");
+		return -EINVAL;
+	}
+	ikaslr_defer_flush();
+	ikaslr_st_add(1, 2);
+	h1 = ikaslr_kp_hits;
+	unregister_kprobe(&kp_tramp);
+
+	pr_info("kprobes: 探跳板 addr=%px 命中 随机化前=%d 后=%d\n",
+		kp_tramp.addr, h0, h1 - h0);
+	if (h0 < 1 || h1 - h0 < 1) {
+		pr_err("FAIL(kprobes): 跳板上的探针本应始终命中\n");
+		return -EINVAL;
+	}
+
+	/* ---- 二、探函数体 ---- */
+	ret = register_kprobe(&kp_body);
+	if (ret) {
+		pr_info("kprobes: 函数体探针注册失败(%d) —— 也是一种如实的拒绝\n", ret);
+		pr_info("kprobes: PASS - 跳板可探；函数体被拒绝(非静默失效)\n");
+		return 0;
+	}
+	ikaslr_kp_hits = 0;
+	ikaslr_st_add(1, 2);
+	h2 = ikaslr_kp_hits;
+	pr_info("kprobes: 探函数体 addr=%px（映像地址）命中=%d，当前变体入口=%px\n",
+		kp_body.addr, h2, (void *)READ_ONCE(*ikaslr_tbl[0]->target));
+	unregister_kprobe(&kp_body);
+
+	if (h2 == 0)
+		pr_info("kprobes: 结论 - 函数体探针**静默失效**：注册成功但一次不命中\n");
+	else
+		pr_info("kprobes: 结论 - 函数体探针意外命中 %d 次，需复查\n", h2);
+	pr_info("kprobes: PASS - 已如实记录两种情形（见 实验/E3-C）\n");
+	return 0;
+}
+#else
+static int __init test_kprobes_coexist(void) { return 0; }
+#endif
+
 static int __init ikaslr_selftest_init(void)
 {
 	int ret;
@@ -814,6 +902,9 @@ static int __init ikaslr_selftest_init(void)
 	if (ret)
 		return ret;
 	ret = test_atomic_defer();
+	if (ret)
+		return ret;
+	ret = test_kprobes_coexist();
 	if (ret)
 		return ret;
 

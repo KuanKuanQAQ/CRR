@@ -10,9 +10,10 @@
      · `BUG()`/`WARN()`（DEBUG_BUGVERBOSE 用 `"i"(__FILE__)`）
      · 静态键（`arch_static_branch` 用 `"i"(key)`）
   B. 以代码地址为键、且**必须写回代码**的旁表
-     · `.static_call_sites` / `__mcount_loc` —— 写进去的是指向区域外的
-       `call rel32`，偏移随函数位置而变，与"函数体内不得有指向区域外的 PC 相对
-       引用"这条不变式直接冲突，**无解**，只能排除。
+     · `.static_call_sites` —— 写进去的是指向区域外的 `call rel32`，偏移随函数
+       位置而变，与"函数体内不得有指向区域外的 PC 相对引用"这条不变式直接冲突，
+       **无解**，只能排除。
+       （`__mcount_loc` 起初也列在这里，实测后发现判错了，见下面 HARD 的注释。）
 
   已不再是约束的（2026-09-10 起，见 `实现/17-implementation-current.md` §3.7）：
      · `__ex_table` / `__bug_table` —— 改为在**查表时换算地址**（变体地址 ->
@@ -43,8 +44,23 @@ from collections import defaultdict
 # 不相容，没有办法。其余地址键旁表已由运行时的地址换算/母本传播处理，见模块注释。
 HARD = {
     ".static_call_sites": "静态调用点（写回的是指向区域外的 call rel32）",
-    "__mcount_loc": "ftrace 插桩点（写回的是指向 __fentry__ 的 call rel32）",
 }
+# __mcount_loc **不在硬约束里**——这一条起初判错了，实测更正如下：
+#
+#   CONFIG_DYNAMIC_FTRACE 在构建期就把 `call __fentry__` 换成了 5 字节 NOP
+#   （实测 dput_body 入口是 `endbr64` + `0f 1f 44 00 00`），因此静态映像里
+#   **没有**指向区域外的 PC 相对调用，函数体照样可搬移——开着 FUNCTION_TRACER
+#   编 S3 范围，verify_movable.py 依然报"全部可搬移"。
+#
+#   冲突发生在**运行期启用 tracer 的那一刻**：ftrace 按 __mcount_loc 记录的
+#   **映像地址**去打补丁，而执行发生在变体里，于是补丁打在一份首次随机化后就被
+#   置 NX、再也不会执行的代码上——**静默失效**（与 kprobes 探函数体同一失效模式，
+#   见 实现/实验/E3-C）。若反过来把补丁翻译到当前变体，写进去的 `call __fentry__`
+#   是指向区域外的 call rel32，下一轮搬移就会失效——那才是真正不相容的地方。
+#
+#   因此这不是"编不出来"的硬约束，而是"能用但功能会静默丢失"的共存问题：
+#   排除掉它会让开着 ftrace 的内核一个函数都不能随机化（53,281 个插桩点覆盖几乎
+#   全部函数），代价远大于收益。
 # 软约束：默认放行，可用 --exclude-soft 重新排除（用于对照实验）
 SOFT = {
     "__ex_table": "异常修正表（已由 fixup_exception 的地址换算处理）",
