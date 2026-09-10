@@ -1,3 +1,7 @@
+> ⚠️ **不完整(2026-09-10)**。本文写于 §3.5.5 陷阱影像 + 改映射落地之前,全文未涉及
+> `trap_base` / `ikaslr_remap` / 三阶段计时 / PREEMPT_RCU 睡眠修复。运行时的当前事实以
+> [`17-implementation-current.md`](17-implementation-current.md) §3 为准。
+
 # 第 3 章实现细节：持续随机化执行机制
 
 > 对应论文第 3 章与 `PROGRESS.md` 的 Phase 1（S1.1–S1.10）。本文随实现推进增补。

@@ -40,8 +40,11 @@
 ## 目录
 
 - `PROGRESS.md`　主控账本
+- **`17-implementation-current.md`　当前实现全貌 —— 逐条对照代码核对,含
+  「已实现 vs 设计要求但未实现」的诚实清单。想了解实现,先读这一份。**
 - `01-overview.md`　实现总览与代码地图
-- `03-randomization.md` / `04-detection.md` / `05-pa-cfi.md`　各章实现细节（中文）
+- `03-randomization.md`（**运行时部分已被 17 取代**）/ `04-detection.md` / `05-pa-cfi.md`　各章实现细节
+- `07-compiler.md`　编译期（**「还未实现」一节部分过时,以 17 §1 为准**）
 - `06-experiments.md`　实验代码使用说明
 - **`实验/`　每个实验一个文档**（目的/配置/步骤/原始数据/判据/发现），
   索引见 [`实验/README.md`](实验/README.md)
