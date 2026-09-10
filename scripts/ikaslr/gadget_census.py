@@ -194,16 +194,22 @@ def report_buckets(items, vmlinux, nm):
 
     # 仅凭桶 1 + 桶 2 能拼出什么：ROP 链的必要件
     stable = usable(buckets[1]) + usable(buckets[2])
+    # 判据放宽到"链子里实际用得上"的形态，而不是只认最短的那一条。
+    # 真实 ROP 链容忍前后多几条无害指令，只要不破坏所需寄存器；这里不做那么细的
+    # 副作用分析，因此下面的计数是**上界**，用于回答"有没有"，不用于回答"有几条好用的"。
     need = {
-        "pop rdi ; ret":  re.compile(r"^pop rdi ; ret$"),
-        "pop rsi ; ret":  re.compile(r"^pop rsi ; ret$"),
-        "pop rdx ; ret":  re.compile(r"^pop rdx ; ret$"),
-        "pop rax ; ret":  re.compile(r"^pop rax ; ret$"),
-        "任意内存写":     re.compile(r"^mov (qword |dword )?ptr \[r\w+\][^;]*, r\w+ ; ret$"),
-        "间接调用":       re.compile(r"^(jmp|call) r\w+$"),
-        "返回用户态":     re.compile(r"\b(swapgs|iretq|sysretq)\b"),
+        "pop rdi(装参数1)": re.compile(r"(^|; )pop rdi ; .*ret$"),
+        "pop rsi(装参数2)": re.compile(r"(^|; )pop rsi ; .*ret$"),
+        "pop rdx(装参数3)": re.compile(r"(^|; )pop rdx ; .*ret$"),
+        "pop rax(装系统调用号)": re.compile(r"(^|; )pop rax ; .*ret$"),
+        "任意内存写": re.compile(
+            r"(^|; )(mov|add|or|xor|and)\s+(qword|dword|word|byte)?\s*ptr\s*\[[^\]]+\]\s*,\s*\w+ ; .*ret$"),
+        "任意内存读": re.compile(
+            r"(^|; )mov\s+\w+\s*,\s*(qword|dword)?\s*ptr\s*\[[^\]]+\] ; .*ret$"),
+        "间接调用/跳转": re.compile(r"(jmp|call) (r\w+|(qword |dword )?ptr \[)"),
+        "返回用户态": re.compile(r"\b(swapgs|iretq|sysretq)\b"),
     }
-    print("\n  仅凭稳定地址（桶 1 + 桶 2）能否拼出可用链：")
+    print(f"\n  仅凭稳定地址（桶 1 + 桶 2，共 {len(stable):,} 个可利用 gadget）能否拼出可用链：")
     for label, rx in need.items():
         n = sum(1 for _, g, _ in stable if rx.search(g))
         print(f"    {label:<16}{'有' if n else '无':<4}{n:>8,} 处")
