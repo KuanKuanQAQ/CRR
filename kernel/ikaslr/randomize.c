@@ -1000,10 +1000,19 @@ int ikaslr_request_rerandomize(void)
 		return ikaslr_rerandomize();
 
 	/*
-	 * 原子上下文：区域已经空的话可以直接做完（关键路径原子安全）。
-	 * 否则不在这里等 —— 推迟到进程上下文。
+	 * 原子上下文：区域已经空的话可以就地做完 —— **但仅限中断未被关闭时**。
+	 *
+	 * 关键路径的收尾要做 ikaslr_retire_trap() → ikaslr_remap() →
+	 * flush_tlb_kernel_range()，而后者在 x86/arm64 上都要经 on_each_cpu()
+	 * 做跨核 TLB 失效。on_each_cpu 会等其他 CPU 应答，而关中断的本 CPU 收不到
+	 * 它们的 IPI —— 那是死锁（内核自身也有 WARN_ON_ONCE(irqs_disabled())）。
+	 *
+	 * 这正是实验总清单 §E3-A 要 J 项回答的那个是非题：**改映射 + 跨核 TLB 失效
+	 * 不能在关中断上下文使用**，因此"就地完成"的条件必须收紧到"中断开着"。
+	 * 只关抢占（例如 RCU 读端、持普通自旋锁）仍然可以就地做完：
+	 * on_each_cpu 在关抢占、开中断时是允许的。
 	 */
-	if (ikaslr_active_count() == 0)
+	if (!irqs_disabled() && ikaslr_active_count() == 0)
 		return ikaslr_rerandomize();
 
 	this_cpu_write(ikaslr_deferred, true);

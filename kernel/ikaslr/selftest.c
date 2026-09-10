@@ -606,6 +606,39 @@ static int __init test_cf_audit(void)
  * 静态键改写只打到了当前变体上，下一轮随机化就会把开关悄悄退回旧状态，而且
  * 不会有任何报错。只有母本也被打上，这一步才会通过。
  */
+/*
+ * S1.17：关中断上下文必须**推迟**随机化，不得就地完成（E3-A 的 J 项是非题）。
+ *
+ * 就地完成的收尾会走 flush_tlb_kernel_range() → on_each_cpu()，而关中断的本 CPU
+ * 收不到其他 CPU 的 IPI 应答，那是死锁。所以关中断时必须走推迟路径，
+ * **哪怕区域此刻是空的**。
+ */
+static int __init test_atomic_defer(void)
+{
+	unsigned long flags, c0, c1;
+	u64 avg, max;
+	int r;
+
+	ikaslr_defer_flush();
+	ikaslr_defer_stats(&c0, &avg, &max);
+
+	local_irq_save(flags);
+	/* 此刻区域为空（自测是单线程的），旧代码会在这里就地做完。*/
+	r = ikaslr_request_rerandomize();
+	local_irq_restore(flags);
+
+	ikaslr_defer_stats(&c1, &avg, &max);
+	pr_info("atomic-defer: irqs-off request -> ret=%d, deferred %lu->%lu\n",
+		r, c0, c1);
+	if (c1 == c0) {
+		pr_err("FAIL(atomic-defer): 关中断时没有推迟——就地完成会在跨核 TLB 失效上死锁\n");
+		return -EINVAL;
+	}
+	ikaslr_defer_flush();
+	pr_info("atomic-defer: PASS - deferred instead of doing it inline\n");
+	return 0;
+}
+
 static int __init test_sidetables(void)
 {
 	unsigned long probe, live, back;
@@ -780,8 +813,11 @@ static int __init ikaslr_selftest_init(void)
 	ret = test_sidetables();
 	if (ret)
 		return ret;
+	ret = test_atomic_defer();
+	if (ret)
+		return ret;
 
-	pr_info("PASS: dispatch + tracking + block + rerand + defer + fixed_out + stale-return + sidetables\n");
+	pr_info("PASS: dispatch + tracking + block + rerand + defer + fixed_out + stale-return + sidetables + atomic-defer\n");
 	return 0;
 }
 /* 在 core 的 late_initcall 之后运行，确保 target 槽已初始化。*/
