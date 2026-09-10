@@ -38,6 +38,8 @@
 #include <linux/preempt.h>
 #include <linux/log2.h>
 #include <linux/minmax.h>
+#include <linux/pgtable.h>
+#include <asm/tlbflush.h>
 
 #include "internal.h"
 
@@ -62,8 +64,19 @@ struct ikaslr_variant {
 	unsigned long		 used;	/* 本次排布实际占用 */
 	unsigned long		*off;	/* 每个函数在本变体内的偏移 */
 	enum ikaslr_var_state	 state;
-	bool			 poisoned;/* 退役后是否已填充陷阱指令 */
+	bool			 poisoned;/* 退役后陷阱是否已就位（填充或重映射）*/
 	unsigned long		 round;	/* 成为 LIVE / RETIRED 时的轮次 */
+
+	/*
+	 * 陷阱影像（§3.5.5 的"预建 int3 页 + 切换时改映射"方案）。
+	 * trap_base 是与 base 等大的并行区，在 prepare 中预填成"函数处 int3、其余为 0"
+	 * 并置 RO+X（连同直映射别名一并修正，避免切换时出现跨别名 W+X）。切换退役时
+	 * 只把 base 的页表项重指到 trap_pg（不改权限），窗口即刻关死。
+	 */
+	void			*trap_base;
+	struct page		**code_pg;/* base 自身的物理页（分配时捕获，用于回指）*/
+	struct page		**trap_pg; /* trap_base 的物理页 */
+	bool			 trapped; /* base 当前是否已重指到 trap_pg */
 };
 
 static struct ikaslr_variant ikaslr_vars[IKASLR_NR_VARIANTS];
@@ -123,6 +136,63 @@ static int ikaslr_make_exec(void *base, unsigned long npages)
 	if (ret)
 		return ret;
 	return set_memory_x((unsigned long)base, npages);
+}
+
+/*
+ * 把一段 vmalloc 虚地址 [va, va+npages) 的页表项重指到 pages[]，权限置 RO+X。
+ * 只改物理页号、不改权限位——pages[] 的直映射别名已由 set_memory_ro/x 预先设为
+ * RO+X（见 ikaslr_build_trap_image），故此处不产生跨别名 W+X。
+ */
+struct ikaslr_remap_arg {
+	unsigned long	 va;
+	struct page	**pages;
+};
+
+static int ikaslr_remap_pte(pte_t *pte, unsigned long addr, void *data)
+{
+	struct ikaslr_remap_arg *a = data;
+	unsigned long idx = (addr - a->va) >> PAGE_SHIFT;
+
+	set_pte_at(&init_mm, addr, pte,
+		   pfn_pte(page_to_pfn(a->pages[idx]), PAGE_KERNEL_ROX));
+	return 0;
+}
+
+static int ikaslr_remap(void *va, struct page **pages, unsigned long npages)
+{
+	struct ikaslr_remap_arg arg = { .va = (unsigned long)va, .pages = pages };
+	unsigned long len = npages << PAGE_SHIFT;
+	int ret;
+
+	ret = apply_to_existing_page_range(&init_mm, (unsigned long)va, len,
+					   ikaslr_remap_pte, &arg);
+	if (ret)
+		return ret;
+	flush_tlb_kernel_range((unsigned long)va, (unsigned long)va + len);
+	flush_icache_range((unsigned long)va, (unsigned long)va + len);
+	return 0;
+}
+
+/*
+ * 预建一个变体的陷阱影像：把 trap_base 填成"每个函数处 int3/BRK、其余为 0"，
+ * 再置 RO+X（连同直映射别名）。在 prepare 里、关键路径之外完成，因此切换退役时
+ * 只需一次纯页表重指 + TLB 刷新，无需 set_memory、无需写内存、窗口不再存在。
+ */
+static int ikaslr_build_trap_image(struct ikaslr_variant *v)
+{
+	unsigned long npages = v->cap >> PAGE_SHIFT;
+	int i, ret;
+
+	ret = ikaslr_make_writable(v->trap_base, npages);
+	if (ret)
+		return ret;
+	memset(v->trap_base, 0, v->used);
+	for (i = 0; i < ikaslr_ntramp; i++)
+		ikaslr_fill_traps(v->trap_base + v->off[i], ikaslr_tbl[i]->size);
+	flush_icache_range((unsigned long)v->trap_base,
+			   (unsigned long)v->trap_base + v->used);
+	/* RO+X：set_memory 会一并把 trap_pg 的直映射别名设为 RO+X。*/
+	return ikaslr_make_exec(v->trap_base, npages);
 }
 
 /*
@@ -220,6 +290,17 @@ static int ikaslr_prepare(struct ikaslr_variant *v)
 	u64 t0 = ktime_get_ns();
 	int i, ret;
 
+	/*
+	 * 若该变体退役时被重指到陷阱影像（trapped），先把 base 的页表项指回它自己的
+	 * 代码页，否则下面的写会落到 trap_pg 上。回收复用变体的常规路径。
+	 */
+	if (v->trapped) {
+		ret = ikaslr_remap(v->base, v->code_pg, npages);
+		if (ret)
+			return ret;
+		v->trapped = false;
+	}
+
 	/* 变体在 READY/RETIRED 时是 RO+X，改写前先去执行权限再放开写权限。*/
 	ret = ikaslr_make_writable(v->base, npages);
 	if (ret)
@@ -249,6 +330,13 @@ static int ikaslr_prepare(struct ikaslr_variant *v)
 	ret = ikaslr_make_exec(v->base, npages);
 	if (ret)
 		return ret;
+
+	/*
+	 * 预建本变体的陷阱影像，供它将来退役时的一步重映射使用（§3.5.5）。
+	 * 失败不致命：切换退役时会回退到旧的"填充"路径。
+	 */
+	if (v->trap_base && ikaslr_build_trap_image(v))
+		pr_warn_ratelimited("trap image build failed for variant %px\n", v->base);
 
 	WRITE_ONCE(ikaslr_last_prep_ns, ktime_get_ns() - t0);
 	return 0;
@@ -313,6 +401,25 @@ static int ikaslr_poison(struct ikaslr_variant *v)
 }
 
 /*
+ * 使退役变体陷阱化（§3.5.5）。优先走"重映射到预建陷阱影像"——纯页表重指 + 一次
+ * TLB 刷新，无 set_memory、无写内存，可在切换后同步完成、窗口即关。仅在没有陷阱
+ * 影像或重映射失败时，退回旧的就地填充路径。
+ */
+static int ikaslr_retire_trap(struct ikaslr_variant *v)
+{
+	unsigned long npages = v->cap >> PAGE_SHIFT;
+
+	if (v->trap_base && !v->trapped) {
+		if (!ikaslr_remap(v->base, v->trap_pg, npages)) {
+			v->trapped = true;
+			return 0;
+		}
+		return -EAGAIN;	/* 重映射失败：留给 refill_work 重试，勿半途改填充 */
+	}
+	return ikaslr_poison(v);
+}
+
+/*
  * 把一个落在已退役变体中的地址映射到当前变体中的对应位置。
  *
  * 在异常上下文中调用，因此**不取锁**：变体数组是定长的，状态变化稀少，
@@ -370,7 +477,7 @@ static void ikaslr_refill_work_fn(struct work_struct *w)
 		struct ikaslr_variant *r = &ikaslr_vars[i];
 
 		if (r->state == VAR_RETIRED && !r->poisoned) {
-			if (!ikaslr_poison(r))
+			if (!ikaslr_retire_trap(r))
 				r->poisoned = true;
 		}
 	}
@@ -488,7 +595,7 @@ int ikaslr_rerandomize(void)
 	 * 把窗口关死；原子上下文中只能交给工作队列，窗口长度取决于其调度。
 	 */
 	if (old && preemptible()) {
-		if (!ikaslr_poison(old))
+		if (!ikaslr_retire_trap(old))
 			old->poisoned = true;
 	}
 	schedule_work(&ikaslr_refill_work);
@@ -531,6 +638,31 @@ int __init ikaslr_pool_init(void)
 					       __builtin_return_address(0));
 		if (!v->base)
 			return -ENOMEM;
+
+		/*
+		 * 陷阱影像并行区（§3.5.5）。分配失败不致命：trap_base 为空时
+		 * 退役走旧的填充路径，功能不变、只是没有零窗口优化。
+		 */
+		v->trap_base = __vmalloc_node_range(cap, PAGE_SIZE,
+						    VMALLOC_START, VMALLOC_END,
+						    GFP_KERNEL, PAGE_KERNEL,
+						    VM_FLUSH_RESET_PERMS, NUMA_NO_NODE,
+						    __builtin_return_address(0));
+		if (v->trap_base) {
+			unsigned long np = cap >> PAGE_SHIFT, k;
+
+			v->code_pg = kcalloc(np, sizeof(*v->code_pg), GFP_KERNEL);
+			v->trap_pg = kcalloc(np, sizeof(*v->trap_pg), GFP_KERNEL);
+			if (!v->code_pg || !v->trap_pg) {
+				vfree(v->trap_base);
+				v->trap_base = NULL;
+			} else {
+				for (k = 0; k < np; k++) {
+					v->code_pg[k] = vmalloc_to_page(v->base + (k << PAGE_SHIFT));
+					v->trap_pg[k] = vmalloc_to_page(v->trap_base + (k << PAGE_SHIFT));
+				}
+			}
+		}
 		v->state = VAR_FREE;
 	}
 
