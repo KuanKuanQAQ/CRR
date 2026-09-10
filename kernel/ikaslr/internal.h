@@ -32,6 +32,9 @@ struct ikaslr_stats {
 	unsigned long enters;	/* 累计进入次数 */
 	unsigned long backoffs;	/* 因阻断而回退重试的次数 */
 	unsigned long forced;	/* 不可睡上下文里放弃等待、硬进入的次数 */
+	unsigned long outleave_blocked;/* out_leave 在阻断期间加回计数的次数 */
+	unsigned long nested_admitted;/* 阻断期间放行的嵌套进入次数 */
+	int	      wait_residual;/* 最近一次等空超时时的残余活跃计数 */
 	int	      max_active;/* 观察到的最大并发数 */
 };
 void ikaslr_get_stats(struct ikaslr_stats *out);

@@ -845,6 +845,24 @@ struct task_struct {
 #endif
 	unsigned short			migration_flags;
 
+#ifdef CONFIG_IKASLR
+	/*
+	 * 本任务当前对 I-KASLR 活跃集合的贡献（论文 §3.4.5）。
+	 *
+	 * 为什么必须按任务记这个深度：被随机化的函数会互相调用（实测 S3 范围里有
+	 * 351 处），于是 fixed_in 会**嵌套**。若嵌套进入时也去等阻断解除，就会自我
+	 * 阻塞——执行流被挡在内层跳板里，而它仍然持有外层那一个 active 计数，
+	 * 随机化方要等计数归零才放行，两边互相等待，必然超时。
+	 * 实测 S3 范围下随机化成功率因此只有 0~3%，而超时那一刻残余计数恰好就是
+	 * 这几个被挡在内层的执行流。
+	 *
+	 * 有了它，ikaslr_enter() 只在 depth == 0（真正**新**进入区域）时才受阻断
+	 * 约束；深度大于零说明本任务已经在区域内、随机化方无论如何都得等它，
+	 * 再挡一次只有坏处没有好处。
+	 * 增减与 active 严格同步：enter/out_leave 加一，leave/out_enter 减一。
+	 */
+	unsigned int			ikaslr_depth;
+#endif
 #ifdef CONFIG_PREEMPT_RCU
 	int				rcu_read_lock_nesting;
 	union rcu_special		rcu_read_unlock_special;

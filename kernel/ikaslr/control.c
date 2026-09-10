@@ -60,6 +60,9 @@ static int ikaslr_stats_show(struct seq_file *m, void *v)
 	seq_printf(m, "enters             %lu\n", ts.enters);
 	seq_printf(m, "enter_backoffs     %lu\n", ts.backoffs);
 	seq_printf(m, "enter_forced       %lu\n", ts.forced);
+	seq_printf(m, "outleave_blocked   %lu\n", ts.outleave_blocked);
+	seq_printf(m, "nested_admitted    %lu\n", ts.nested_admitted);
+	seq_printf(m, "wait_residual      %d\n", ts.wait_residual);
 	seq_printf(m, "max_active         %d\n", ts.max_active);
 	seq_puts(m, "\n");
 	seq_printf(m, "rounds             %lu\n", rounds);

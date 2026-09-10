@@ -53,6 +53,11 @@ static DECLARE_WAIT_QUEUE_HEAD(ikaslr_unblock_wq);/* 放行时唤醒被挡住的
 static atomic_long_t ikaslr_enters;
 static atomic_long_t ikaslr_backoffs;
 static atomic_long_t ikaslr_forced;	/* 不可睡上下文里放弃等待、硬进入的次数 */
+/* 诊断：out_leave 在阻断期间把计数加回去的次数，以及等空超时时的残余计数。*/
+static atomic_long_t ikaslr_outleave_blocked;
+/* 阻断期间因"本任务已在区域内"而被放行的嵌套进入次数——旧代码会在这里自我阻塞。*/
+static atomic_long_t ikaslr_nested_admitted;
+static int ikaslr_wait_residual;
 static int ikaslr_max_active;
 
 int ikaslr_active_count(void)
@@ -65,6 +70,9 @@ void ikaslr_get_stats(struct ikaslr_stats *out)
 	out->enters = atomic_long_read(&ikaslr_enters);
 	out->backoffs = atomic_long_read(&ikaslr_backoffs);
 	out->forced = atomic_long_read(&ikaslr_forced);
+	out->outleave_blocked = atomic_long_read(&ikaslr_outleave_blocked);
+	out->nested_admitted = atomic_long_read(&ikaslr_nested_admitted);
+	out->wait_residual = READ_ONCE(ikaslr_wait_residual);
 	out->max_active = READ_ONCE(ikaslr_max_active);
 }
 
@@ -114,9 +122,24 @@ void ikaslr_enter(void)
 	int cur, spins = 0;
 
 retry:
+	/*
+	 * 深度与 active 严格同步递增。下面只有 depth == 1（本任务**新**进入区域）
+	 * 才受阻断约束——嵌套进入不能被挡，否则就是自我阻塞，见 task_struct 里
+	 * ikaslr_depth 的说明。
+	 */
+	current->ikaslr_depth++;
 	atomic_inc(&ikaslr_active);
 	smp_mb();			/* 加一 与 读标志 之间不得重排 */
 	if (unlikely(READ_ONCE(ikaslr_blocked))) {
+		if (current->ikaslr_depth > 1) {
+			/*
+			 * 嵌套进入：本任务已经在区域内，随机化方无论如何都得等它出来，
+			 * 挡它只会造成自我阻塞（见 task_struct 里 ikaslr_depth 的说明）。
+			 */
+			if (IS_ENABLED(CONFIG_IKASLR_STATS))
+				atomic_long_inc(&ikaslr_nested_admitted);
+			goto entered;
+		}
 		/*
 		 * 不可睡的上下文里只能自旋，而**自旋必须有上限**。
 		 *
@@ -145,6 +168,7 @@ retry:
 			goto entered;
 		}
 		atomic_long_inc(&ikaslr_backoffs);
+		current->ikaslr_depth--;
 		if (atomic_dec_and_test(&ikaslr_active) &&
 		    wq_has_sleeper(&ikaslr_zero_wq))
 			wake_up(&ikaslr_zero_wq);
@@ -183,6 +207,7 @@ void ikaslr_leave(void)
 	 * 仍有 151 ns/次，改用 wq_has_sleeper 后见 §3.6.3）。
 	 * wq_has_sleeper() 自带所需的屏障，不会漏唤醒。
 	 */
+	current->ikaslr_depth--;
 	if (atomic_dec_and_test(&ikaslr_active) &&
 	    wq_has_sleeper(&ikaslr_zero_wq))
 		wake_up(&ikaslr_zero_wq);
@@ -239,6 +264,7 @@ void ikaslr_out_enter(void *target)
 	}
 	if (IS_ENABLED(CONFIG_IKASLR_STATS))
 		atomic_dec(&ikaslr_inside);
+	current->ikaslr_depth--;
 	if (atomic_dec_and_test(&ikaslr_active) &&
 	    wq_has_sleeper(&ikaslr_zero_wq))
 		wake_up(&ikaslr_zero_wq);
@@ -254,6 +280,9 @@ EXPORT_SYMBOL_GPL(ikaslr_out_enter);
  */
 void ikaslr_out_leave(void)
 {
+	if (IS_ENABLED(CONFIG_IKASLR_STATS) && unlikely(READ_ONCE(ikaslr_blocked)))
+		atomic_long_inc(&ikaslr_outleave_blocked);
+	current->ikaslr_depth++;
 	atomic_inc(&ikaslr_active);
 	if (IS_ENABLED(CONFIG_IKASLR_STATS))
 		atomic_inc(&ikaslr_inside);
@@ -302,7 +331,13 @@ int ikaslr_wait_region_empty(unsigned int timeout_ms)
 			cpu_relax();
 		}
 	}
-	return atomic_read(&ikaslr_active) == 0 ? 0 : -ETIMEDOUT;
+	{
+		int left = atomic_read(&ikaslr_active);
+
+		if (left)
+			WRITE_ONCE(ikaslr_wait_residual, left);
+		return left == 0 ? 0 : -ETIMEDOUT;
+	}
 }
 
 int ikaslr_nr_funcs(void)

@@ -2385,6 +2385,15 @@ __latent_entropy struct task_struct *copy_process(
 	INIT_LIST_HEAD(&p->children);
 	INIT_LIST_HEAD(&p->sibling);
 	rcu_copy_process(p);
+#ifdef CONFIG_IKASLR
+	/*
+	 * task_struct 是从父任务整份拷贝来的，而 fork 完全可能发生在父任务正处于
+	 * 随机化区域内的时候——那样子任务一出生就带着一个非零的深度，于是它的
+	 * fixed_in 永远不受阻断约束（深度不为零被当成"已经在区域内"），
+	 * 而它的 ikaslr_leave 又会把深度减成负数。必须清零。
+	 */
+	p->ikaslr_depth = 0;
+#endif
 	p->vfork_done = NULL;
 	spin_lock_init(&p->alloc_lock);
 
