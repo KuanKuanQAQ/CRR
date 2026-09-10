@@ -52,6 +52,7 @@ static DECLARE_WAIT_QUEUE_HEAD(ikaslr_unblock_wq);/* 放行时唤醒被挡住的
 
 static atomic_long_t ikaslr_enters;
 static atomic_long_t ikaslr_backoffs;
+static atomic_long_t ikaslr_forced;	/* 不可睡上下文里放弃等待、硬进入的次数 */
 static int ikaslr_max_active;
 
 int ikaslr_active_count(void)
@@ -63,8 +64,17 @@ void ikaslr_get_stats(struct ikaslr_stats *out)
 {
 	out->enters = atomic_long_read(&ikaslr_enters);
 	out->backoffs = atomic_long_read(&ikaslr_backoffs);
+	out->forced = atomic_long_read(&ikaslr_forced);
 	out->max_active = READ_ONCE(ikaslr_max_active);
 }
+
+/*
+ * 不可睡上下文里放弃等待前的最大重试次数。每次重试是「一次原子加、一次屏障、
+ * 一次原子减、一次 cpu_relax」，约几十纳秒，因此这个数量级对应百微秒级的上限——
+ * 比正常的阻断窗口（关键路径实测 0.5–2 µs）宽两个数量级，又远短于
+ * ikaslr_wait_region_empty() 的超时。
+ */
+#define IKASLR_SPIN_LIMIT 4096
 
 /* 等待阻断解除。可能在非抢占上下文（中断、持锁）被调用，故分两条路径。*/
 static void ikaslr_wait_unblocked(void)
@@ -87,7 +97,7 @@ static void ikaslr_wait_unblocked(void)
 		if (preemptible() && !rcu_preempt_depth())
 			wait_event(ikaslr_unblock_wq, !READ_ONCE(ikaslr_blocked));
 		else
-			cpu_relax();
+			return;		/* 不可睡：由调用方按次数设上限，见 ikaslr_enter */
 	}
 }
 
@@ -101,19 +111,48 @@ static void ikaslr_wait_unblocked(void)
  */
 void ikaslr_enter(void)
 {
-	int cur;
+	int cur, spins = 0;
 
 retry:
 	atomic_inc(&ikaslr_active);
 	smp_mb();			/* 加一 与 读标志 之间不得重排 */
 	if (unlikely(READ_ONCE(ikaslr_blocked))) {
+		/*
+		 * 不可睡的上下文里只能自旋，而**自旋必须有上限**。
+		 *
+		 * 早先这里是无限自旋，理由是"阻断窗口只有微秒量级"。那个假设在小范围
+		 * 下成立，一到真实规模就不成立了：ikaslr_wait_region_empty() 等不到空
+		 * 时，阻断窗口就是它的整个超时（100 ms）。
+		 *
+		 * 而更要命的是死锁：被随机化的函数会出现在**关中断**的路径上——实测
+		 * S3 范围里 mm/ 的 first_online_pgdat 被 quiet_vmstat() 经
+		 * tick_nohz_stop_tick() 调用。两个 CPU 在这里关着中断无限自旋，于是
+		 * 让阻断方超时所需的**时钟中断本身**也被卡住，整机停摆（实测：客户机
+		 * 时间冻结在 1.86 s，gdb 显示 CPU0/CPU3 都停在本函数）。
+		 *
+		 * 因此到达上限就**带着已经加过的计数直接进入**。这样做是安全的：
+		 * 计数已经加过，随机化方的"等区域变空"必然看得见，于是它会超时并
+		 * 跳过本轮，不会在我们身处区域内时搬移代码。
+		 *
+		 * 残留窗口只有一个：随机化方**已经**读到计数为零、尚未放行的那一瞬。
+		 * 此时硬进入的执行流可能落进即将退役的变体里——这正是陈旧返回地址的
+		 * 场景，由退役变体的陷阱指令 + ikaslr_fixup_addr() 兜底（§3.5.5），
+		 * 代价是一次陷阱，不是错误。
+		 */
+		if (++spins > IKASLR_SPIN_LIMIT &&
+		    !(preemptible() && !rcu_preempt_depth())) {
+			atomic_long_inc(&ikaslr_forced);
+			goto entered;
+		}
 		atomic_long_inc(&ikaslr_backoffs);
 		if (atomic_dec_and_test(&ikaslr_active) &&
 		    wq_has_sleeper(&ikaslr_zero_wq))
 			wake_up(&ikaslr_zero_wq);
 		ikaslr_wait_unblocked();
+		cpu_relax();
 		goto retry;
 	}
+entered:
 
 	/*
 	 * 以下全部是统计，不参与机制本身。实测它们在跳板热路径上占了绝大部分
