@@ -29,6 +29,8 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/GlobalVariable.h"
+#include "llvm/IR/InlineAsm.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
@@ -159,6 +161,141 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
   }
 
   /// 改造一个函数：body 入 .rand.text，新建同名跳板入 .tramp.text。
+  /// 把一个符号的地址物化成**64 位绝对立即数**，返回该地址的值。
+  ///
+  /// 这是函数体可搬移的关键（论文 §3.4.3）。内核以 -mcmodel=kernel 编译，
+  /// 对外引用都是 PC 相对的（`call rel32`、`mov off(%rip)`），函数体一旦被搬到
+  /// 别的地址，这些偏移就全错了——实测 `seq_puts_body` 里的 `call strlen`
+  /// 搬移后落到了一个无关的 vmalloc 页上并触发取指缺页。
+  ///
+  /// x86-64 上的解法是 64 位绝对寻址：`movabsq $sym, %reg`（R_X86_64_64），
+  /// 绝对地址不随代码位置改变。IR 层面没法直接表达——
+  /// `inttoptr(ptrtoint @f)` 会被后端折叠回 `call rel32`，
+  /// 而 LLVM 14 也不支持每函数的 code-model 属性（实测两者都无效）。
+  /// 因此用内联汇编 + `"s"`（符号）约束强制物化。
+  Value *materializeAbs(IRBuilder<> &B, Constant *Sym) {
+    Type *I8Ptr = Type::getInt8PtrTy(Sym->getContext());
+    FunctionType *AsmTy = FunctionType::get(I8Ptr, {Sym->getType()}, false);
+    InlineAsm *IA = InlineAsm::get(AsmTy, "movabsq $1, $0", "=r,s",
+                                   /*hasSideEffects=*/false);
+    return B.CreateCall(IA, {Sym});
+  }
+
+  /// 常量里是否（递归地）引用了全局符号。
+  static bool refsGlobal(Constant *C, unsigned Depth = 0) {
+    if (Depth > 8)
+      return false;
+    if (isa<GlobalValue>(C))
+      return true;
+    if (auto *CE = dyn_cast<ConstantExpr>(C))
+      for (unsigned i = 0; i < CE->getNumOperands(); ++i)
+        if (auto *Op = dyn_cast<Constant>(CE->getOperand(i)))
+          if (refsGlobal(Op, Depth + 1))
+            return true;
+    return false;
+  }
+
+  /// 把一个（可能是常量表达式的）引用重建为"绝对地址 + 指令"形式。
+  ///
+  /// 只处理裸的 GlobalVariable 操作数是不够的：实测 `single_open` 里的
+  /// `kmalloc_caches+0x28` 是 GEP 常量表达式、`d_splice_alias` 里的
+  /// `rename_lock` 被折进了内存操作数，两者都以 ConstantExpr 出现，
+  /// 漏掉它们就仍是 `(%rip)` 相对寻址，搬移后读到错误地址（实测触发缺页）。
+  Value *rebuildAbs(IRBuilder<> &B, Constant *C) {
+    if (isa<GlobalValue>(C)) {
+      Value *A = materializeAbs(B, C);
+      return B.CreateBitCast(A, C->getType());
+    }
+    if (auto *CE = dyn_cast<ConstantExpr>(C)) {
+      Instruction *I = CE->getAsInstruction();
+      for (unsigned i = 0; i < I->getNumOperands(); ++i)
+        if (auto *Op = dyn_cast<Constant>(I->getOperand(i)))
+          if (refsGlobal(Op))
+            I->setOperand(i, rebuildAbs(B, Op));
+      B.Insert(I);
+      return I;
+    }
+    return C;
+  }
+
+  /// 消除函数体内所有指向区域外的 PC 相对引用，使其可整体搬移。
+  ///
+  /// 两类引用（见 ../../Documentation/crr/实现/14-code-model-and-unmovable.md）：
+  ///   · 对外部函数的直接调用 -> 绝对地址 + 间接调用
+  ///   · 对全局变量的引用     -> 绝对地址
+  /// 函数**内部**的相对跳转随函数整体搬移自动保持正确，不必处理。
+  ///
+  /// 统一按"操作数里含全局符号就重建"处理，直接调用因此自然变成间接调用。
+  void makeBodyPositionIndependent(Function *Body) {
+    // 栈保护会让后端生成一条到 __stack_chk_fail 的**直接**调用，那是 PC 相对的，
+    // 搬移后失效；被随机化的函数体因此关掉栈保护（仅限这些函数）。
+    Body->removeFnAttr(Attribute::StackProtect);
+    Body->removeFnAttr(Attribute::StackProtectStrong);
+    Body->removeFnAttr(Attribute::StackProtectReq);
+
+    // llvm.memcpy/memset/memmove 会被后端降级成到 memcpy 等的直接调用，
+    // 同样是 PC 相对。这里先把它们换成对内核同名符号的**绝对地址间接调用**。
+    SmallVector<MemIntrinsic *, 8> Mem;
+    for (BasicBlock &BB : *Body)
+      for (Instruction &I : BB)
+        if (auto *MI = dyn_cast<MemIntrinsic>(&I))
+          Mem.push_back(MI);
+    for (MemIntrinsic *MI : Mem) {
+      Module *M = Body->getParent();
+      LLVMContext &Ctx = M->getContext();
+      Type *I8Ptr = Type::getInt8PtrTy(Ctx);
+      Type *I64 = Type::getInt64Ty(Ctx);
+      IRBuilder<> B(MI);
+      const char *Nm = isa<MemCpyInst>(MI) ? "memcpy"
+                     : isa<MemMoveInst>(MI) ? "memmove" : "memset";
+      Type *Arg1 = isa<MemSetInst>(MI) ? Type::getInt32Ty(Ctx) : I8Ptr;
+      FunctionType *FT = FunctionType::get(I8Ptr, {I8Ptr, Arg1, I64}, false);
+      FunctionCallee C = M->getOrInsertFunction(Nm, FT);
+      Value *Abs = materializeAbs(B, cast<Constant>(C.getCallee()));
+      Value *FP = B.CreateBitCast(Abs, FT->getPointerTo());
+      Value *A0 = B.CreateBitCast(MI->getArgOperand(0), I8Ptr);
+      Value *A1 = MI->getArgOperand(1);
+      if (!isa<MemSetInst>(MI))
+        A1 = B.CreateBitCast(A1, I8Ptr);
+      Value *A2 = B.CreateZExtOrTrunc(MI->getArgOperand(2), I64);
+      B.CreateCall(FT, FP, {A0, A1, A2});
+      MI->eraseFromParent();
+    }
+
+    SmallVector<Instruction *, 32> Work;
+    for (BasicBlock &BB : *Body)
+      for (Instruction &I : BB)
+        Work.push_back(&I);
+
+    for (Instruction *I : Work) {
+      auto *CB = dyn_cast<CallBase>(I);
+
+      // **内联汇编整条跳过**：它的操作数可能带 "i"（立即数）一类约束，
+      // 换成运行期值就不满足约束了。实测 WARN_ON 的 "i"(__FILE__) 会因此
+      // 报 "invalid operand for inline asm constraint 'i'"。
+      // 这类函数本就被 gen_funcs.py 以"含 BUG/WARN"为由排除在随机化范围之外。
+      if (CB && CB->isInlineAsm())
+        continue;
+
+      // 内建函数（llvm.memcpy 等）的 callee 必须保持直接形式，否则后端报错。
+      Function *Intrin = CB ? CB->getCalledFunction() : nullptr;
+      bool SkipCallee = Intrin && Intrin->isIntrinsic();
+
+      IRBuilder<> B(I);
+      for (unsigned n = 0; n < I->getNumOperands(); ++n) {
+        auto *C = dyn_cast<Constant>(I->getOperand(n));
+        if (!C || !refsGlobal(C))
+          continue;
+        if (SkipCallee && CB && n == CB->arg_size())   // callee 操作数
+          continue;
+        if (auto *GV = dyn_cast<GlobalValue>(C))
+          if (GV->getName().startswith("__ikaslr_"))
+            continue;
+        I->setOperand(n, rebuildAbs(B, C));
+      }
+    }
+  }
+
   bool transform(Module &M, Function *F) {
     LLVMContext &Ctx = M.getContext();
     std::string Name = F->getName().str();
@@ -178,6 +315,9 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
     F->setName(Name + "_body");
     F->setSection(".rand.text." + Name);
     F->addFnAttr(Attribute::NoInline);
+
+    // 关键：消除函数体内指向区域外的 PC 相对引用，否则搬移后必崩（§3.4.3）。
+    makeBodyPositionIndependent(F);
 
     T->setName(Name);
     T->setSection(".tramp.text." + Name);

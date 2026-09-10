@@ -4,7 +4,7 @@
 | --- | --- |
 | **清单编号** | E3-8 的延伸；解锁 E3／E4~E7／E9／E10／E12 的前置 |
 | **对应正文** | §3.5.1（Pass 实现）、§3.4.3（函数级位置无关） |
-| **状态** | 🟡 Pass 可用、内核可编可启动；**但被随机化的函数体尚不可搬移** |
+| **状态** | ✅ **打通**：35 个真实内核函数被随机化，内核可编、可启动、自测通过、8/8 稳定 |
 | **环境** | Linux 6.8，x86-64，clang 14 + GNU binutils，QEMU+KVM |
 
 ## 1. 目标
@@ -62,7 +62,7 @@ make O=<b> CC=clang CRR_TRAMPOLINE=y \
 `/proc/ikaslr` 可用。以 2 个函数的最小名单编译时，**内核内自测全部通过**
 （dispatch/tracking/block/rerand/defer/fixed_out/stale-return）。
 
-## 3. 暴露的根本缺口：**函数体不是位置无关的**
+## 3. 曾暴露的根本缺口：函数体不是位置无关的（**已解决**）
 
 内核启动后，只要**真正调用到被随机化的函数**就会崩溃：
 
@@ -105,16 +105,70 @@ ffffffff81e79020 <seq_puts_body>:
 现有的 3 个内建示例函数之所以能跑，正是因为 `randfuncs.c` 用
 `-mcmodel=large -fno-pic` 单独编译、`selftest.c` 里的函数是刻意写成自足的。
 
-## 4. 下一步（明确的工作项）
+## 4. 位置无关改造的实现（§3.4.3 落地）
 
-1. **在 pass 里实现函数体的位置无关改造**（这是解锁所有端到端实验的真正前置）：
-   - 把体内对外部函数的 `call` 改为经 `fixed_out`；
-   - 把对全局变量的 RIP 相对访问改为绝对寻址（x86）／共享 GOT（arm64）。
-2. 把 `libIKaslrPass.so` 与 `IKASLR_FUNCS` 加进构建依赖，避免用陈旧对象。
-3. **ORC**：被搬移函数的 ORC 表项必须一并搬移，否则栈回溯失效——
-   本次崩溃的调用栈全是 `?`，正是这个问题的直接表现。
+### 4.1 x86-64 上怎么做到
 
-## 5. 复现
+IR 层面表达不出"绝对寻址"：`inttoptr(ptrtoint @f)` 会被后端折回 `call rel32`，
+LLVM 14 也**不支持每函数的 `code-model` 属性**（两者都实测无效）。
+可行的办法是**内联汇编 + `"s"`（符号）约束**把符号地址物化成 64 位绝对立即数：
+
+```
+movabsq $sym, %reg      →  R_X86_64_64 重定位
+call    *%reg
+```
+
+于是 pass 对函数体做统一改写：**凡操作数里（递归地）含全局符号，就重建为
+"绝对地址 + 指令"形式**。直接调用因此自然变成间接调用，全局变量访问变成
+先取绝对地址再解引用。
+
+### 4.2 逐个啃掉的五类残留（每一类都是实测发现的）
+
+| # | 残留 | 为什么 | 处理 |
+| --- | --- | --- | --- |
+| 1 | `call rel32` 到外部函数 | 最初只做了跳板，没做体改造 | 绝对地址 + 间接调用 |
+| 2 | `kmalloc_caches+0x28`、`rename_lock` 仍是 `(%rip)` | 全局藏在 **ConstantExpr**（GEP／bitcast）里，只匹配裸 `GlobalVariable` 会漏 | 递归重建 ConstantExpr |
+| 3 | `invalid operand for inline asm constraint 'i'` | 把 `WARN_ON` 的 `"i"(__FILE__)` 换成了运行期值 | **内联汇编整条跳过**（这类函数本就被 `gen_funcs.py` 排除） |
+| 4 | `call __x86_indirect_thunk_r11` | **retpoline**：间接调用被编成到固定 thunk 的 PC 相对直接调用 | 关闭 retpoline（四档需一致） |
+| 5 | `call __stack_chk_fail` / `call __memcpy` | 后端生成的直接调用，IR 里没有对应指令 | 对函数体去掉栈保护属性；把 `llvm.memcpy/memset/memmove` 换成绝对地址间接调用 |
+
+**验证判据**：反汇编整个 `.rand.text`，`(%rip)` 与 `call <绝对地址>` 应为 **0** 处。
+实测 35 个函数体全部通过。
+
+> **一条值得写进正文的约束**：**retpoline 与可搬移代码在 x86 上不相容**——
+> 间接调用会被编译成到固定 thunk 的 PC 相对调用。随机化区域内必须关闭 retpoline，
+> 或让 thunk 调用也走绝对寻址。
+
+### 4.3 结果
+
+以 S1 编译：**35 个可随机化函数**（32 个 VFS 核心 + 3 个内建示例），
+`.rand.text` 4 277 B。内核启动、**内核内自测全部通过**、`/proc` 可读
+（读 `/proc/ikaslr/stats` 本身就要走随机化后的 `seq_puts`/`seq_printf`），
+**连续 8 次启动全部通过、无一崩溃**。
+
+实测运行数据（35 个函数）：
+
+| 量 | 值 |
+| --- | ---: |
+| 关键路径 `critical_path_ns` | 481～1 913 ns |
+| 其中 `cp_update_ns`（35 个槽） | 116～387 ns |
+| 其中 `cp_wait_ns` | 41～223 ns |
+| 改映射 `cp_remap_ns` | 17.9～23.0 µs |
+| 变体准备 `prepare_ns` | 114 µs |
+| 陈旧返回被兜底修正 | 3 次（`stale_fixup_fails` = 0） |
+
+> 连续 200 次触发中 `rounds_missed` = 199：变体池被抽干，补充工作队列跟不上，
+> 属预期行为（无就绪变体时返回 `-EAGAIN`），不是错误。**这正是 E9 频率敏感性
+> 要量化的那条上限。**
+
+## 5. 仍待处理
+
+1. 把 `libIKaslrPass.so` 与 `IKASLR_FUNCS` 加进构建依赖——现在改名单/改 pass
+   **不会触发重编**，必须手动删掉含 `.tramp.text` 的目标文件，已踩过两次。
+2. **ORC**：被搬移函数的 ORC 表项未搬移，栈回溯失效（崩溃时调用栈全是 `?`）。
+3. arm64 侧的等价改造（`adrp` → 共享 GOT，`bl` → 间接）。
+
+## 6. 复现
 
 ```sh
 make -C tools/ikaslr/llvm                      # 编 pass
