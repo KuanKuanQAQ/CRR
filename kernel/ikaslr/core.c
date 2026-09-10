@@ -25,6 +25,7 @@
 #include <linux/delay.h>
 #include <linux/jiffies.h>
 #include <linux/preempt.h>
+#include <linux/rcupdate.h>
 #include <linux/export.h>
 
 #include "internal.h"
@@ -69,7 +70,21 @@ void ikaslr_get_stats(struct ikaslr_stats *out)
 static void ikaslr_wait_unblocked(void)
 {
 	while (READ_ONCE(ikaslr_blocked)) {
-		if (preemptible())
+		/*
+		 * 只有真正可以睡的上下文才允许睡。
+		 *
+		 * `preemptible()` 单独用是**不够的**：在 CONFIG_PREEMPT_RCU 下
+		 * `rcu_read_lock()` 并不关抢占，只是给 rcu_read_lock_nesting 加一，
+		 * 因此 RCU 读端临界区里 `preemptible()` 仍为真。而 VFS 的 rcu-walk
+		 * 路径查找会在 RCU 读端临界区里调用 dput/inode_permission 这类函数——
+		 * 一旦它们被随机化，这里就会在 RCU 读端临界区中睡眠，内核报
+		 * "Voluntary context switch within RCU read-side critical section!"
+		 * （实测：随机化 VFS 函数后 6 次启动中 2 次触发）。
+		 *
+		 * 阻断窗口本身只有微秒量级（关键路径实测 0.5–2 µs），所以在不可睡的
+		 * 上下文里自旋等待是完全可接受的。
+		 */
+		if (preemptible() && !rcu_preempt_depth())
 			wait_event(ikaslr_unblock_wq, !READ_ONCE(ikaslr_blocked));
 		else
 			cpu_relax();
@@ -235,7 +250,9 @@ int ikaslr_wait_region_empty(unsigned int timeout_ms)
 	unsigned long deadline = jiffies + msecs_to_jiffies(timeout_ms);
 
 	while (atomic_read(&ikaslr_active) != 0) {
-		if (preemptible()) {
+		/* 同 ikaslr_wait_unblocked()：RCU 读端临界区里 preemptible() 仍为真，
+		 * 不能据此判断可否睡眠。*/
+		if (preemptible() && !rcu_preempt_depth()) {
 			if (!wait_event_timeout(ikaslr_zero_wq,
 						atomic_read(&ikaslr_active) == 0,
 						deadline - jiffies))

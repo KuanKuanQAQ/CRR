@@ -590,7 +590,16 @@ endif
 ifeq ($(wildcard $(IKASLR_FUNCS)),)
 $(error I-KASLR: IKASLR_FUNCS file not found: $(IKASLR_FUNCS))
 endif
-KBUILD_CFLAGS += -fpass-plugin=$(IKASLR_PASS)
+# Rebuild when the pass or the function list changes.
+#
+# Kbuild's if_changed only compares the compile command line, and neither the
+# plugin .so nor the IKASLR_FUNCS file appears in it -- so editing the list or
+# rebuilding the pass silently left stale objects behind, mixing functions from
+# two different lists into one image.  Fold a hash of both into the command line
+# so any change to either forces a full rebuild.
+IKASLR_STAMP := $(shell cat $(IKASLR_PASS) $(IKASLR_FUNCS) 2>/dev/null | \
+		  md5sum | cut -c1-16)
+KBUILD_CFLAGS += -fpass-plugin=$(IKASLR_PASS) -DIKASLR_STAMP=0x$(IKASLR_STAMP)
 endif
 
 KBUILD_CPPFLAGS := -D__KERNEL__

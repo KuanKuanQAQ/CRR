@@ -50,4 +50,6 @@
 - `12-got-codemodel-results.md`　共享 GOT 与代码模型（T1–T5）
 - `14-code-model-and-unmovable.md`　代码模型实现设计 + **哪些内核代码不能随机化**（实测）
 - `15-scope-selection.md`　**随机化对象怎么选、为什么**（名单在 `scripts/ikaslr/funcs/`）
+- `16-position-independence.md`　**函数体位置无关改造怎么做通的**（x86/arm64 全过程、
+  两条架构级不相容、ORC 与 RCU 两个坑）
 - 代码落点：`kernel/ikaslr/`（运行时）、`scripts/ikaslr/`（实验脚本）、`tools/ikaslr/`（LLVM pass 桩与接口）

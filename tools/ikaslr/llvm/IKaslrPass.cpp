@@ -31,6 +31,7 @@
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/IntrinsicInst.h"
+#include "llvm/ADT/Triple.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/PassPlugin.h"
@@ -114,6 +115,8 @@ struct IKaslrMarkPass : PassInfoMixin<IKaslrMarkPass> {
 };
 
 struct IKaslrPass : PassInfoMixin<IKaslrPass> {
+  bool IsAArch64 = false;   /* 由 run() 按模块 triple 设定 */
+
 
   /// 发出该函数的 target 槽、表项结构与表内指针。
   /// 表里存的是**指针**而非结构体本身：x86-64 会把 >=32 字节的对象按 32 字节
@@ -176,7 +179,28 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
   Value *materializeAbs(IRBuilder<> &B, Constant *Sym) {
     Type *I8Ptr = Type::getInt8PtrTy(Sym->getContext());
     FunctionType *AsmTy = FunctionType::get(I8Ptr, {Sym->getType()}, false);
-    InlineAsm *IA = InlineAsm::get(AsmTy, "movabsq $1, $0", "=r,s",
+
+    // 各架构把"符号地址 -> 64 位绝对立即数"的写法不同：
+    //   x86-64 : 一条 movabs（R_X86_64_64）
+    //   AArch64: movz/movk 四条（R_AARCH64_MOVW_UABS_G0_NC..G3）——
+    //            没有 64 位立即数指令，必须分四段拼；`adrp` 是 PC 相对的，
+    //            正是搬移后失效的那种寻址，不能用。
+    const char *Asm;
+    if (IsAArch64)
+      // AArch64 **不能用绝对立即数**（movz/movk 那套）：内核镜像以 PIE 链接
+      // （CONFIG_RELOCATABLE），链接器直接拒绝 R_AARCH64_MOVW_UABS_*
+      // （实测报 "can not be used when making a shared object"）。
+      //
+      // 正确做法是**随函数一起搬移的字面量池**：`ldr $0, =sym` 让汇编器在
+      // 本函数所在节（.rand.text.F）内放一条字面量，用 PC 相对的 ldr 取它。
+      // 节内相对偏移随函数整体搬移保持不变，而字面量本身是 R_AARCH64_ABS64，
+      // 由内核启动时的重定位填成最终地址——两边都成立。
+      // 这正是论文 §3.4.3 所说"arm64 上共享偏移表/字面量池是刚需"。
+      Asm = "ldr $0, =$1";
+    else
+      Asm = "movabsq $1, $0";
+
+    InlineAsm *IA = InlineAsm::get(AsmTy, Asm, "=r,s",
                                    /*hasSideEffects=*/false);
     return B.CreateCall(IA, {Sym});
   }
@@ -332,6 +356,15 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
     T->removeFnAttr(Attribute::UWTable);   // LLVM 14 的写法
     T->addFnAttr(Attribute::NoUnwind);
 
+    // 跳板要**继承原函数的代码生成属性**，否则它与内核其余部分不一致。
+    // 尤其是 "frame-pointer"：内核开 CONFIG_FRAME_POINTER 时每个函数都建帧指针，
+    // 而凭空造的函数默认不建，栈回溯走到跳板就断链（实测回溯里满是 '?'）。
+    // target-cpu/target-features 关系到指令选择，也一并继承。
+    for (const char *A : {"frame-pointer", "target-cpu", "target-features",
+                          "no-trapping-math", "stack-protector-buffer-size"})
+      if (F->hasFnAttribute(A))
+        T->addFnAttr(F->getFnAttribute(A));
+
     // 3. target 槽，初值为函数体的链接期地址。
     //    必须在 RAUW 之后创建，否则这条引用也会被一并替换成跳板。
     auto *Target = new GlobalVariable(
@@ -402,6 +435,7 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
   }
 
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &) {
+    IsAArch64 = Triple(M.getTargetTriple()).isAArch64();
     std::set<std::string> Sel = loadFuncList();
     if (Sel.empty())
       return PreservedAnalyses::all();
