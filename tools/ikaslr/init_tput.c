@@ -25,6 +25,29 @@
 
 #define SECONDS	5
 
+/*
+ * 采 enters/outs 的增量：**必须与吞吐测量用同一个负载、同一个时间窗**。
+ * 第一版把 G 取自另一个采集程序（init_e3a 的 worker），两者每轮的系统调用组合
+ * 不同，代入模型自然对不上——那不是"模型有二阶效应"，那是口径错了。
+ */
+static long long stat_field(const char *key)
+{
+	static char buf[8192];
+	int fd = open("/proc/ikaslr/stats", O_RDONLY);
+	ssize_t n;
+	char *p;
+
+	if (fd < 0)
+		return -1;
+	n = read(fd, buf, sizeof(buf) - 1);
+	close(fd);
+	if (n <= 0)
+		return -1;
+	buf[n] = 0;
+	p = strstr(buf, key);
+	return p ? strtoll(p + strlen(key), NULL, 10) : -1;
+}
+
 static double now_s(void)
 {
 	struct timespec ts;
@@ -59,19 +82,32 @@ static long long spin(double secs)
 
 int main(void)
 {
-	long long warm, n;
+	long long warm, n, e0, o0, e1, o1;
 	double t0, t1;
 
 	mount("proc", "/proc", "proc", 0, NULL);
 
 	warm = spin(0.5);			/* 预热：让页缓存与分支预测就位 */
+
+	e0 = stat_field("enters ");
+	o0 = stat_field("outs ");
 	t0 = now_s();
 	n = spin(SECONDS);
 	t1 = now_s();
+	e1 = stat_field("enters ");
+	o1 = stat_field("outs ");
 
 	printf("TPUT loops=%lld elapsed_s=%.3f loops_per_s=%.0f "
 	       "syscalls_per_s=%.0f warm=%lld\n",
 	       n, t1 - t0, n / (t1 - t0), 4.0 * n / (t1 - t0), warm);
+	if (e0 >= 0 && e1 >= 0)
+		printf("TPUT-G d_enters=%lld d_outs=%lld per_loop_in=%.1f "
+		       "per_loop_out=%.1f g_in_per_s=%.0f g_out_per_s=%.0f\n",
+		       e1 - e0, o1 - o0, (double)(e1 - e0) / n,
+		       (double)(o1 - o0) / n, (e1 - e0) / (t1 - t0),
+		       (o1 - o0) / (t1 - t0));
+	else
+		printf("TPUT-G none (base kernel or CONFIG_IKASLR_STATS off)\n");
 
 	/* 同一次启动里把 ikaslr 统计也带出来，便于把吞吐与 G 对齐。*/
 	{
