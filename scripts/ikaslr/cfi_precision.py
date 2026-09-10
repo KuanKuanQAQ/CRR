@@ -129,8 +129,11 @@ def kcfi_from_dwarf(vmlinux):
                     name.value.decode())
     return sig2fn, None
 
-CALL_RELOCS = {"R_X86_64_PLT32", "R_X86_64_PC32", "R_AARCH64_CALL26",
-               "R_AARCH64_JUMP26"}
+# 只有这些才是"调用/跳转"。**R_X86_64_PC32 不在其中**：x86-64 上 call/jmp 用
+# PLT32（实测：fs/read_write.o 里 267 条 PLT32 全是 call/jmp），而 PC32 用于
+# `lea foo(%rip)` 这类**在代码里取地址**的形态——那正是"地址被取过"。
+# 第一版把 PC32 一并当成调用排除掉了，于是低估了可被间接调用的函数集合。
+CALL_RELOCS = {"R_X86_64_PLT32", "R_AARCH64_CALL26", "R_AARCH64_JUMP26"}
 
 
 def address_taken(build_dir):
