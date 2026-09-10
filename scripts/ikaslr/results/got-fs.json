@@ -1,0 +1,9 @@
+{
+  "files": 63,
+  "funcs": 2108,
+  "funcs_with_refs": 852,
+  "per_func_total": 1738,
+  "shared_total": 551,
+  "dedup_ratio": 0.6829689298043728,
+  "got_relocs": 0
+}
