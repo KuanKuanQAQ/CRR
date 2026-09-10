@@ -58,6 +58,7 @@ static int ikaslr_stats_show(struct seq_file *m, void *v)
 	seq_printf(m, "active             %d\n", ikaslr_active_count());
 	seq_printf(m, "inside             %d\n", ikaslr_inside_count());
 	seq_printf(m, "enters             %lu\n", ts.enters);
+	seq_printf(m, "outs               %lu\n", ts.outs);
 	seq_printf(m, "enter_backoffs     %lu\n", ts.backoffs);
 	seq_printf(m, "enter_forced       %lu\n", ts.forced);
 	seq_printf(m, "outleave_blocked   %lu\n", ts.outleave_blocked);

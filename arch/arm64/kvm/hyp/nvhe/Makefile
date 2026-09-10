@@ -14,8 +14,6 @@ ccflags-y += -fno-stack-protector	\
 	     -DDISABLE_BRANCH_PROFILING	\
 	     $(DISABLE_STACKLEAK_PLUGIN)
 		 
-ccflags-remove-y += -fpass-plugin=$(CRR_PLUGIN_FUNCTIMER)
-ccflags-remove-y += -fpass-plugin=$(CRR_PLUGIN_TRAMPOLINE)
 
 hostprogs := gen-hyprel
 HOST_EXTRACFLAGS += -I$(objtree)/include
@@ -113,3 +111,7 @@ KCOV_INSTRUMENT	:= n
 # Skip objtool checking for this directory because nVHE code is compiled with
 # non-standard build rules.
 OBJECT_FILES_NON_STANDARD := y
+# I-KASLR：本目录的代码运行在特殊环境（早期启动 / EL2 hyp / EFI stub），
+# 不得被跳板改造插桩。旧写法引用的 CRR_PLUGIN_* 变量在插件接线重写后已不存在，
+# 于是这条移除**实际上一直是空操作**；改用现在的变量名。
+ccflags-remove-y += -fpass-plugin=$(IKASLR_PASS)

@@ -1,13 +1,12 @@
-# I-KASLR 随机化函数名单（gen_funcs.py 生成）
+# I-KASLR 随机化函数名单（E10 范围扫描）
 # 候选范围: fs/*.o block/*.o net/core/*.o mm/*.o
-# 已按实测可搬移性筛选，按被引用次数降序；共 256 个
-seq_printf
+# 取自 s3-full.txt 的前 256 个（同一排序，因此各档之间有包含关系，
+# 便于看单调趋势）；s3-full 已剔除编译期跳过与实测不可搬移的函数
 seq_puts
 __brelse
 __folio_put
 kvfree
 skb_put
-netdev_err
 dput
 net_ratelimit
 rtnl_unlock
@@ -22,11 +21,9 @@ skb_trim
 kmem_cache_create
 seq_lseek
 __free_pages
-kvmalloc_node
 path_put
 kstrdup
 seq_put_decimal_ull
-netdev_info
 single_release
 kmem_cache_destroy
 single_open
@@ -43,11 +40,9 @@ generic_file_llseek
 unlock_buffer
 seq_put_decimal_ull_width
 skb_push
-logfc
 __mod_node_page_state
 unregister_pernet_subsys
 skb_clone
-is_vmalloc_addr
 __dev_get_by_index
 mod_node_page_state
 rtnl_register
@@ -82,7 +77,6 @@ __folio_lock
 __next_zones_zonelist
 blk_queue_flag_set
 dev_get_by_index_rcu
-netdev_warn
 seq_open
 __mod_zone_page_state
 folio_mapping
@@ -103,13 +97,11 @@ set_nlink
 skb_pull
 napi_schedule_prep
 seq_list_next
-vzalloc
 __skb_checksum_complete
 d_instantiate
 blk_queue_flag_clear
 path_get
 skb_dequeue
-vmalloc_to_page
 dma_pool_alloc
 fs_param_is_string
 memdup_user
@@ -119,7 +111,6 @@ dev_addr_mod
 folio_mark_dirty
 get_zeroed_page
 rtnl_trylock
-vmalloc
 free_netdev
 next_zone
 seq_list_start
@@ -134,7 +125,6 @@ __alloc_percpu_gfp
 kern_path
 __page_file_index
 ihold
-netdev_printk
 napi_disable
 neigh_destroy
 dma_pool_destroy
@@ -185,7 +175,6 @@ sk_reset_timer
 skb_queue_purge_reason
 ___pskb_trim
 __neigh_create
-__vmalloc
 dev_close
 filp_close
 memdup_user_nul
@@ -252,8 +241,20 @@ kill_litter_super
 kmem_cache_create_usercopy
 locks_lock_inode_wait
 next_online_pgdat
-proto_register
 rtnl_register_module
 seq_release_private
 skb_copy
 sync_blockdev
+sync_filesystem
+vfs_statfs
+__folio_start_writeback
+cdev_add
+cdev_init
+compat_ptr_ioctl
+d_invalidate
+dst_discard_out
+folio_clear_dirty_for_io
+folio_end_writeback
+inode_init_once
+locks_init_lock
+memory_read_from_buffer

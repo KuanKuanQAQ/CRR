@@ -1,13 +1,12 @@
-# I-KASLR 随机化函数名单（gen_funcs.py 生成）
+# I-KASLR 随机化函数名单（E10 范围扫描）
 # 候选范围: fs/*.o block/*.o net/core/*.o mm/*.o
-# 已按实测可搬移性筛选，按被引用次数降序；共 64 个
-seq_printf
+# 取自 s3-full.txt 的前 64 个（同一排序，因此各档之间有包含关系，
+# 便于看单调趋势）；s3-full 已剔除编译期跳过与实测不可搬移的函数
 seq_puts
 __brelse
 __folio_put
 kvfree
 skb_put
-netdev_err
 dput
 net_ratelimit
 rtnl_unlock
@@ -22,11 +21,9 @@ skb_trim
 kmem_cache_create
 seq_lseek
 __free_pages
-kvmalloc_node
 path_put
 kstrdup
 seq_put_decimal_ull
-netdev_info
 single_release
 kmem_cache_destroy
 single_open
@@ -43,11 +40,9 @@ generic_file_llseek
 unlock_buffer
 seq_put_decimal_ull_width
 skb_push
-logfc
 __mod_node_page_state
 unregister_pernet_subsys
 skb_clone
-is_vmalloc_addr
 __dev_get_by_index
 mod_node_page_state
 rtnl_register
@@ -65,3 +60,9 @@ simple_attr_open
 simple_attr_release
 simple_inode_init_ts
 kill_fasync
+krealloc
+early_memunmap
+__filemap_get_folio
+dma_pool_free
+first_online_pgdat
+fs_param_is_u32

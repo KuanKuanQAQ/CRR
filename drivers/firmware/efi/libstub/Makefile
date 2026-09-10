@@ -33,8 +33,6 @@ cflags-$(CONFIG_LOONGARCH)	+= -fpie
 
 cflags-$(CONFIG_EFI_PARAMS_FROM_FDT)	+= -I$(srctree)/scripts/dtc/libfdt
 
-ccflags-remove-y += -fpass-plugin=$(CRR_PLUGIN_FUNCTIMER)
-ccflags-remove-y += -fpass-plugin=$(CRR_PLUGIN_TRAMPOLINE)
 
 KBUILD_CFLAGS			:= $(subst $(CC_FLAGS_FTRACE),,$(cflags-y)) \
 				   -Os -DDISABLE_BRANCH_PROFILING \
@@ -171,3 +169,7 @@ quiet_cmd_stubcopy = STUBCPY $@
 		/bin/false;						\
 	fi;								\
 	$(OBJCOPY) $(STUBCOPY_FLAGS-y) $< $@
+# I-KASLR：本目录的代码运行在特殊环境（早期启动 / EL2 hyp / EFI stub），
+# 不得被跳板改造插桩。旧写法引用的 CRR_PLUGIN_* 变量在插件接线重写后已不存在，
+# 于是这条移除**实际上一直是空操作**；改用现在的变量名。
+ccflags-remove-y += -fpass-plugin=$(IKASLR_PASS)

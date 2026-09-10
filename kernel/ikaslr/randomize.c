@@ -734,8 +734,6 @@ int ikaslr_rerandomize(void)
 	if (atomic_cmpxchg(&ikaslr_in_progress, 0, 1) != 0)
 		return -EBUSY;
 
-	t0 = ktime_get_ns();
-
 	/* 取一份就绪变体。没有就绪变体则本次放弃并催促补充。*/
 	spin_lock_irqsave(&ikaslr_pool_lock, flags);
 	for (i = 0; i < IKASLR_NR_VARIANTS; i++) {
@@ -753,9 +751,48 @@ int ikaslr_rerandomize(void)
 		goto out;
 	}
 
-	/* 阻断入口并等待活跃集合变空。*/
+	/*
+	 * 调试用完整性自检：即将启用的变体里，每个函数体的开头若干字节必须与映像
+	 * 母本一致。不一致说明要么变体内容被写坏，要么偏移排错——两者都会表现为
+	 * "随机化之后函数返回错误结果"。
+	 *
+	 * **必须放在阻断之前**。早先它在"更新 target"与"放行"之间，也就是**关键路径
+	 * 内部**：它遍历全部函数做 memcmp，S3 范围（485 个函数）下把关键路径抬高了
+	 * 约 3.6 µs，于是 E3-A 测出来的 K 与 H+I+J 差了一大截。而这项检查根本不需要
+	 * 在阻断窗口里做——被检查的是一个 READY 变体，内容自准备完成后就不再变化。
+	 */
+	if (IS_ENABLED(CONFIG_IKASLR_DEBUG)) {
+		for (i = 0; i < ikaslr_ntramp; i++) {
+			const u8 *want = ikaslr_tbl[i]->body;
+			const u8 *got = next->base + next->off[i];
+			size_t n = min_t(size_t, 8, ikaslr_tbl[i]->size);
+
+			/*
+			 * 打印全部被比较的 n 个字节，而不是只打头 4 个。否则头 4 字节
+			 * 相同（例如 endbr64 f3 0f 1e fa）而第 5~8 字节不同时，日志会
+			 * 显示成 "want ...==got ..." 的假象。
+			 */
+			if (memcmp(want, got, n)) {
+				pr_err("integrity: %s target=%px off=%lu content mismatch over %zu B\n"
+				       "  want %*ph\n  got  %*ph\n",
+				       ikaslr_tbl[i]->name, got, next->off[i], n,
+				       (int)n, want, (int)n, got);
+			}
+		}
+	}
+
+	/*
+	 * 阻断入口并等待活跃集合变空。
+	 *
+	 * critical_path_ns 从这里开始计，到放行为止——也就是**可观测的停顿窗口**
+	 * （H 等待 + I 更新）。选取就绪变体、DEBUG 自检都在窗口之外，不该计入；
+	 * J（改映射）发生在放行之后，单独由 cp_remap_ns 给出。
+	 * 这样 critical_path_ns == cp_wait_ns + cp_update_ns（+ 少量记账），
+	 * 三者可以互相校验；早先 t0 放在函数开头，K 与 H+I+J 差一大截无法解释。
+	 */
+	t0 = ktime_get_ns();
 	{
-		u64 tw = ktime_get_ns();
+		u64 tw = t0;
 
 		ikaslr_block_region();
 		ret = ikaslr_wait_region_empty(IKASLR_WAIT_MS);
@@ -780,32 +817,6 @@ int ikaslr_rerandomize(void)
 					     next->base + next->off[i]);
 		smp_wmb();
 		WRITE_ONCE(ikaslr_update_ns, ktime_get_ns() - tu);
-	}
-
-	/*
-	 * 调试用完整性自检：切换之后，每个 target 指向处的开头若干字节必须与
-	 * 映像里该函数体的开头一致。不一致说明要么变体内容被写坏，要么 target
-	 * 指到了错误的偏移——两者都会表现为"随机化之后函数返回错误结果"。
-	 */
-	if (IS_ENABLED(CONFIG_IKASLR_DEBUG)) {
-		for (i = 0; i < ikaslr_ntramp; i++) {
-			const u8 *want = ikaslr_tbl[i]->body;
-			const u8 *got = next->base + next->off[i];
-			size_t n = min_t(size_t, 8, ikaslr_tbl[i]->size);
-
-			/*
-			 * 打印全部被比较的 n 个字节，而不是只打头 4 个。
-			 * 否则头 4 字节相同（例如 endbr64 f3 0f 1e fa）而第 5~8
-			 * 字节不同时，日志会显示成 "want ...==got ..." 的假象，
-			 * 让真实的不一致无法从日志里看出来。
-			 */
-			if (memcmp(want, got, n)) {
-				pr_err("integrity: %s target=%px off=%lu content mismatch over %zu B\n"
-				       "  want %*ph\n  got  %*ph\n",
-				       ikaslr_tbl[i]->name, got, next->off[i], n,
-				       (int)n, want, (int)n, got);
-			}
-		}
 	}
 
 	old = ikaslr_live;

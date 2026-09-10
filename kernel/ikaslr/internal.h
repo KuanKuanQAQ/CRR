@@ -34,6 +34,7 @@ struct ikaslr_stats {
 	unsigned long forced;	/* 不可睡上下文里放弃等待、硬进入的次数 */
 	unsigned long outleave_blocked;/* out_leave 在阻断期间加回计数的次数 */
 	unsigned long nested_admitted;/* 阻断期间放行的嵌套进入次数 */
+	unsigned long outs;	/* 经 fixed_out 离开区域的次数（E3-A 的 G 项）*/
 	int	      wait_residual;/* 最近一次等空超时时的残余活跃计数 */
 	int	      max_active;/* 观察到的最大并发数 */
 };

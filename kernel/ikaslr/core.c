@@ -57,6 +57,8 @@ static atomic_long_t ikaslr_forced;	/* 不可睡上下文里放弃等待、硬�
 static atomic_long_t ikaslr_outleave_blocked;
 /* 阻断期间因"本任务已在区域内"而被放行的嵌套进入次数——旧代码会在这里自我阻塞。*/
 static atomic_long_t ikaslr_nested_admitted;
+/* 经 fixed_out 离开区域的次数。与 enters 一起构成 E3-A 的 G 项（跨区域调用频度）。*/
+static atomic_long_t ikaslr_outs;
 static int ikaslr_wait_residual;
 static int ikaslr_max_active;
 
@@ -72,6 +74,7 @@ void ikaslr_get_stats(struct ikaslr_stats *out)
 	out->forced = atomic_long_read(&ikaslr_forced);
 	out->outleave_blocked = atomic_long_read(&ikaslr_outleave_blocked);
 	out->nested_admitted = atomic_long_read(&ikaslr_nested_admitted);
+	out->outs = atomic_long_read(&ikaslr_outs);
 	out->wait_residual = READ_ONCE(ikaslr_wait_residual);
 	out->max_active = READ_ONCE(ikaslr_max_active);
 }
@@ -262,8 +265,10 @@ void ikaslr_out_enter(void *target)
 		 * CFI violation（与第 5 章的 PA 验证一并处理）。
 		 */
 	}
-	if (IS_ENABLED(CONFIG_IKASLR_STATS))
+	if (IS_ENABLED(CONFIG_IKASLR_STATS)) {
 		atomic_dec(&ikaslr_inside);
+		atomic_long_inc(&ikaslr_outs);
+	}
 	current->ikaslr_depth--;
 	if (atomic_dec_and_test(&ikaslr_active) &&
 	    wq_has_sleeper(&ikaslr_zero_wq))

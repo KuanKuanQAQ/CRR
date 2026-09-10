@@ -11,8 +11,6 @@ KBUILD_CFLAGS	:= $(subst $(CC_FLAGS_FTRACE),,$(KBUILD_CFLAGS)) -fpie \
 		   -fno-asynchronous-unwind-tables -fno-unwind-tables \
 		   $(call cc-option,-fno-addrsig)
 
-ccflags-remove-y += -fpass-plugin=$(CRR_PLUGIN_FUNCTIMER)
-ccflags-remove-y += -fpass-plugin=$(CRR_PLUGIN_TRAMPOLINE)
 
 # remove SCS flags from all objects in this directory
 KBUILD_CFLAGS	:= $(filter-out $(CC_FLAGS_SCS), $(KBUILD_CFLAGS))
@@ -36,3 +34,7 @@ $(obj)/lib-%.o: $(srctree)/lib/%.c FORCE
 
 obj-y		:= kaslr_early.pi.o lib-fdt.pi.o lib-fdt_ro.pi.o
 extra-y		:= $(patsubst %.pi.o,%.o,$(obj-y))
+# I-KASLR：本目录的代码运行在特殊环境（早期启动 / EL2 hyp / EFI stub），
+# 不得被跳板改造插桩。旧写法引用的 CRR_PLUGIN_* 变量在插件接线重写后已不存在，
+# 于是这条移除**实际上一直是空操作**；改用现在的变量名。
+ccflags-remove-y += -fpass-plugin=$(IKASLR_PASS)
