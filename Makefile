@@ -559,24 +559,38 @@ KBUILD_CFLAGS += -fno-common
 KBUILD_CFLAGS += -fno-PIE
 KBUILD_CFLAGS += -fno-strict-aliasing
 
-# CRR: out-of-tree LLVM passes.  CRR_PLUGIN_DIR points at the llvm-tutor build
-# that provides them; override it if yours lives elsewhere:
-#     make CRR_PLUGIN_DIR=/path/to/llvm-tutor/build/lib
-# Set CRR_TRAMPOLINE=n to build without trampoline injection.
-CRR_PLUGIN_DIR ?= /home/lirk/llvm-tutor/build/lib
-CRR_TRAMPOLINE ?= y
-CRR_PLUGIN_TRAMPOLINE := $(CRR_PLUGIN_DIR)/libInjectTrampoline.so
-CRR_PLUGIN_FUNCTIMER  := $(CRR_PLUGIN_DIR)/libFuncTimer.so
-export CRR_PLUGIN_TRAMPOLINE CRR_PLUGIN_FUNCTIMER
+# I-KASLR: trampoline-generating LLVM pass (tools/ikaslr/llvm).
+#
+# The pass renames each listed function F to F_body in .rand.text.F (the movable
+# body) and emits a same-named trampoline F in .tramp.text.F, so existing
+# callers reach the trampoline unchanged.  Which functions get transformed comes
+# from IKASLR_FUNCS (one symbol per line); generate a list with
+# scripts/ikaslr/gen_funcs.py, see Documentation/crr/实现/15-scope-selection.md.
+#
+#     make LLVM=1 CRR_TRAMPOLINE=y IKASLR_FUNCS=/abs/path/funcs.txt
+#
+# CRR_TRAMPOLINE=n builds without any transformation (nothing is randomized).
+CRR_TRAMPOLINE ?= n
+IKASLR_PASS ?= $(srctree)/tools/ikaslr/llvm/libIKaslrPass.so
+export IKASLR_FUNCS
 
 ifeq ($(CRR_TRAMPOLINE),y)
-ifeq ($(wildcard $(CRR_PLUGIN_TRAMPOLINE)),)
-$(error CRR: LLVM pass not found at $(CRR_PLUGIN_TRAMPOLINE). \
-	Build llvm-tutor and point CRR_PLUGIN_DIR at its build/lib, \
-	or pass CRR_TRAMPOLINE=n to build without trampoline injection. \
-	See README.md.)
+ifeq ($(wildcard $(IKASLR_PASS)),)
+$(error I-KASLR: pass not found at $(IKASLR_PASS). \
+	Build it with 'make -C tools/ikaslr/llvm', \
+	or pass CRR_TRAMPOLINE=n to build without trampoline injection.)
 endif
-KBUILD_CFLAGS += -fpass-plugin=$(CRR_PLUGIN_TRAMPOLINE)
+ifneq ($(shell $(CC) --version 2>/dev/null | grep -qi clang && echo y),y)
+$(error I-KASLR: CRR_TRAMPOLINE=y needs clang (-fpass-plugin). \
+	Build with CC=clang (or LLVM=1 if you have the full LLVM toolchain).)
+endif
+ifeq ($(IKASLR_FUNCS),)
+$(error I-KASLR: set IKASLR_FUNCS=/abs/path/funcs.txt (see scripts/ikaslr/funcs/).)
+endif
+ifeq ($(wildcard $(IKASLR_FUNCS)),)
+$(error I-KASLR: IKASLR_FUNCS file not found: $(IKASLR_FUNCS))
+endif
+KBUILD_CFLAGS += -fpass-plugin=$(IKASLR_PASS)
 endif
 
 KBUILD_CPPFLAGS := -D__KERNEL__

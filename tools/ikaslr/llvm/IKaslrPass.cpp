@@ -184,6 +184,14 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
     T->addFnAttr(Attribute::NoInline);
     T->setVisibility(F->getVisibility());
 
+    // 跳板是我们凭空造出来的函数，不会继承翻译单元的代码生成选项。内核以
+    // -fno-asynchronous-unwind-tables 编译并在链接脚本里丢弃 .eh_frame，
+    // 而新建函数默认带 uwtable，于是只有跳板会产生 .eh_frame，链接期报
+    // "unplaced orphan section `.eh_frame'" 而失败（实测）。
+    // 因此显式去掉 uwtable 并标 nounwind；同时继承原函数的这两项属性。
+    T->removeFnAttr(Attribute::UWTable);   // LLVM 14 的写法
+    T->addFnAttr(Attribute::NoUnwind);
+
     // 3. target 槽，初值为函数体的链接期地址。
     //    必须在 RAUW 之后创建，否则这条引用也会被一并替换成跳板。
     auto *Target = new GlobalVariable(
