@@ -39,6 +39,8 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 
+#include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <set>
 #include <string>
@@ -52,6 +54,13 @@ static cl::opt<std::string> FuncsFile(
 static cl::opt<bool> VerifyOnly(
     "ikaslr-verify", cl::init(false),
     cl::desc("Only report cross-region calls; do not transform"));
+
+/// 关闭 fixed_out 改写（仅用于 A/B 测量 fixed_out 本身的开销）。
+/// 用环境变量而非 cl::opt：-mllvm 选项在插件注册之前就被解析，那条路走不通。
+static bool noOutWrap() {
+  const char *E = getenv("IKASLR_NO_OUTWRAP");
+  return E && *E && strcmp(E, "0") != 0;
+}
 
 static cl::opt<bool> Verbose(
     "ikaslr-verbose", cl::init(false),
@@ -116,6 +125,9 @@ struct IKaslrMarkPass : PassInfoMixin<IKaslrMarkPass> {
 
 struct IKaslrPass : PassInfoMixin<IKaslrPass> {
   bool IsAArch64 = false;   /* 由 run() 按模块 triple 设定 */
+  std::set<std::string> Sel;/* 被随机化的函数名单，由 run() 载入 */
+  unsigned NrOutWrapped = 0;/* 被包成 fixed_out 序列的调用点数 */
+  bool NoOutWrap = false;   /* IKASLR_NO_OUTWRAP=1 时不生成 fixed_out（A/B 用）*/
 
 
   /// 发出该函数的 target 槽、表项结构与表内指针。
@@ -242,23 +254,10 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
     return C;
   }
 
-  /// 消除函数体内所有指向区域外的 PC 相对引用，使其可整体搬移。
-  ///
-  /// 两类引用（见 ../../Documentation/crr/实现/14-code-model-and-unmovable.md）：
-  ///   · 对外部函数的直接调用 -> 绝对地址 + 间接调用
-  ///   · 对全局变量的引用     -> 绝对地址
-  /// 函数**内部**的相对跳转随函数整体搬移自动保持正确，不必处理。
-  ///
-  /// 统一按"操作数里含全局符号就重建"处理，直接调用因此自然变成间接调用。
-  void makeBodyPositionIndependent(Function *Body) {
-    // 栈保护会让后端生成一条到 __stack_chk_fail 的**直接**调用，那是 PC 相对的，
-    // 搬移后失效；被随机化的函数体因此关掉栈保护（仅限这些函数）。
-    Body->removeFnAttr(Attribute::StackProtect);
-    Body->removeFnAttr(Attribute::StackProtectStrong);
-    Body->removeFnAttr(Attribute::StackProtectReq);
-
-    // llvm.memcpy/memset/memmove 会被后端降级成到 memcpy 等的直接调用，
-    // 同样是 PC 相对。这里先把它们换成对内核同名符号的**绝对地址间接调用**。
+  /// llvm.memcpy/memset/memmove 会被后端降级成到 memcpy 等的**直接**调用，
+  /// 那是 PC 相对的。这里先在 IR 层把它们换成对内核同名符号的显式调用，
+  /// 后续由 wrapOutboundCalls 包上 fixed_out、再由物化改成绝对间接调用。
+  void lowerMemIntrinsics(Function *Body) {
     SmallVector<MemIntrinsic *, 8> Mem;
     for (BasicBlock &BB : *Body)
       for (Instruction &I : BB)
@@ -275,16 +274,117 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
       Type *Arg1 = isa<MemSetInst>(MI) ? Type::getInt32Ty(Ctx) : I8Ptr;
       FunctionType *FT = FunctionType::get(I8Ptr, {I8Ptr, Arg1, I64}, false);
       FunctionCallee C = M->getOrInsertFunction(Nm, FT);
-      Value *Abs = materializeAbs(B, cast<Constant>(C.getCallee()));
-      Value *FP = B.CreateBitCast(Abs, FT->getPointerTo());
       Value *A0 = B.CreateBitCast(MI->getArgOperand(0), I8Ptr);
       Value *A1 = MI->getArgOperand(1);
       if (!isa<MemSetInst>(MI))
         A1 = B.CreateBitCast(A1, I8Ptr);
       Value *A2 = B.CreateZExtOrTrunc(MI->getArgOperand(2), I64);
-      B.CreateCall(FT, FP, {A0, A1, A2});
+      B.CreateCall(C, {A0, A1, A2});
       MI->eraseFromParent();
     }
+  }
+
+  /// 运行时钩子自身不能再被包一层，否则无限递归。
+  static bool isIKaslrRuntime(StringRef N) {
+    return N == "ikaslr_enter" || N == "ikaslr_leave" ||
+           N == "ikaslr_out_enter" || N == "ikaslr_out_leave";
+  }
+
+  /// 登记一个合法的跨区域目标（§3.5.2）。链接器把 .data..ikaslr_whitelist 汇总成
+  /// 白名单，fixed_out 在放行前查询。每模块去重；跨模块的重复由内核初始化时再去重。
+  void emitWhitelist(Module &M, Function *Callee) {
+    std::string N = ("__ikaslr_wl_" + Callee->getName()).str();
+    if (M.getNamedGlobal(N))
+      return;
+    Type *I8Ptr = Type::getInt8PtrTy(M.getContext());
+    auto *G = new GlobalVariable(M, I8Ptr, /*isConstant=*/false,
+                                 GlobalValue::InternalLinkage,
+                                 ConstantExpr::getBitCast(Callee, I8Ptr), N);
+    G->setSection(".data..ikaslr_whitelist");
+    G->setAlignment(Align(8));
+    appendToUsed(M, {G});
+  }
+
+  /// 把函数体内**离开随机化区域**的调用改写成 fixed_out 序列（§3.4.2）：
+  ///
+  ///     ikaslr_out_enter(target);   // 记录离开 + 白名单检查（第 5 章再叠加 PA）
+  ///     r = target(...);
+  ///     ikaslr_out_leave();         // 重新进入
+  ///
+  /// **哪些调用要包**：目标地址固定、且不属于随机化机制自身的调用，即
+  ///   ② 同编译单元内的 static 函数、③ 其他编译单元的全局函数。
+  /// **哪些不包**：
+  ///   ① 调用被随机化的函数——RAUW 之后落到 fixed_in 跳板，跳板自己 enter/leave，
+  ///      再包一层只会徒增两次原子操作；
+  ///   · ikaslr_out_enter/out_leave 自身（无限递归）；
+  ///   · 内联汇编、intrinsic（不是真正的调用）；
+  ///   · musttail（其后不允许插指令）。
+  ///
+  /// **间接调用不包**：目标是运行期值，静态白名单覆盖不到，包了只会让
+  /// ikaslr_out_enter 每次都走"未登记目标"的告警路径。间接调用的合法性检查
+  /// 属于第 5 章 PA CFI 的范畴。
+  ///
+  /// 计数不平衡的安全方向：out_enter 减、out_leave 加。若调用不返回（noreturn），
+  /// 计数偏**小**——区域显得更空，随机化更容易进行，不会误判为"仍有执行流"。
+  /// 反向（计数偏大）才会让随机化永远等不到空，因此必须保证每个 out_enter 后面
+  /// 紧跟着唯一的 out_leave：CallInst 不是终结指令，其 getNextNode() 必然存在，
+  /// 插入点唯一，配对精确。
+  void wrapOutboundCalls(Function *Body) {
+    Module &M = *Body->getParent();
+    LLVMContext &Ctx = M.getContext();
+    Type *I8Ptr = Type::getInt8PtrTy(Ctx);
+    FunctionCallee OutEnter =
+        M.getOrInsertFunction("ikaslr_out_enter", Type::getVoidTy(Ctx), I8Ptr);
+    FunctionCallee OutLeave =
+        M.getOrInsertFunction("ikaslr_out_leave", Type::getVoidTy(Ctx));
+
+    SmallVector<std::pair<CallInst *, Function *>, 32> Out;
+    for (BasicBlock &BB : *Body)
+      for (Instruction &I : BB) {
+        auto *CI = dyn_cast<CallInst>(&I);
+        if (!CI || CI->isInlineAsm() || CI->isMustTailCall())
+          continue;
+        // getCalledFunction() 对"经 bitcast 常量表达式的调用"返回 null
+        //（memcpy 的声明签名与内核不一致时就是这种形态），故手工剥离。
+        auto *Callee =
+            dyn_cast<Function>(CI->getCalledOperand()->stripPointerCasts());
+        if (!Callee || Callee->isIntrinsic())
+          continue;
+        StringRef N = Callee->getName();
+        if (Sel.count(N.str()) || N.endswith("_body"))
+          continue;                       // ① 走 fixed_in 跳板
+        if (isIKaslrRuntime(N) || N.startswith("__ikaslr_"))
+          continue;
+        Out.push_back({CI, Callee});
+      }
+
+    for (auto &P : Out) {
+      CallInst *CI = P.first;
+      Function *Callee = P.second;
+      IRBuilder<> B(CI);
+      B.CreateCall(OutEnter, {ConstantExpr::getBitCast(Callee, I8Ptr)});
+      B.SetInsertPoint(CI->getNextNode());
+      B.CreateCall(OutLeave);
+      CI->setTailCall(false);   // 尾调用会直接 jmp 走，跳过 out_leave
+      emitWhitelist(M, Callee);
+    }
+    NrOutWrapped += Out.size();
+  }
+
+  /// 消除函数体内所有指向区域外的 PC 相对引用，使其可整体搬移。
+  ///
+  /// 两类引用（见 ../../Documentation/crr/实现/14-code-model-and-unmovable.md）：
+  ///   · 对外部函数的直接调用 -> 绝对地址 + 间接调用
+  ///   · 对全局变量的引用     -> 绝对地址
+  /// 函数**内部**的相对跳转随函数整体搬移自动保持正确，不必处理。
+  ///
+  /// 统一按"操作数里含全局符号就重建"处理，直接调用因此自然变成间接调用。
+  void makeBodyPositionIndependent(Function *Body) {
+    // 栈保护会让后端生成一条到 __stack_chk_fail 的**直接**调用，那是 PC 相对的，
+    // 搬移后失效；被随机化的函数体因此关掉栈保护（仅限这些函数）。
+    Body->removeFnAttr(Attribute::StackProtect);
+    Body->removeFnAttr(Attribute::StackProtectStrong);
+    Body->removeFnAttr(Attribute::StackProtectReq);
 
     SmallVector<Instruction *, 32> Work;
     for (BasicBlock &BB : *Body)
@@ -338,6 +438,25 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
     }
   }
 
+  /// 这个函数能不能做成"跳板 + 可搬移函数体"？不能的话说明为什么。
+  /// 返回 nullptr 表示可以。
+  static const char *rejectReason(Function *F) {
+    // 变参函数：跳板要把收到的变参原样转给函数体，而 IR 层做不到——
+    // 只能转发**具名**参数，变参部分连同 x86-64 的 %al（向量寄存器计数）
+    // 一起丢失，函数体里的 va_start 读到的就是垃圾。
+    // 唯一能原样转发的是 musttail call，但 musttail 要求其后紧跟 ret，
+    // 而跳板在调用之后**必须**执行 ikaslr_leave()，两者不相容。
+    // 实测：随机化 seq_printf 会让 /proc/self/status 读出垃圾，
+    // 表现为 vsnprintf 的 "field width too large" 告警与读野指针的缺页。
+    if (F->isVarArg())
+      return "variadic (cannot forward varargs through a trampoline)";
+    // naked 函数没有编译器生成的序言/尾声，函数体就是一段裸汇编，
+    // 既不能加跳板也谈不上位置无关改造。
+    if (F->hasFnAttribute(Attribute::Naked))
+      return "naked (hand-written prologue)";
+    return nullptr;
+  }
+
   bool transform(Module &M, Function *F) {
     LLVMContext &Ctx = M.getContext();
     std::string Name = F->getName().str();
@@ -358,7 +477,16 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
     F->setSection(".rand.text." + Name);
     F->addFnAttr(Attribute::NoInline);
 
-    // 关键：消除函数体内指向区域外的 PC 相对引用，否则搬移后必崩（§3.4.3）。
+    // 三步，顺序不能换：
+    //   1. 把 llvm.mem* 降级成对 memcpy/memset/memmove 的显式调用，
+    //      这样下一步才看得见它们；
+    //   2. 把离开区域的调用包成 fixed_out 序列（此时 callee 还是可辨认的
+    //      Function，物化之后就只剩一个不透明的间接调用了）；
+    //   3. 消除所有指向区域外的 PC 相对引用，否则搬移后必崩（§3.4.3）。
+    //      这一步会把上面新插入的 out_enter/out_leave 调用一并变成绝对间接调用。
+    lowerMemIntrinsics(F);
+    if (!NoOutWrap)
+      wrapOutboundCalls(F);
     makeBodyPositionIndependent(F);
 
     T->setName(Name);
@@ -371,6 +499,12 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
     // 而新建函数默认带 uwtable，于是只有跳板会产生 .eh_frame，链接期报
     // "unplaced orphan section `.eh_frame'" 而失败（实测）。
     // 因此显式去掉 uwtable 并标 nounwind；同时继承原函数的这两项属性。
+    // 参数与返回值的属性决定 ABI：sret（返回大结构体的隐藏指针）、byval
+    // （按值传结构体）、zeroext/signext（窄整型的扩展方式）。跳板若缺了它们，
+    // 调用者按一种约定传、跳板按另一种收，是静默的寄存器/栈错位。
+    // 必须原样搬到跳板签名上，稍后也要原样加到跳板对函数体的调用上。
+    T->setAttributes(F->getAttributes());
+
     T->removeFnAttr(Attribute::UWTable);   // LLVM 14 的写法
     T->addFnAttr(Attribute::NoUnwind);
 
@@ -409,6 +543,15 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
       Args.push_back(&A);
     CallInst *CI = B.CreateCall(FTy, Callee, Args);
     CI->setTailCall(false);
+    {
+      // 只搬参数与返回值属性，不搬函数级属性（那些属于函数本身，不属于调用点）。
+      AttributeList AL = F->getAttributes();
+      SmallVector<AttributeSet, 8> PA;
+      for (unsigned n = 0; n < FTy->getNumParams(); ++n)
+        PA.push_back(AL.getParamAttrs(n));
+      CI->setAttributes(
+          AttributeList::get(Ctx, AttributeSet(), AL.getRetAttrs(), PA));
+    }
 
     B.CreateCall(Leave);
     if (FTy->getReturnType()->isVoidTy())
@@ -454,7 +597,8 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
 
   PreservedAnalyses run(Module &M, ModuleAnalysisManager &) {
     IsAArch64 = Triple(M.getTargetTriple()).isAArch64();
-    std::set<std::string> Sel = loadFuncList();
+    NoOutWrap = noOutWrap();
+    Sel = loadFuncList();
     if (Sel.empty())
       return PreservedAnalyses::all();
 
@@ -464,17 +608,31 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
     }
 
     SmallVector<Function *, 8> Todo;
+    SmallVector<std::string, 4> Skipped;
     for (Function &F : M) {
       if (F.isDeclaration() || F.getName().endswith("_body"))
         continue;
-      if (Sel.count(F.getName().str()))
-        Todo.push_back(&F);
+      if (!Sel.count(F.getName().str()))
+        continue;
+      if (const char *Why = rejectReason(&F)) {
+        errs() << "ikaslr: skipping " << F.getName() << ": " << Why << "\n";
+        Skipped.push_back(F.getName().str());
+        continue;
+      }
+      Todo.push_back(&F);
     }
     if (Todo.empty())
-      return PreservedAnalyses::all();
+      return Skipped.empty() ? PreservedAnalyses::all()
+                             : PreservedAnalyses::none();
 
     for (Function *F : Todo)
       transform(M, F);
+
+    if (Verbose || NrOutWrapped)
+      errs() << "ikaslr: " << M.getName() << ": " << Todo.size()
+             << " function(s), " << NrOutWrapped
+             << " outbound call(s) routed through fixed_out"
+             << (NoOutWrap ? " [DISABLED]" : "") << "\n";
 
     return PreservedAnalyses::none();
   }

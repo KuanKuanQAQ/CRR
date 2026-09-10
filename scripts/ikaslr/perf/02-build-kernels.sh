@@ -61,8 +61,20 @@ for v in "${WANT[@]}"; do
     grep -E 'CONFIG_IKASLR' "$O/.config" || echo "   (IKASLR off)"
     grep -E 'CONFIG_(RETPOLINE|UNWINDER_ORC|UNWINDER_FRAME_POINTER|ARM64_BTI)=' "$O/.config" || true
 
+    # 编译输出留一份：pass 会把"这个函数不能随机化"的原因打到 stderr，
+    # 下面据此生成 $O/ikaslr-skipped.txt。
     # shellcheck disable=SC2046
-    kbuild "$O" $(ikaslr_pass_args) -j"$JOBS" "$IMG" modules
+    kbuild "$O" $(ikaslr_pass_args) -j"$JOBS" "$IMG" modules 2>&1 | tee "$O/build.log"
+    [ "${PIPESTATUS[0]}" = 0 ] || { echo "!! $v 编译失败，见 $O/build.log"; exit 1; }
+
+    if [ "$v" != base ] && [ "$CRR_TRAMPOLINE" = y ]; then
+        grep -oE 'ikaslr: skipping [A-Za-z0-9_]+: .*' "$O/build.log" \
+            | sed 's/^ikaslr: skipping //' | sort -u > "$O/ikaslr-skipped.txt"
+        if [ -s "$O/ikaslr-skipped.txt" ]; then
+            echo "-- pass 跳过了 $(wc -l < "$O/ikaslr-skipped.txt") 个函数（名单里有、但改造不了）："
+            sed 's/^/     /' "$O/ikaslr-skipped.txt"
+        fi
+    fi
 
     # 校验：被随机化的函数体必须真的可搬移（见 实现/16-position-independence.md §8）
     if [ "$v" != base ] && [ "$CRR_TRAMPOLINE" = y ]; then

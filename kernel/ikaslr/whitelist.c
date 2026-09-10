@@ -85,6 +85,13 @@ int __init ikaslr_whitelist_init(void)
 
 		if (!*p)
 			continue;
+		/*
+		 * 跨模块去重：同一个外部函数（如 _raw_spin_lock）会被每个引用它的
+		 * 编译单元各登记一项，编译器只能做到模块内去重。这里靠已插入的部分
+		 * 做一次查重，既省内存也让 /proc/ikaslr/stats 的计数有意义。
+		 */
+		if (ikaslr_whitelist_ok(*p))
+			continue;
 		node = kmalloc(sizeof(*node), GFP_KERNEL);
 		if (!node)
 			return -ENOMEM;
