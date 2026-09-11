@@ -557,6 +557,47 @@ t->size = end - (unsigned long)t->body;
 被重建成"物化出来的地址"之后,那条 `call` 自然只能是间接的。
 不需要为调用单独写一条规则。
 
+#### 6.1.1 "怎么知道外部引用都找全了"
+
+这是本方案最该被追问的一点。答案是:**pass 不去"找"外部引用,它穷举改写。**
+`makeBodyPositionIndependent()` 里没有任何识别调用的逻辑:
+
+```cpp
+for (BasicBlock &BB : *Body)
+  for (Instruction &I : BB)
+    Work.push_back(&I);                       // 每一条指令
+for (Instruction *I : Work)
+  for (unsigned n = 0; n < I->getNumOperands(); ++n) {   // 每一个操作数
+    auto *C = dyn_cast<Constant>(I->getOperand(n));
+    if (!C || !refsGlobal(C)) continue;       // 递归判断是否触及全局符号
+    I->setOperand(n, rebuildAbs(B, C));
+  }
+```
+
+**在 IR 这一层这是穷尽的**,因为一个操作数只可能是:
+
+| 操作数 | 能否指名函数外部的东西 |
+|---|---|
+| `Instruction` / `Argument` | 不能。运行期算出的 SSA 值,本身与位置无关 |
+| `BasicBlock` | 不能。本函数内的标号,随函数搬移 |
+| `ConstantInt` / `ConstantFP` / `undef` … | 不能。没有地址 |
+| **`GlobalValue`** | **能 —— 这是 IR 里唯一能指名外部事物的构造** |
+| `ConstantExpr` 包着 `GlobalValue` | 能 —— 所以 `refsGlobal`/`rebuildAbs` 必须递归 |
+
+"能指名外部"与"是 `GlobalValue`"在 IR 层等价,所以"扫全部操作数 + 递归判
+`GlobalValue`"不存在漏网。
+
+**但 IR 层穷尽 ≠ 机器码层穷尽。** 有些引用在本 pass 跑完之后才进入机器码:
+
+| 来源 | 处置 |
+|---|---|
+| 后端为栈保护生成的 `call __stack_chk_fail` | 去掉这些函数体的栈保护属性(§7.2) |
+| `llvm.memcpy` 等 intrinsic 降级出的直接调用 | 提前在 IR 层降级,再交给上面的规则(§6.3) |
+| 后端 libcall(`__divti3` 之类) | 不主动处理,靠 §9 的机器码扫描兜底 |
+| **内联汇编** | 整条跳过,内容对 pass 不透明(§6.4) |
+
+所以**pass 本身给不出完备性保证**,§9 的验证不是走形式,而是唯一的保证来源。
+
 ### 6.2 嵌套 `ConstantExpr` 的递归重建
 
 IR 里的引用常常不是裸的全局符号,而是套了几层的常量表达式,例如
@@ -704,6 +745,24 @@ BTI 要求间接分支的落点有一条 `bti` 指令。本方案把直接调用
 它同时输出不合格的函数名,供"编译 → 扫描 → 剔除 → 重编"的迭代使用 ——
 静态启发式筛选必然有漏网(尤其是内联汇编展开的 per-CPU 访问),
 **这一步不能省**。
+
+**它检查的是链接后的机器码,不是 IR**,因此对 §6.1.1 列出的那几类"pass 之后
+才出现的引用"同样有效 —— 后端 libcall 会以"指向区域外的直接 `call`"的形式
+被抓住,内联汇编展开的 RIP 相对引用会以 `(%rip)` 的形式被抓住。
+**这是整条链上唯一不依赖对编译器行为的推理的环节。**
+
+实测 S3 构建(`e3a-s3-full-sy`,区域 `ffffffff81eb9000`–`ffffffff81ee006f`):
+
+| 项 | 值 |
+|---|---:|
+| 区域内指令总数 | 39 134 |
+| **`(%rip)` 残留** | **0** |
+| **指向区域外的直接转移**(`call`/`jmp`/条件跳转) | **0** |
+| `movabs` 物化 | 6 363 |
+| 间接 `call`/`jmp` | 4 363 |
+
+注意最后一行的对照:条件跳转一条都没跳出区域,说明**函数内部的控制流确实
+全部留在函数体内**,这正是"函数粒度"成立的前提。
 
 ### 9.2 一处必须知道的假阳性:`static_cpu_has()`
 
