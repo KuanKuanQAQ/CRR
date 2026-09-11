@@ -1,259 +1,511 @@
-# 函数体位置无关改造：怎么做到的（x86-64 与 AArch64）
+# 在 `-mcmodel=kernel` 之上实现函数粒度的位置无关
 
-> 记录把「被随机化的函数体真正可搬移」这件事做通的完整过程：每一处障碍、根因、
-> 处理办法与验证判据。这是 §3.4.3 的工程落地，也是所有端到端实验的前置。
-> 代码：`tools/ikaslr/llvm/IKaslrPass.cpp`；实验记录：`实验/E-pass-bringup-LLVM插桩落地.md`。
+> Linux 6.8,clang 14,x86-64 与 AArch64 双架构实测。最后校准 2026-09-11。
+> 实现在 `tools/ikaslr/llvm/IKaslrPass.cpp`;验证工具 `scripts/ikaslr/verify_movable.py`。
+>
+> **本文自成一篇**,不需要先读别的文档。
 
-## 0. 结果
-
-| | x86-64 | AArch64 |
-| --- | --- | --- |
-| 随机化函数数 | **35**（32 VFS 核心 + 3 内建示例） | **34** |
-| `.rand.text` | 4 277 B | 5 644 B |
-| 函数体内残留的 PC 相对外部引用 | **0** | **0** |
-| 内核自测 | ✅ 全通过 | ✅ 全通过 |
-| 读 `/proc/ikaslr/stats`（走随机化后的 `seq_puts`/`seq_printf`） | ✅ | ✅ |
-| 连续启动 | **10/10** 无崩溃无告警 | **3/3**（TCG） |
+与相邻文档的分工:本文只讲**位置无关改造本身**;
+跳板与随机化运行时见 [`17-implementation-current.md`](17-implementation-current.md);
+搬不动的函数的完整清单见 [`18-不可随机化清单.md`](18-不可随机化清单.md);
+[`14-code-model-and-unmovable.md`](14-code-model-and-unmovable.md) 是本文的早期版本,
+其 §2 已被本文取代。
 
 ---
 
-## 1. 问题：为什么函数体默认搬不动
+## 0. 结果速览
 
-内核以 `-mcmodel=kernel`（x86）／PIE（arm64）编译，函数体内**指向区域外**的引用
-都是 PC 相对的。函数被复制到别的地址后，这些相对偏移全部失效。
+| | x86-64 | AArch64 |
+|---|---|---|
+| 手段 | `movabs`(`R_X86_64_64`) | 随函数搬移的**字面量池**(`R_AARCH64_ABS64`) |
+| 区域内 `(%rip)` / `adrp` 残留 | **0** | **0** |
+| 指向区域外的直接调用/跳转 | **0** | **0** |
+| 实测 | S3 = 496 个函数,3/3 干净启动 | S1 = 19 个函数,TCG 启动 + 自测通过 |
 
-实测最直接的证据：`seq_puts_body` 里有
+**代码模型始终是 `-mcmodel=kernel`。** 本方案没有把任何一个文件改成
+`-mcmodel=large` —— 改的是**被选中的那些函数内部的引用**,粒度是函数,不是文件。
 
+代价(x86-64,S3 范围 480 个函数):
+
+| 项 | 值 |
+|---|---:|
+| 绝对地址物化 | 6 359 处 |
+| 由此产生的间接调用 | 4 319 处 |
+| 纯物化净增(估) | 区域的 **23%–32%**,每函数 76–105 B |
+| 函数体合计 vs 同一批函数在 base 里 | 96 275 B → 156 321 B(**+62.4%**) |
+
+> 最后一行是**净值**,含两个方向相反的效应:物化让代码变大,而给被选中函数打
+> `noinline` 又消掉了原本散在各调用者里的内联副本。两者不能混为一谈,§10.1 拆开讲。
+
+---
+
+## 1. 问题:`-mcmodel=kernel` 为什么让函数体搬不动
+
+### 1.1 内核为什么必须用这个代码模型
+
+x86-64 内核映像被链接到 `0xffffffff80000000` 往上的**高 2 GB**。
+`-mcmodel=kernel` 正是为这块地址空间设计的:它假定所有代码与数据都落在
+"距当前 PC ±2 GB"之内,于是
+
+- 函数调用编成 `call rel32` —— 4 字节相对偏移;
+- 全局变量访问编成 `mov off(%rip),%reg` —— 4 字节 RIP 相对偏移。
+
+比起 64 位绝对寻址,这省下大量指令字节与取指带宽。**内核不能不用它** ——
+换成别的模型会让整个映像显著变大、变慢,而那是全内核的代价,不是随机化范围的代价。
+
+### 1.2 于是引用全是 PC 相对的
+
+```asm
+call   ffffffff81234560 <strlen>          ; R_X86_64_PLT32，相对偏移
+mov    0x1a2b3c(%rip),%rax                ; R_X86_64_PC32，相对偏移
+lea    0x1a2b40(%rip),%rdi                ; 取全局变量地址，也是相对
 ```
-e8 f9 bf fd ff    call ffffffff81e55030 <strlen>     ← call rel32
-```
 
-复制到 `0xffa00000000350f0` 后，该指令位于 `…5102`，目标变成
-`…5107 + (−0x24007)` = **`0xffa0000000011100`**——与实际故障地址**逐位吻合**
-（`#PF: supervisor instruction fetch`）。
+这些偏移在**链接期**按"这条指令在哪"算死。
 
-**函数内部**的相对跳转随函数整体搬移自动保持正确，不必处理。要消除的只有
-两类对外引用：**外部函数调用**与**全局变量访问**。
+### 1.3 一搬就错,而且错得很难看
 
-## 2. x86-64：64 位绝对寻址
+函数体被复制到别处执行时,PC 变了,而指令里的偏移没变 ——
+于是 `call` 跳到一个与目标毫无关系的地址。
 
-### 2.1 只有内联汇编能表达
+实测过一次:`seq_puts_body` 里有一条 `call rel32 <strlen>`,函数体被搬到 vmalloc
+区之后,那条 call 落到了一个无关的 vmalloc 页上,触发取指缺页。
+**算术能对得上**:故障地址 = 新函数体地址 + (原 call 的偏移),一个 bit 都不差。
 
-IR 层面表达不出「绝对寻址」，两条看似可行的路都实测无效：
+> 这类错误的麻烦之处在于**它不一定立刻崩**。偏移指向的地方如果恰好是可执行的
+> 别的代码,就会静默地执行错误的东西。所以本方案的验证判据是**静态零残留**
+> (§9),而不是"启动起来了就算过"。
+
+---
+
+## 2. 为什么不是"把这些文件改成 `-mcmodel=large`"
+
+`-mcmodel=large` 确实能把上面三类引用都变成 64 位绝对寻址。但**按文件加这个选项是错的**:
+
+1. **粒度不对。** 一个 `.c` 文件里通常只有少数几个函数进了随机化范围,
+   给整个文件换代码模型,等于让**同文件里其余所有函数**一起付出代码膨胀与取指压力。
+   `fs/dcache.c` 有上百个函数,而 S3 从里面只选了十几个。
+2. **代价的归属会算错。** 第 6 章要报的是"随机化这些函数的代价",
+   而不是"把这些文件整体换代码模型的代价"。后者显著更大,且与随机化无关。
+3. **它改不到真正需要改的地方。** 代码模型只影响编译器自己生成的引用;
+   内联汇编里的引用、per-CPU 访问器展开出来的东西,换模型一样改不到(§6.4)。
+
+**因此本方案的做法是:保持 `-mcmodel=kernel` 不变,在编译器后端生成代码之前,
+用一个 LLVM pass 只改写被选中函数内部的引用。** 粒度是函数,不是文件。
+
+---
+
+## 3. 做法总览
+
+### 3.1 pass 挂在哪、做什么
+
+LLVM 新 Pass Manager 插件,两个挂点:
+
+| 挂点 | 做的事 | 为什么在这里 |
+|---|---|---|
+| `PipelineStart` | 给名单里的函数打 `noinline` | **必须在内联器之前**。内联器一旦把它们内联进调用者,那个内联副本就绕过了跳板,不变式失效 |
+| `OptimizerLast` | 做改造 | 在常规优化**之后**,否则优化会把刚造出来的跳板再内联掉 |
+
+改造对每个选中的函数 `F` 做三件事:
+
+1. 新建一个同名同签名的**跳板**,把 `F` 的所有使用者改指向它(RAUW);
+2. 把 `F` 改名为 `F_body`、落到 `.rand.text.F` 段 —— 这就是会被搬移的函数体;
+3. **把函数体内所有指向区域外的 PC 相对引用改写成绝对寻址** ← 本文的主题。
+
+> 第 1 步与第 2 步的**顺序不能反**。只改名是不够的:调用指令引用的是函数**对象**
+> 而非名字,把 `F` 改名为 `F_body` 之后,调用点会跟着指向 `F_body`,等于绕过跳板。
+> 实测确实如此(`caller_fn` 直接 `jmp target_fn_body`)。必须先建跳板再 RAUW。
+
+### 3.2 判据:什么叫"可搬移"
+
+> **函数体内不得存在指向区域外的 PC 相对引用。**
+
+- x86-64:任何 `(%rip)`;任何目标落在区域外的 `call`/`jmp <绝对地址>`
+- AArch64:任何 `adrp`;任何目标落在区域外的 `bl`/`b`
+
+函数**内部**的相对跳转(分支、循环)随函数整体搬移自动保持正确,不必处理 ——
+这也是"函数粒度"这个选择的根据:**以整个函数为单位搬,内部相对关系就全都不变**。
+
+---
+
+## 4. x86-64:64 位绝对立即数
+
+### 4.1 IR 层表达不出来 —— 三条路都堵死
+
+想让后端生成 `movabs $sym, %reg`,自然的想法是在 IR 里写一个"把符号当整数用"的表达式。
+三条路实测都不通:
 
 | 尝试 | 结果 |
-| --- | --- |
-| `inttoptr(ptrtoint @f to i64)` | 被后端**折回** `call rel32` |
-| 每函数 `"code-model"="large"` 属性 | LLVM 14 **忽略**，仍是 `call rel32` |
+|---|---|
+| `inttoptr(ptrtoint @f to i64)` | 后端把它**折叠回** `call rel32`,白做 |
+| 给函数加 per-function code model 属性 | LLVM 14 **不支持**(`"code-model"` 函数属性是后来才有的) |
+| 给模块设 `Large` code model | 那是整模块的,等于 §2 说的按文件换模型 |
 
-可行的是**内联汇编 + `"s"`（符号）约束**：
+**唯一可靠的表达方式是内联汇编 + `"s"`(符号)约束:**
 
-```
-movabsq $sym, %reg      →  R_X86_64_64
-call    *%reg
-```
-
-> `"i"`（立即数）约束在目标文件生成阶段会报
-> `invalid operand for inline asm constraint 'i'`，**必须用 `"s"`**。
-
-### 2.2 统一的改写规则
-
-pass 对函数体做一件事：**凡指令操作数里（递归地）含全局符号，就重建为
-「绝对地址 + 指令」形式**。直接调用因此自然变成间接调用，全局访问变成
-先取绝对地址再解引用。
-
-### 2.3 逐个啃掉的五类残留
-
-每一类都是**反汇编整个 `.rand.text` 找 `(%rip)` 和 `call <绝对地址>`** 发现的：
-
-| # | 残留 | 根因 | 处理 |
-| --- | --- | --- | --- |
-| 1 | `call rel32` 到外部函数 | 最初只做了跳板、没做体改造 | 绝对地址 + 间接调用 |
-| 2 | `kmalloc_caches+0x28`、`rename_lock` 仍是 `(%rip)` | 全局藏在 **ConstantExpr**（GEP／bitcast）里，只匹配裸 `GlobalVariable` 会漏 | **递归**重建 ConstantExpr |
-| 3 | `invalid operand for inline asm constraint 'i'` | 把 `WARN_ON` 的 `"i"(__FILE__)` 换成了运行期值，破坏了约束 | **内联汇编整条跳过**（这类函数本就被 `gen_funcs.py` 排除） |
-| 4 | `call __x86_indirect_thunk_r11` | **retpoline**：间接调用被编成到固定 thunk 的 PC 相对直接调用 | 关闭 retpoline，见 §4 |
-| 5 | `call __stack_chk_fail`、`call __memcpy` | **后端生成**的直接调用，IR 里没有对应指令可改 | 对函数体去掉栈保护属性；把 `llvm.memcpy/memset/memmove` 降级成绝对地址间接调用 |
-
-## 3. AArch64：随函数搬移的字面量池
-
-### 3.1 绝对立即数在 arm64 上**不可用**
-
-arm64 内核镜像以 **PIE** 链接（`CONFIG_RELOCATABLE`），链接器直接拒绝绝对重定位：
-
-```
-relocation R_AARCH64_MOVW_UABS_G0_NC against `names_cachep'
-        can not be used when making a shared object; recompile with -fPIC
+```cpp
+// 返回值类型 i8*，输入是符号本身
+FunctionType *AsmTy = FunctionType::get(I8Ptr, {Sym->getType()}, false);
+InlineAsm *IA = InlineAsm::get(AsmTy, "movabsq $1, $0", "=r,s", false);
+return B.CreateCall(IA, {Sym});
 ```
 
-所以 x86 那套 `movz/movk` 四段拼绝对地址在 arm64 上**编不过**。
+`"s"` 约束告诉编译器"这个操作数是一个符号地址,请按立即数给我" ——
+汇编器据此发出 `R_X86_64_64` 重定位,链接器填进 64 位绝对地址。
+**绝对地址不随代码位置改变**,这正是要的。
 
-### 3.2 正确做法：字面量池
+`hasSideEffects=false` 很重要:它让这条内联汇编可以被 CSE 合并、被提到循环外,
+否则同一个符号在一个函数里会被物化很多次。
 
-```
-ldr $0, =sym        →  汇编器在**本函数所在节**内放一条字面量
-blr $0
-```
+### 4.2 生成出来的样子
 
-反汇编印证：
+对全局变量:
 
-```
-0000000000000000 <f>:
-   4:  ldr  x8, 18 <f+0x18>      ← PC 相对，偏移落在同一节内
-   8:  blr  x8
-  18:  R_AARCH64_ABS64  ext      ← 字面量，绝对地址
+```asm
+movabs $0xffffffff81ee1548,%rdi          ; 10 字节，R_X86_64_64
 ```
 
-两边都成立：**节内相对偏移**随函数整体搬移保持不变；**字面量本身**是
-`R_AARCH64_ABS64`，由内核启动时的重定位填成最终地址，复制时already是最终值。
+对函数调用 —— 直接调用变成"物化地址 + 间接调用":
 
-> 这正是论文 §3.4.3 所说「arm64 上共享偏移表／字面量池是**刚需**而非优化」——
-> 本次实测给出了它的确切理由：**PIE 镜像不接受绝对重定位**。
-
-## 4. 两条架构级不相容（值得写进正文）
-
-| 架构 | 与可搬移代码不相容的设施 | 为什么 | 处理 |
-| --- | --- | --- | --- |
-| **x86-64** | **retpoline** | 间接调用被编成到固定 thunk 的 **PC 相对**直接调用（`call __x86_indirect_thunk_r11`），一搬就错 | 随机化范围内必须关闭；或让 thunk 调用也走绝对寻址 |
-| **AArch64** | **BTI**（分支目标识别） | 本方案把**直接调用改成了间接调用**，而 BTI 要求间接分支落点必须有 `BTI` 指令；只被直接 `bl` 调用的函数没有落点标记 → `Oops - BTI` | 关闭 `CONFIG_ARM64_BTI_KERNEL`；或让编译器给所有可能成为间接目标的函数加落点 |
-
-两者是同一件事的两面：**把直接调用变成间接调用，就会与"约束间接分支"的硬件
-CFI 设施冲突**。x86 上没撞到 IBT，是因为内核开 IBT 时**所有**函数都带 `endbr64`；
-arm64 的 BTI 落点是按需发射的，因此撞上了。
-
-> 注意四档配置必须**一致**地关闭这些项，否则测的是缓解措施的开销而非随机化开销。
-
-## 5. 栈回溯：ORC 的问题与处理
-
-### 5.1 问题
-
-ORC（Oops Rewind Capability）是 x86 的栈回溯格式，objtool 在**链接期**生成
-`.orc_unwind_ip` 表，把**代码地址**映射到该处的栈帧布局。
-函数被搬到变体后，ORC 表项仍指向**原地址**，回溯到搬移后的 PC 就查不到表项。
-
-实测（从一个被随机化的函数里 `dump_stack()`）：
-
-```
-Call Trace:
- dump_stack_lvl+0x69/0xa0
- ? ikaslr_control_init+0xa0/0xa0     ← 这些 '?' 是栈扫描猜出来的，且是错的
- ? ikaslr_rf_general+0x24/0x40
- ? test_general_function+0x99/0x160
+```asm
+movabs $0xffffffff810b8db0,%rax          ; 10 字节
+call   *%rax                             ;  2 字节
 ```
 
-`?` 表示不可靠。之前每次崩溃调用栈全是 `?`，根因就在这里。
-影响 oops 回溯、`perf` 调用链、livepatch 一致性检查。
+(取自 `dput_body` 的真实反汇编。)
 
-### 5.2 处理：改用帧指针 unwinder
+---
 
-`CONFIG_UNWINDER_FRAME_POINTER=y`（关 `UNWINDER_ORC`）。帧指针回溯在运行时沿
-`%rbp` 链走，**不依赖任何以地址为键的表**，因此对搬移后的代码天然成立。
+## 5. AArch64:随函数搬移的字面量池
 
-配套还需一处 pass 改动：**跳板必须继承原函数的 `frame-pointer` 属性**。
-跳板是 pass 凭空造的函数，默认不建帧指针，回溯走到跳板就断链
-（实测回溯里仍满是 `?`）。现在一并继承 `frame-pointer`／`target-cpu`／
-`target-features` 等代码生成属性。
+### 5.1 绝对立即数在 arm64 上**不可用**
 
-**代价**：帧指针会占用一个寄存器并增加序言/尾声，对性能有影响。
-由于**四档配置一律相同**，A/B 对比仍然有效；但绝对数字包含了这部分开销，
-正文报告时要写明。
+AArch64 没有 64 位立即数指令,要用 `movz` + 三条 `movk` 拼:
 
-### 5.3 更"正确"的做法（未做，列为后续）
-
-内核对模块有 `unwind_module_init()` 这类机制来注册动态代码的 ORC。
-完备方案应当在 `prepare` 时**把被搬移函数的 ORC 表项按新地址重建并注册**，
-并在 `orc_find()` 中查询 I-KASLR 的表。这样可以保留 ORC。
-本文选择帧指针方案是工程取舍，不是原理限制。
-
-## 6. 顺带发现并修复的一个真实内核 bug
-
-只有当**真实内核函数**（而非自足的示例函数）被随机化后才会暴露：
-
-```
-WARNING: ... rcu_note_context_switch+0x214/0x520
-Voluntary context switch within RCU read-side critical section!
+```asm
+movz x0, #:abs_g3:sym
+movk x0, #:abs_g2_nc:sym
+movk x0, #:abs_g1_nc:sym
+movk x0, #:abs_g0_nc:sym
 ```
 
-**根因**：`ikaslr_wait_unblocked()` 用 `preemptible()` 判断能否睡眠：
+这需要 `R_AARCH64_MOVW_UABS_G0_NC` ~ `G3` 四条重定位。
 
-```c
-if (preemptible())
-        wait_event(...);       /* 睡 */
-else
-        cpu_relax();
+**但内核映像以 PIE 链接**(`CONFIG_RELOCATABLE`),链接器**直接拒绝**这类重定位:
+
+```
+relocation R_AARCH64_MOVW_UABS_G0_NC ... can not be used when making a shared object
 ```
 
-但在 `CONFIG_PREEMPT_RCU` 下 **`rcu_read_lock()` 并不关抢占**，只是给
-`rcu_read_lock_nesting` 加一，所以 RCU 读端临界区里 `preemptible()` **仍为真**。
-而 VFS 的 **rcu-walk 路径查找**会在 RCU 读端临界区里调用 `dput`／`inode_permission`
-这类函数——一旦它们被随机化，`fixed_in` 就会在 RCU 读端临界区里睡眠。
+而 `adrp`(PC 相对的页寻址)恰恰是搬移后失效的那种寻址,更不能用。
+**两条路都堵死了。**
 
-实测：6 次启动中 2 次触发。
+### 5.2 字面量池为什么成立
 
-**修复**：判据改为 `preemptible() && !rcu_preempt_depth()`。
-阻断窗口只有微秒量级（关键路径实测 0.5–2 µs），不可睡上下文里自旋完全可接受。
-`ikaslr_wait_region_empty()` 有同样的判据，一并修正。
+正确做法是让汇编器在**本函数所在的节内**放一条 8 字节字面量,用 PC 相对的 `ldr` 取它:
 
-修复后 **10/10 启动干净、无告警**。
+```cpp
+InlineAsm::get(AsmTy, "ldr $0, =$1", "=r,s", false);
+```
 
-> **对正文的意义**：这是 D3「覆盖非抢占上下文」的一个具体侧面——
-> 不能睡的上下文不只有"关抢占/关中断"，**RCU 读端临界区**同样不能睡，
-> 而它恰恰是 VFS 热路径的常态。建议在 §3.4.6 明确列出。
+这为什么能成立 —— 两件事**同时**满足:
 
-## 7. 构建系统：让改名单能触发重编
+1. **`ldr` 是 PC 相对的,但目标在函数体内。** 字面量被放进 `.rand.text.F`,
+   与函数体同属一个节、一起搬移,**节内偏移不变**,所以 `ldr` 永远取到正确的位置。
+2. **字面量本身是 `R_AARCH64_ABS64`。** 它是数据不是指令,PIE 允许;
+   内核启动时的重定位把它填成最终的 64 位绝对地址。
 
-Kbuild 的 `if_changed` 只比较**编译命令行**，而插件 `.so` 与 `IKASLR_FUNCS`
-都不在命令行里——改了名单或重编了 pass **不会触发重编**，于是镜像里混着
-两份名单编出来的对象（本次踩过两次，一次表现为链接期 `.eh_frame` 报错、
-一次表现为"改成 2 函数名单后仍显示 35 个函数"）。
+一句话:**PC 相对的部分随函数搬移而自洽,绝对的部分放在数据里由重定位负责。**
 
-处理：把两者的哈希折进命令行。
+> 这正对应论文 §3.4.3 的判断:**共享偏移表/字面量池在 arm64 上是刚需,
+> 在 x86-64 上只是可选的体积优化**(x86 有 64 位绝对立即数,不需要这一层)。
+
+### 5.3 生成出来的样子
+
+```asm
+ffff8000810dc738:  ldr  x0, ffff8000810dc798 <path_get_body+0x78>   ; 取字面量
+ffff8000810dc73c:  ldr  x8, ffff8000810dc7a0 <path_get_body+0x80>
+ffff8000810dc740:  blr  x8                                          ; 间接调用
+```
+
+注意那几个目标地址 —— `+0x78`、`+0x80`、`+0x88` 全在**函数体内部**,
+就是字面量池。函数搬到哪里,这些偏移都不变。
+
+---
+
+## 6. 改写的范围
+
+### 6.1 统一规则:操作数里含全局符号就重建
+
+不按"这是调用还是取地址"分类处理,而是统一成一条:
+
+> 遍历函数体的每条指令,**任何一个操作数只要(递归地)引用了全局符号,就重建它**。
+
+直接调用因此自然变成间接调用 —— 它的 callee 操作数就是一个全局符号,
+被重建成"物化出来的地址"之后,那条 `call` 自然只能是间接的。
+不需要为调用单独写一条规则。
+
+### 6.2 嵌套 `ConstantExpr` 的递归重建
+
+IR 里的引用常常不是裸的全局符号,而是套了几层的常量表达式,例如
+`getelementptr(bitcast(@global))`。因此:
+
+- `refsGlobal(C)` **递归**判断一个常量里有没有全局符号(限深 8 层防环);
+- `rebuildAbs(C)` **递归**重建:遇到 `GlobalValue` 就物化;遇到 `ConstantExpr`
+  就把它转成真正的指令(`getAsInstruction()`),再对它的每个操作数递归。
+
+不递归的话,`getelementptr` 外壳会把里面的全局符号藏住,漏改。
+
+### 6.3 内建 `mem*` 的降级
+
+`llvm.memcpy` / `memset` / `memmove` 这类 intrinsic,后端会在**本 pass 之后**
+把它们降级成对 `memcpy` 等的**直接调用** —— 那时已经改不到了。
+
+因此先在 IR 层把它们换成对内核同名符号的显式调用,再让 §6.1 的规则去处理。
+顺序是:**降级 → 包 fixed_out → 物化**,三步不能换。
+
+### 6.4 明确**不改**的
+
+| 不改什么 | 为什么 |
+|---|---|
+| **内联汇编** | 整条跳过。它的操作数可能带 `"i"`(立即数)一类约束,换成运行期值就不满足约束了 —— 实测改写 `WARN_ON` 的 `"i"(__FILE__)` 直接报 `invalid operand for inline asm constraint 'i'` |
+| intrinsic 的 callee | 保持直接形式,否则后端报错 |
+| `__ikaslr_*` 前缀的符号 | 本机制自己的表与槽,不该被改写 |
+
+**内联汇编这一条是后续所有"不可随机化"的根源**:per-CPU 访问(`%gs:` 常量偏移)、
+`test_and_set_bit()` 对全局变量的原子位操作,都是内联汇编展开的 RIP 相对引用,
+pass 跳过它们,于是这些函数搬不动。详见 `18-不可随机化清单.md`。
+
+---
+
+## 7. 逐个啃掉的坑
+
+每一条都是实测踩出来的,不是预判。
+
+### 7.1 PHI 节点:物化指令不能插在它前面
+
+PHI 必须连续位于基本块开头,在它前面插指令是**非法 IR**。
+实测让后端在指令选择阶段直接段错误:
+
+```
+'X86 DAG->DAG Instruction Selection' on @register_filesystem_body
+```
+
+正确做法:PHI 的某个传入值若需要物化,要在**对应的前驱块末尾**物化,
+再把 PHI 的那一路改指向物化结果。
+
+### 7.2 栈保护:会生成一条到 `__stack_chk_fail` 的直接调用
+
+后端为开了栈保护的函数生成一条**直接** `call __stack_chk_fail`,那是 PC 相对的,
+而且是后端自己加的、IR 层看不到。处理:对被随机化的函数体去掉栈保护属性
+(`StackProtect` / `StackProtectStrong` / `StackProtectReq`)。
+
+**只对这些函数去掉**,不是全内核关栈保护。
+
+### 7.3 `.eh_frame` 孤儿段:跳板是凭空造的函数
+
+内核以 `-fno-asynchronous-unwind-tables` 编译,并在链接脚本里丢弃 `.eh_frame`。
+而**新建的 `Function` 默认带 `uwtable` 属性**,于是只有跳板会产生 `.eh_frame`,
+链接期报:
+
+```
+ld: error: unplaced orphan section `.eh_frame'
+```
+
+处理:跳板显式 `removeFnAttr(UWTable)` + `addFnAttr(NoUnwind)`。
+
+### 7.4 跳板必须继承函数体的代码生成属性
+
+凭空造出来的函数不会继承翻译单元的代码生成选项。三类必须手工搬过去:
+
+| 属性 | 不搬会怎样 |
+|---|---|
+| `frame-pointer` | 内核开 `CONFIG_FRAME_POINTER` 时每个函数都建帧指针,而新建函数默认不建 —— 栈回溯走到跳板就断链(实测回溯里满是 `?`) |
+| `target-cpu` / `target-features` | 指令选择会用错指令集 |
+| **参数与返回值属性** | `sret`(大结构体返回的隐藏指针)、`byval`(按值传结构体)、`zeroext`/`signext`(窄整型扩展方式)——跳板少了它们,调用者按一种约定传、跳板按另一种收,**是静默的寄存器/栈错位** |
+
+最后一条要搬两处:跳板的**签名**上,以及跳板**对函数体那次调用**的调用点上。
+
+### 7.5 拒绝改造的两类函数
+
+| 类别 | 为什么不能 |
+|---|---|
+| **变参函数** | 跳板要把变参原样转给函数体,IR 层做不到 —— 只能转发具名参数,变参连同 x86-64 的 `%al`(向量寄存器计数)一起丢失。唯一能原样转发的 `musttail call` 要求其后紧跟 `ret`,而跳板之后**必须**执行离开区域的记账,两者不相容 |
+| **`naked` 函数** | 没有编译器生成的序言/尾声,函数体就是裸汇编 |
+
+> 变参这条在被发现之前是一个**静默的数据损坏**:随机化 `seq_printf` 之后
+> `va_start` 读到垃圾,表现为 `/proc/self/status` 乱码、`vsnprintf` 报
+> "field width too large"、读野指针缺页 —— 而**启动看起来是成功的**。
+> 现在 pass 主动拒绝并打印 `ikaslr: skipping <fn>: variadic ...`。
+
+### 7.6 构建系统:改名单必须能触发重编
+
+kbuild **不跟踪** `.so` 插件与函数名单文件的变化。换了名单或重编了插件,
+旧的 `.o` 会被当成最新的复用 —— 这个坑踩过两次。
+
+处理:把插件与名单的内容哈希塞进 `KBUILD_CFLAGS`:
 
 ```make
-IKASLR_STAMP := $(shell cat $(IKASLR_PASS) $(IKASLR_FUNCS) 2>/dev/null | md5sum | cut -c1-16)
+IKASLR_STAMP := $(shell cat $(IKASLR_PASS) $(IKASLR_FUNCS) | md5sum | cut -c1-16)
 KBUILD_CFLAGS += -fpass-plugin=$(IKASLR_PASS) -DIKASLR_STAMP=0x$(IKASLR_STAMP)
 ```
 
-验证：名单不变 → **0** 次重编；换名单 → **2 793** 次重编。
+内容一变,命令行就变,kbuild 自然全量重编。
 
-## 8. 验证判据（每次改动后都应跑）
+> 另:选函数用**名单文件**而不是源码注解,是为了不改动被随机化子系统的源码。
+> 名单经环境变量 `IKASLR_FUNCS` 传入 —— 不能用 `-mllvm -ikaslr-funcs-file=`,
+> 因为 `-mllvm` 选项在插件注册**之前**就被解析,那个选项那时还不存在。
 
-1. **静态**：反汇编整个 `.rand.text`，
-   x86 上 `(%rip)` 与 `call <绝对地址>` 应为 **0**；
-   arm64 上 `adrp` 与指向区域外的 `bl/b` 应为 **0**。
-2. **动态**：内核自测全通过；读 `/proc/ikaslr/stats`（本身要走随机化后的
-   `seq_puts`/`seq_printf`）成功；连续启动无 oops、**无 WARNING**。
+---
 
-> 第 2 条里「无 WARNING」不能省——RCU 那个 bug 只体现为 WARNING，
-> 只 grep oops 会漏掉。
+## 8. 两条架构级不相容
 
-## 9. 复现
+这两条不是实现缺陷,是**机制与既有内核设施的硬冲突**,四档配置必须一律相同地关掉。
 
-```sh
-make -C tools/ikaslr/llvm                          # 编 pass
+### 8.1 x86:retpoline
 
-# x86-64
-make O=<b> CC=clang CRR_TRAMPOLINE=n x86_64_defconfig
-scripts/config --file <b>/.config -e IKASLR -e IKASLR_DEBUG \
-    -d RETPOLINE -d RETHUNK -d UNWINDER_ORC -e UNWINDER_FRAME_POINTER
-make O=<b> CC=clang CRR_TRAMPOLINE=n olddefconfig
-make O=<b> CC=clang CRR_TRAMPOLINE=y \
-     IKASLR_FUNCS=$PWD/scripts/ikaslr/funcs/s1-vfs.txt -j$(nproc) bzImage
+retpoline 把间接调用换成"调用一个固定位置的 thunk"——
+而那是 **PC 相对**的调用。本方案恰恰把直接调用变成间接调用,于是每一处都变成
+指向区域外的相对调用,一搬就错。
 
-# AArch64
-make O=<a> ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- \
-     CRR_TRAMPOLINE=n defconfig
-scripts/config --file <a>/.config -e IKASLR -e IKASLR_DEBUG -d ARM64_BTI_KERNEL -d ARM64_BTI
-make O=<a> ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- \
-     CRR_TRAMPOLINE=n olddefconfig
-make O=<a> ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- \
-     CRR_TRAMPOLINE=y IKASLR_FUNCS=$PWD/scripts/ikaslr/funcs/s1-vfs.txt -j$(nproc) Image
+`RETPOLINE` / `RETHUNK` / `CPU_UNRET_ENTRY` / `CALL_DEPTH_TRACKING` 必须关。
+
+### 8.2 arm64:BTI
+
+BTI 要求间接分支的落点有一条 `bti` 指令。本方案把直接调用改成经绝对地址的
+间接调用,而目标函数的入口未必有 BTI 落点 —— 实测直接 `Oops - BTI`。
+
+`ARM64_BTI` / `ARM64_BTI_KERNEL` 必须关。
+
+> 这两条的共同点很值得写进正文:**它们都是"把间接调用变得更安全"的机制,
+> 而本方案为了位置无关恰恰在制造间接调用。** 冲突是结构性的,不是配置问题。
+
+---
+
+## 9. 验证
+
+### 9.1 判据与工具
+
+`scripts/ikaslr/verify_movable.py` 反汇编 `[__rand_text_start, __rand_text_end)`,
+按 §3.2 的判据逐条检查。**每次改动 pass 之后都应该跑。**
+
+它同时输出不合格的函数名,供"编译 → 扫描 → 剔除 → 重编"的迭代使用 ——
+静态启发式筛选必然有漏网(尤其是内联汇编展开的 per-CPU 访问),
+**这一步不能省**。
+
+### 9.2 一处必须知道的假阳性:`static_cpu_has()`
+
+检查器曾把 13 个 vmalloc / 页表族函数报成不可搬移:
+
+```
+is_vmalloc_addr_body
+    到区域外的直接调用/跳转: jmp ffffffff82b57148 <_einittext+0x2676>
 ```
 
-## 10. 仍未做的
+目标在 `.altinstr_aux` 节里,是 `static_cpu_has()` 的辅助代码(测 CPU 特性后
+跳回函数体)。而**那条跳出去的 `jmp` 在启动时会被 `apply_alternatives()` 改写掉** ——
+实测这 13 个函数的 23 处跳出区域的 `jmp`,**100% 被 `.altinstructions` 覆盖**。
+
+变体是在 alternatives 应用**之后**从映像复制的,所以副本里根本没有那条 `jmp`。
+检查器查的是**启动前**的映像,因此误报。
+
+已修:检查器现在读 `.altinstructions`,对被覆盖的指令放行并单独计数。
+
+> **教训值得写进正文:判定可搬移性必须考虑启动期的代码改写,只看静态映像会误判。**
+
+### 9.3 实测结果
+
+| 架构 | 范围 | 结果 |
+|---|---|---|
+| x86-64 | S3 = 496 个函数,区域 165 KB | `(%rip)` 残留 **0**,区域外直接跳转 **0**;3/3 干净启动,自测与并发压力全过 |
+| AArch64 | S1 = 19 个函数 | `adrp` 残留 **0**;QEMU TCG 启动 + 自测通过 |
+
+---
+
+## 10. 代价
+
+### 10.1 代码体积
+
+**纯物化开销**(x86-64,S3 = 480 个函数,区域 159 631 B):
+
+| 项 | 数量 |
+|---|---:|
+| `movabs`(绝对物化) | 6 359 处 |
+| 其中产生间接调用的 | 4 319 处 |
+| 其余是数据引用 | 2 040 处 |
+
+估算净增:调用类每处 `10 + 2 − 5 = +7` B(`movabs` + `call *reg` 取代 `call rel32`),
+数据类每处 `10 − 7 = +3` B(`movabs` 取代 `lea off(%rip)`),合计
+
+```
+4319 × 7 + 2040 × 3 ≈ 36 KB  ≈ 区域的 23%  ≈ 每函数 76 B
+```
+
+数据类那一项是**下界**:base 里若原本是 `mov off(%rip),%rax`(7 B,一步取值),
+改写后是 `movabs` + `mov (%rax),%rax` = 13 B,净 +6 而不是 +3。
+取另一端的假设(所有 `movabs` 都是净增的 10 B)得到上界 ≈ 50 KB ≈ **32%** ≈ 每函数 105 B。
+所以纯物化开销的区间是**区域的 23%–32%,每函数 76–105 B**,报数时给区间而不是单点。
+
+**而端到端量出来的是 +62.4%**(同一批 481 个函数:base 96 275 B → 函数体 156 321 B,
+平均 200 → 325 B)。两个数不一致,因为端到端那个是**净值**,里面混着两个方向相反的效应:
+
+- **(+) 物化**让代码变大 —— 上面的 23%–32%;
+- **(−) `noinline`** 消掉了原本散在各调用者里的内联副本。
+
+实测的一个例子:`next_zone` 在 base 里 105 B、在 +R 里只有 49 B ——
+因为 base 把一个被调函数内联了进来,而那个被调函数也在随机化名单里、被打了
+`noinline`,于是 +R 里它变成一次尾调用。
+
+> 报数时**必须说清是哪个口径**。单说"+62.4%"会被追问"里面有多少是 noinline 的影响"。
+
+另外,`fixed_out`(离开区域时的白名单检查与计数记账)是**另一笔**开销:
+同一份名单开关它,区域从 107 471 B 变成 159 631 B,**+48.5%**。那不属于位置无关改造。
+
+### 10.2 运行时开销
+
+位置无关本身的运行时代价很小:间接转移净开销实测 **0.5–1.4 ns/次**
+(把 `call rel32` 换成 `movabs` + `call *reg`)。
+
+真正的大头在跳板的进出记账,不在这里 —— `fixed_in` 合计 13.0 ns 里有 12.5 ns 是
+全局原子计数。详细的开销剖面见 `实验/E3-A-跳板机制完整开销剖面.md`。
+
+---
+
+## 11. 仍未做的
 
 | 项 | 说明 |
-| --- | --- |
-| ORC 表项搬移 | 当前用帧指针 unwinder 回避；完备方案见 §5.3 |
-| 全局引用的 ConstantExpr 覆盖面 | 已覆盖 GEP/bitcast 等常见形式；更奇特的常量表达式尚未穷举，判据是 §8 的静态扫描 |
-| arm64 共享 GOT | 当前每函数一个字面量池条目；论文 §3.4.3 的**共享**单表尚未实现（省体积，不影响正确性） |
-| 更大范围 | 目前验证到 S1（32 个函数）。S2/S3 需重跑 §8 的判据 |
+|---|---|
+| **arm64 共享 GOT** | 当前是**每函数一个字面量池**,同一个符号在多个函数体里各存一份。设计要的是共享表。只是空间开销,不影响正确性;作者 2026-09-10 决定不做 |
+| **ORC 展开表重定位** | ORC 按地址索引,代码搬走后查不到条目。当前强制改用帧指针 unwinder(四档一律相同,不影响对比公平性,也不影响运行正确性——只影响回溯可读性)。作者决定不做 |
+| **内联汇编里的全局引用** | §6.4 说明了为什么不改。理论可解(逐条改内核的位操作宏),代价与收益不成比例 |
+
+---
+
+## 12. 复现
+
+```sh
+# 编插件
+make -C tools/ikaslr/llvm
+
+# x86-64
+IKASLR_FUNCS=$PWD/scripts/ikaslr/funcs/s3-full.txt \
+  make O=<build> CC=clang CRR_TRAMPOLINE=y -j$(nproc) bzImage
+python3 scripts/ikaslr/verify_movable.py <build>/vmlinux --arch x86_64
+
+# AArch64
+IKASLR_FUNCS=$PWD/scripts/ikaslr/funcs/s1-vfs.txt \
+  make O=<build> ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang \
+       CRR_TRAMPOLINE=y -j$(nproc) Image
+python3 scripts/ikaslr/verify_movable.py <build>/vmlinux --arch arm64
+
+# 看生成出来的样子
+objdump -d --disassemble='dput_body' <build>/vmlinux | head -20
+```
+
+**强制配置**(四档一律相同,见 §8):
+
+```
+x86-64 : RETPOLINE=n RETHUNK=n CPU_UNRET_ENTRY=n CALL_DEPTH_TRACKING=n
+         UNWINDER_ORC=n UNWINDER_FRAME_POINTER=y
+arm64  : ARM64_BTI=n ARM64_BTI_KERNEL=n
+```
