@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 402" width="720" height="402"
+     font-family="PingFang SC, Hiragino Sans GB, Noto Sans CJK SC, Microsoft YaHei, sans-serif">
+<!-- 图 5-5 跳板处的分区验证 -->
+<defs>
+  <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#000"/></marker>
+  <marker id="ahs" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#000"/></marker>
+  <marker id="oah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0.6,0.6 L7,4 L0.6,7.4 z" fill="#fff" stroke="#000" stroke-width="1"/></marker>
+  <marker id="ahb" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#0072B2"/></marker>
+  <marker id="ahr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#D55E00"/></marker>
+  <marker id="ahg" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#555"/></marker>
+  <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#fff"/><line x1="0" y1="0" x2="0" y2="6" stroke="#000" stroke-width="1"/></pattern>
+  <pattern id="hatch2" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><rect width="5" height="5" fill="#fff"/><line x1="0" y1="0" x2="0" y2="5" stroke="#000" stroke-width="0.7"/></pattern>
+  <pattern id="dots" width="5" height="5" patternUnits="userSpaceOnUse"><rect width="5" height="5" fill="#fff"/><circle cx="2.5" cy="2.5" r="0.9" fill="#000"/></pattern>
+</defs>
+<style>
+  text  { fill:#000; }
+  .lbl  { font-size:11.5px; letter-spacing:.06em; }
+  .box  { fill:#fff; stroke:#000; stroke-width:1.2; }
+  .thick{ fill:#fff; stroke:#000; stroke-width:2; }
+  .plain{ fill:#fff; stroke:#000; stroke-width:0.8; }
+  .nr   { fill:#fff; stroke:#000; stroke-width:1.2; stroke-dasharray:6 3; }
+  .tr   { fill:#fff; stroke:#0072B2; stroke-width:2; }
+  .rd   { fill:#F0F0F0; stroke:#000; stroke-width:1.2; stroke-dasharray:1.5 2.5; }
+  .dt   { fill:#E3EEF7; stroke:#0072B2; stroke-width:2; }
+  .hw   { fill:#EDEDED; stroke:#555; stroke-width:1.2; }
+  .ours { fill:#E3EEF7; stroke:#0072B2; stroke-width:2; }
+  .dis  { fill:#fff; stroke:#000; stroke-width:0.8; stroke-dasharray:2 2; }
+  .concl{ fill:#E3EEF7; stroke:#0072B2; stroke-width:1.6; }
+  .ghost{ fill:#fff; stroke:#D55E00; stroke-width:1.2; stroke-dasharray:4 3; }
+  .trap { fill:url(#hatch); stroke:#000; stroke-width:1.2; }
+  .shade{ fill:url(#hatch2); stroke:#000; stroke-width:1; }
+  .dotf { fill:url(#dots); stroke:#000; stroke-width:1.2; }
+  .c5   { fill:#fff; stroke:#000; stroke-width:1.2; }
+  .bt   { font-size:12.5px; text-anchor:middle; }
+  .btl  { font-size:12.5px; }
+  .bs   { font-size:11px; text-anchor:middle; }
+  .bsl  { font-size:11px; }
+  .ttl  { font-size:13.5px; font-weight:bold; text-anchor:middle; }
+  .ttll { font-size:13.5px; font-weight:bold; }
+  .mono { font-family:"SF Mono",Menlo,Consolas,"Courier New",monospace; font-size:11.5px; }
+  .monos{ font-family:"SF Mono",Menlo,Consolas,"Courier New",monospace; font-size:10.5px; }
+  .mn   { fill:#000; font-weight:bold; }
+  .off  { fill:#555; }
+  .cap  { font-size:11px; fill:#333; }
+  .capc { font-size:11px; fill:#333; text-anchor:middle; }
+  .note { font-size:11.5px; }
+  .key  { font-size:11.5px; font-weight:bold; fill:#0072B2; }
+  .keyc { font-size:11.5px; font-weight:bold; text-anchor:middle; fill:#0072B2; }
+  .red  { font-size:11.5px; font-weight:bold; fill:#D55E00; }
+  .redc { font-size:11.5px; font-weight:bold; text-anchor:middle; fill:#D55E00; }
+  .good { font-size:11.5px; font-weight:bold; }
+  .goodc{ font-size:11.5px; font-weight:bold; text-anchor:middle; }
+  .gold { font-size:11.5px; font-weight:bold; }
+  .cf   { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#ah); }
+  .cfb  { fill:none; stroke:#0072B2; stroke-width:2; marker-end:url(#ahb); }
+  .cfg  { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#ah); }
+  .cfr  { fill:none; stroke:#D55E00; stroke-width:1.6; stroke-dasharray:7 3; marker-end:url(#ahr); }
+  .cfy  { fill:none; stroke:#0072B2; stroke-width:2; marker-end:url(#ahb); }
+  .cfm  { fill:none; stroke:#000; stroke-width:0.9; marker-end:url(#ahs); }
+  .cfo  { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#oah); }
+  .df   { fill:none; stroke:#555; stroke-width:1.1; stroke-dasharray:4 3; marker-end:url(#ahg); }
+  .dfb  { fill:none; stroke:#0072B2; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahb); }
+  .dfr  { fill:none; stroke:#D55E00; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahr); }
+  .dfy  { fill:none; stroke:#0072B2; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahb); }
+  .dep  { fill:none; stroke:#000; stroke-width:1.1; stroke-dasharray:6 4; marker-end:url(#ahs); }
+  .ln   { fill:none; stroke:#000; stroke-width:1.1; }
+  .lnr  { fill:none; stroke:#D55E00; stroke-width:1.6; }
+  .lng  { fill:none; stroke:#000; stroke-width:1.3; }
+  .dash { fill:none; stroke:#000; stroke-width:1; stroke-dasharray:5 4; }
+  .div  { stroke:#000; stroke-width:0.6; }
+  .axis { stroke:#000; stroke-width:1.1; fill:none; }
+  .grid { stroke:#999; stroke-width:0.5; stroke-dasharray:2 3; }
+</style>
+<rect width="720" height="402" fill="#fff"/>
+<text class="lbl" x="30" y="40">进入随机化区域</text>
+<text class="lbl" x="380" y="40">离开随机化区域</text>
+<rect class="nr" x="30" y="56" width="310" height="40"/>
+<text class="bt" x="185" y="80">非随机化区域：CallSite → 函数指针 p</text>
+<path class="cf" d="M185,96 L185,116"/>
+<rect class="tr" x="30" y="116" width="310" height="120"/>
+<text class="ttll" x="42" y="136">入口</text>
+<text class="monos" x="44" y="158" xml:space="preserve"><tspan class="mn">cmp</tspan>  p, 跳板区下界</text>
+<text class="monos" x="44" y="175" xml:space="preserve"><tspan class="mn">ccmp</tspan> p, 跳板区上界<tspan class="off">     ; 范围检查</tspan></text>
+<text class="monos" x="44" y="192" xml:space="preserve"><tspan class="mn">b.hi</tspan> .Lviolation</text>
+<text class="monos" x="44" y="209" xml:space="preserve">计数 / 深度进出，blr [target]</text>
+<path class="cf" d="M185,236 L185,256"/>
+<rect class="rd" x="30" y="256" width="310" height="40"/>
+<text class="bt" x="185" y="280">随机化区域：只能落在函数入口</text>
+<text class="cap" x="30" y="318">保证：以调用形式进入的控制流只能落在函数入口，</text>
+<text class="cap" x="30" y="334">因为跳板是调用进入该区域的唯一形式。</text>
+<text class="cap" x="30" y="350">返回方向经标记落到函数内偏移，由标记的栈槽签名约束。</text>
+<rect class="rd" x="380" y="56" width="310" height="40"/>
+<text class="bt" x="535" y="80">随机化函数体：bl fixed_out_G</text>
+<path class="cf" d="M535,96 L535,116"/>
+<rect class="tr" x="380" y="116" width="310" height="120"/>
+<text class="ttll" x="392" y="136">出口</text>
+<text class="monos" x="394" y="158" xml:space="preserve"><tspan class="mn">autia</tspan> x16, H(&amp;callsite)<tspan class="off">  ; 认证：来源真实性</tspan></text>
+<text class="monos" x="394" y="175" xml:space="preserve"><tspan class="mn">bl</tspan>   whitelist_check<tspan class="off">     ; 白名单：集合成员性</tspan></text>
+<text class="monos" x="394" y="192" xml:space="preserve">两项都通过才放行</text>
+<text class="monos" x="394" y="209" xml:space="preserve"><tspan class="mn">bl</tspan> G；返回时按标记解析</text>
+<path class="cf" d="M535,236 L535,256"/>
+<rect class="nr" x="380" y="256" width="310" height="40"/>
+<text class="bt" x="535" y="280">非随机化区域：G（布局不变）</text>
+<text class="cap" x="380" y="318">仅白名单：可换成白名单内另一个合法目标；</text>
+<text class="cap" x="380" y="334">仅认证：可复用别处合法签发的指针；</text>
+<text class="cap" x="380" y="350">两者叠加才构成完整约束。</text>
+<rect class="nr" x="30" y="376" width="22" height="13"/>
+<text class="cap" x="58" y="386">非随机化区域</text>
+<rect class="tr" x="142" y="376" width="22" height="13"/>
+<text class="cap" x="170" y="386">出入口</text>
+<rect class="rd" x="221" y="376" width="22" height="13"/>
+<text class="cap" x="249" y="386">随机化区域</text>
+<path class="cf" d="M322,382 L352,382"/>
+<text class="cap" x="358" y="386">控制流</text>
+</svg>

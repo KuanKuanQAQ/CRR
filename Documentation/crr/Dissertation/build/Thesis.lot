@@ -1,0 +1,38 @@
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {1-1}{\ignorespaces \enspace Linux 内核 CVE 的缺陷类型分布}}{2}{table.caption.16}%
+\contentsline {table}{\numberline {1-2}{\ignorespaces \enspace Linux 内核 CVE 所涉代码的可模块化性}}{5}{table.caption.18}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {2-1}{\ignorespaces \enspace Linux 内核镜像中可利用 gadget 的分布}}{16}{table.caption.20}%
+\contentsline {table}{\numberline {2-2}{\ignorespaces \enspace 持续随机化代表性工作的横向对比}}{20}{table.caption.22}%
+\contentsline {table}{\numberline {2-3}{\ignorespaces \enspace 安全不变式的维持与论证方式}}{32}{table.caption.26}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {3-1}{\ignorespaces \enspace 本章使用的随机化范围}}{36}{table.caption.28}%
+\contentsline {table}{\numberline {3-2}{\ignorespaces \enspace 图~\ref {fig:3-2} 中每一步之后的执行流状态}}{39}{table.caption.30}%
+\contentsline {table}{\numberline {3-3}{\ignorespaces \enspace 一次跨区域调用往返的指令序列与周期分析}}{41}{table.caption.31}%
+\contentsline {table}{\numberline {3-4}{\ignorespaces \enspace 单次随机化的时间分解}}{49}{table.caption.35}%
+\contentsline {table}{\numberline {3-5}{\ignorespaces \enspace 不可随机化函数的分类}}{50}{table.caption.36}%
+\contentsline {table}{\numberline {3-6}{\ignorespaces \enspace 实验平台与配置}}{51}{table.caption.37}%
+\contentsline {table}{\numberline {3-7}{\ignorespaces \enspace 随机化抵达至开始的延迟}}{52}{table.caption.38}%
+\contentsline {table}{\numberline {3-8}{\ignorespaces \enspace 随机化开始至完成、完成至释放与抵达至释放的时长}}{53}{table.caption.40}%
+\contentsline {table}{\numberline {3-9}{\ignorespaces \enspace 四种方法在三个关键时刻上的时效对比}}{53}{table.caption.41}%
+\contentsline {table}{\numberline {3-10}{\ignorespaces \enspace 随机化四个核心子系统的端到端开销}}{55}{table.caption.43}%
+\contentsline {table}{\numberline {3-11}{\ignorespaces \enspace 与已有持续随机化工作的同条件对比}}{55}{table.caption.44}%
+\contentsline {table}{\numberline {3-12}{\ignorespaces \enspace 跨区域调用频度与常驻开销随随机化范围的变化}}{57}{table.caption.47}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {4-1}{\ignorespaces \enspace 两级跳板各段的指令序列与周期分析}}{67}{table.caption.50}%
+\contentsline {table}{\numberline {4-2}{\ignorespaces \enspace 两个平台单次检测开销的分解}}{72}{table.caption.53}%
+\contentsline {table}{\numberline {4-3}{\ignorespaces \enspace 各类负载下的触发频率与读取来源}}{73}{table.caption.54}%
+\contentsline {table}{\numberline {4-4}{\ignorespaces \enspace 检测到随机化完成的延迟分布}}{73}{table.caption.55}%
+\contentsline {table}{\numberline {4-5}{\ignorespaces \enspace 泄露地址利用竞态的结果}}{74}{table.caption.56}%
+\contentsline {table}{\numberline {4-6}{\ignorespaces \enspace 未激活与激活状态在真实规模下的单次调用开销}}{76}{table.caption.58}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {5-1}{\ignorespaces \enspace 合法目标数分布对比}}{88}{table.caption.64}%
+\contentsline {table}{\numberline {5-2}{\ignorespaces \enspace 类型哈希机制下最大的几个等价类}}{89}{table.caption.65}%
+\contentsline {table}{\numberline {5-3}{\ignorespaces \enspace 三档上下文策略在三个快照时刻的精度}}{91}{table.caption.67}%
+\contentsline {table}{\numberline {5-4}{\ignorespaces \enspace 高扇入函数识别的收敛}}{91}{table.caption.68}%
+\contentsline {table}{\numberline {5-5}{\ignorespaces \enspace 两种随机化原语的对照}}{93}{table.caption.70}%
+\contentsline {table}{\numberline {5-6}{\ignorespaces \enspace 施加本章机制前后的效果}}{94}{table.caption.71}%
+\contentsline {table}{\numberline {5-7}{\ignorespaces \enspace 向各方法移植所需的改造}}{96}{table.caption.74}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }

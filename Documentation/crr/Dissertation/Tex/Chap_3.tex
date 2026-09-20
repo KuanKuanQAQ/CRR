@@ -1,0 +1,663 @@
+%% 第 3 章  作者直接维护此文件；md2tex.py 不再生成
+\chapter{基于跳板函数的低开销持续随机化方法}
+\label{chap:3}
+
+\section{引言}
+
+Linux 内核的 built-in 代码指在任何配置下都无法编译为模块、只能静态链接进内核映像的代码。虚拟文件系统、网络核心与内存管理等核心子系统都属于 built-in 代码，它们是内核中执行最频繁的路径。
+
+现有的内核持续随机化方法以模块与驱动为对象，其可行性建立在模块与核心内核之间存在一道有限而明确的接口之上：模块只经导出符号表调用内核，内核只经注册的操作表回调模块，全部跨界引用可以收拢进一张表。Built-in 代码之间的调用密集而直接，没有这道边界，这些方法因而在原理上无法随机化它。而 built-in 代码恰恰需要随机化：表~\ref{tab:1-2} 的统计表明，2024 年 1 月至 2026 年 8 月公开的内核漏洞中有 21.6\% 涉及 built-in 代码，这部分漏洞位于现有方法的保护范围之外。本章的目标是提出一种 built-in 代码的持续随机化方法，把随机化保护扩展到内核核心子系统。
+
+把持续随机化施加到 built-in 代码上，代价集中在两处：每次随机化都要更新指向被搬移代码的全部索引，而 built-in 代码之间的引用密集且散布在代码、数据与 per-CPU 区域中；随机化前必须确认没有执行流停留在将被搬移的代码里，而 built-in 代码大量运行在中断、软中断与关抢占区间这类无法被调度器暂停的上下文中。本章以位置固定的跳板函数集中代码索引，使一次随机化的改写量只与随机化函数个数相关而与调用点数量无关；以跳板上的进出计数确定安全的暂停点，使随机化不必保留任何旧代码副本，并及时执行。
+
+与现有方法相比，本章提出的随机化方法有三个贡献：随机化的关键路径上只改写跳板中的目标地址，单次随机化的停顿短；不保留旧副本，已泄露的地址在切换完成的那一刻就真正过期；函数指针的取值恒为跳板地址，内核中把函数地址当作数值使用的大量代码模式不受影响。
+
+本章的组织如下。第 3.2 节说明 built-in 代码为何使索引更新与安全暂停成为新问题，并归纳本章面对的挑战；第 3.3 节给出系统设计，包括总体架构、跳板函数的指令序列与周期分析、函数粒度的位置无关代码、以及执行流追踪与安全暂停；第 3.4 节给出编译器与运行时的实现，并划定可随机化的边界；第 3.5 节评估；第 3.6 节给出安全性分析；第 3.7 节小结。
+
+\section{研究背景与动机}
+
+\subsection{Built-in 代码的代码索引更新}
+
+持续随机化每移动一个函数，所有指向它的引用都要相应更新。这些引用统称为代码索引，包括代码中的直接调用与跳转、数据段中保存函数地址的变量、栈上的返回地址、以及各类偏移表中的条目。索引更新的规模决定了一次随机化的代价。
+
+模块与核心内核之间存在有限且明确的接口。模块只经由导出符号表调用内核，内核只经由注册的操作表回调模块。Adelie\citep{nikolaev2022adelie} 正是利用这一点，把模块的全部外部引用收拢进一张只读的全局偏移表，随机化时只改表项；模块内部的引用则由位置无关编译消除。这条路线的每一步都依赖那道接口边界。
+
+Built-in 代码没有这道边界。核心子系统之间的调用关系密集、直接且动态：虚拟文件系统直接调用块层与内存管理，网络核心直接调用内存分配与调度器，函数地址以绝对值散布在代码段的直接调用、数据段的操作表、以及 per-CPU 区域中。指针追踪类方案（Shuffler\citep{williams2016shuffler} 路线）在随机化时逐处改写这些引用，更新量正比于引用数量。跳转表类方案把代码指针换成表的下标，随机化时只重排表项，但它改变了指针的语义：C 语言允许数据与指针自由转换，赋值时无法判定一个值最终会被当作数值参与运算还是被当作地址解引用，而内核中把函数地址当作数值比较、哈希与反查的场合极多，这类方案在内核中无法成立。
+
+索引更新在 built-in 场景下因此是一个新问题。
+
+\subsection{Built-in 代码的执行流暂停}
+
+随机化一个函数之前必须确认没有执行流正在其中运行。
+
+模块代码大多运行在可调度的上下文中，Adelie 以 \lstinline[breaklines=false]@schedule_on_each_cpu()@ 配合 RCU 宽限期即可确保没有执行流停留在被搬移的模块代码里：宽限期结束意味着每个处理器核都经历过一次调度，任何在旧代码中的执行流都已退出。Built-in 代码不满足这一前提。中断处理程序不接受调度；软中断与 RCU 读侧临界区在关抢占的条件下运行；持有自旋锁的区间不能睡眠；长驻的内核线程可能长时间不经过调度点。宽限期式的判据对这些上下文一概失效，而它们恰恰是核心子系统的常态。
+
+回避暂停的做法是保留旧副本。Shuffler 采用异步洗牌，随机化时不回收旧代码，让仍在旧代码中执行的线程自然结束。这在用户态可行，因为进程的执行路径通常很快经过一次系统调用边界；在 built-in 代码的长执行路径下，旧副本会长期存活并累积，成为位置稳定的 gadget 来源，已泄露的地址因而并不过期，与持续随机化的目的直接冲突。安全暂停在 built-in 场景下因而也是一个新问题。
+
+\subsection{研究动机与挑战}
+
+上两节归纳出现有方法在 built-in 代码上的三处不足：索引更新量随引用密度膨胀，没有边界可以把引用收拢；暂停机制与无副本性质冲突，要么覆盖不到非抢占上下文，要么留下旧副本；已有的内核方案都以模块边界为前提，而 built-in 代码没有这条边界。
+
+本章要面对的挑战相应有三。其一，如何使一次随机化的索引更新量只与被随机化函数的个数相关，且不改变函数指针的值语义。其二，如何在不保留旧副本的前提下确定安全的暂停点，使切换完成的那一刻起旧地址就不再可执行。其三，如何覆盖中断、异常与关抢占区间这类无法被调度器暂停的上下文，既不造成死锁，也不把随机化区域关停一段不确定的时间。
+
+\section{系统设计}
+
+\subsection{总体架构}
+
+本章机制由编译期与运行期两部分构成，图~\ref{fig:3-1} 给出其总体结构：左侧为编译期的三项改造，右侧为运行期的三个区域与随机化线程，随机化线程在关键路径上只改写跳转桩。
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\textwidth,height=0.46\textheight,keepaspectratio]{schematic/ch3-architecture-mono}
+    \bicaption{\enspace 本章机制的总体架构}{\enspace Overall Architecture of the Proposed Mechanism}
+    \label{fig:3-1}
+\end{figure}
+
+编译期由 LLVM 扩展完成三项工作：把随机化区域内的函数改造为函数粒度的位置无关代码，为每个函数生成跳板，并把所有跨越区域边界的控制流重定向到跳板。产物是一份内核映像，其中被随机化的函数体落在一个独立的段中，跳板与目标地址表落在位置固定的区域。
+
+运行期的内核地址空间分为三个区域。随机化区域容纳函数体的当前变体，每个周期整体重排一次；跳板区域位置固定，每个随机化的函数在其中有一个入口跳板，每个随机化代码调用的外部函数在其中有一个出口跳板；非随机化区域是内核其余的全部代码，位置固定。随机化线程按固定间隔驱动，同时维护两项运行期状态：记录区域内的执行流数目以及预先分配好的代码变体池。一次随机化中真正落在关键路径上的改写只有跳板中的目标地址。变体的准备与旧变体的回收都在关键路径之外完成。这是本章随机化开销低的原因。
+
+\textbf{随机化对象的选取。} 随机化区域由编译期给定的函数集合构成，集合以子系统累加而成。表~\ref{tab:3-1} 列出本章使用的全部范围，后文各实验取自该表。默认范围取虚拟文件系统核心、块层、网络核心与内存管理四个子系统。选取的依据是：第 1.2 节的统计表明，涉及只能内建代码的漏洞大部分分布在这四个子系统；四者又覆盖了内核中最热的路径与最多样的调用模式。表中前三档是默认范围的前缀，用于观察开销随规模的变化；外推范围在四个子系统之外再加入调度器、中断、IPv4 与进程间通信四个子系统，只用于第 3.5.5 节；驱动对照范围与已有工作的随机化对象相同，只用于第 3.5.4 节的同条件对比。每一档的函数集合在构建时按第 3.4.3 节的判据剔除不可随机化的函数，表中的函数数为剔除后的实际值。
+
+\begin{table}[!htbp]
+    \bicaption{\enspace 本章使用的随机化范围}{\enspace Composition of the Randomization Scopes Used in This Chapter}
+    \label{tab:3-1}
+    \centering
+    \scriptsize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.25}
+    \resizebox{\ifdim\width>\textwidth\textwidth\else\width\fi}{!}{%
+    \begin{tabular}{llrrll}
+        \hline
+        范围 & 构成 & 函数数 & 占比 & 代表的调用模式 & 用于\\
+        \hline
+        文件系统核心 & 虚拟文件系统核心文件 & 40 & 0.07\% & 频繁的间接调用与深调用链 & 表~\ref{tab:3-4}、表~\ref{tab:3-12}\\
+        加块层 & 前一档加 \lstinline[breaklines=false]@block/@ & 128 & 0.21\% & I/O 完成路径上的软中断上下文 & 表~\ref{tab:3-4}、表~\ref{tab:3-12}\\
+        加网络核心 & 前一档加 \lstinline[breaklines=false]@net/core/@ & 208 & 0.34\% & 高频的小包处理路径 & 表~\ref{tab:3-4}、表~\ref{tab:3-12}\\
+        默认范围 & 前一档加 \lstinline[breaklines=false]@mm/@ 分配路径 & 483 & 0.80\% & 共用分配路径与关抢占区间 & 其余全部实验\\
+        外推范围 & 默认范围加调度器等四个子系统 & 3,285 & 5.3\% & 约四成 built-in 代码 & 表~\ref{tab:3-12}\\
+        驱动对照 & NVMe 与 E1000e 驱动 & 491 & 0.81\% & 与已有工作相同的对象 & 表~\ref{tab:3-11}\\
+        \hline
+    \end{tabular}
+    }
+\end{table}
+
+\subsection{跳板函数的设计}
+
+跳板函数是本章的核心。它分为方向相反的两类。入口跳板 \lstinline[breaklines=false]@fixed_in@ 负责从非随机化区域进入随机化区域，每个被随机化的函数对应一个；出口跳板 \lstinline[breaklines=false]@fixed_out@ 负责从随机化区域离开，每个随机化函数调用的外部函数对应一个。以下按进入方向、返回方向、出口跳板、跳转桩与返回标记的解析五段给出指令序列，每段之后说明该段做了什么（以 AArch64 记法示意，x86-64 的形式同构）。清单中的指令为示意记法，原子加一、屏障与返回标记的装载在实现中分别展开为具体的原子指令、相应作用域的屏障与多条立即数装载指令。
+
+\textbf{入口跳板：进入方向。} 入口跳板有两种到达方式：区域外的调用点以 \lstinline[breaklines=false]@bl fixed_in_F@ 到达，区域内的调用点先把返回标记装入 x30 再以 \lstinline[breaklines=false]@b fixed_in_F@ 到达。跳板要做的第一件判断是这条执行流此前是否已在区域内，判据为当前任务的内外标志。
+
+\begin{lstlisting}[,numbers=none,basicstyle=\ttfamily\scriptsize,keepspaces=true]
+fixed_in_F:
+    ldr     w17, [x_cur, #inside]     ; 读当前任务的内外标志
+    stp     x17, x30, [sp, #-16]!     ; 保存进入前的标志与调用者的返回地址或标记
+    cbnz    w17, .Lnested             ; 标志为 1：区域内部的调用，不计数
+    mov     w16, #1
+    stadd   w16, [x_cnt]              ; 从区域外进入：活跃计数原子加一
+    dmb     ish                       ; 先加一，再查阻断标志
+    str     w16, [x_cur, #inside]     ; 标志置 1
+    ldr     w16, [x_flag]
+    cbnz    w16, .Lblocked            ; 已阻断：减一、标志清零，等待放行后重试
+    b       .Lcall
+.Lnested:
+    ldr     w16, [x_flag]
+    cbnz    w16, .Lblocked_in         ; 已阻断：计数减一并等待，放行后加一再继续
+.Lcall:
+    bl      stub_F                    ; 经跳转桩调用 F 的当前变体；F 返回时落回此处
+\end{lstlisting}
+
+标志为 0 说明执行流来自区域外，此时计数加一、标志置 1、再检查阻断标志。标志为 1 说明这是区域内部的一次调用，执行流在进入区域时已被计数，跳板因此不碰计数，只检查阻断标志。加一与查阻断标志之间的次序不能颠倒，屏障保证这一点：先加一再查，随机化线程只要读到计数为零，就可以断定没有执行流正处在进入的中途。进入前的标志与调用者留下的返回地址或返回标记一并压在跳板自己的栈帧里，返回方向据此在两条路径之间选择。
+
+\textbf{入口跳板：返回方向。} 函数体返回后落回跳板，接上面的 \lstinline[breaklines=false]@.Lcall@ 继续。
+
+\begin{lstlisting}[,numbers=none,basicstyle=\ttfamily\scriptsize,keepspaces=true]
+    ldp     x17, x30, [sp], #16       ; 恢复进入前的标志与调用者的返回地址或标记
+    cbnz    w17, .Lret_nested         ; 进入时已在区域内：返回到区域内的调用者
+    str     wzr, [x_cur, #inside]     ; 标志清零
+    mov     w16, #-1
+    stadd   w16, [x_cnt]              ; 活跃计数原子减一：执行流已离开区域
+    ret                               ; 回到区域外的原调用点
+.Lret_nested:
+    ldr     w16, [x_flag]
+    cbnz    w16, .Lblocked_in         ; 已阻断：计数减一并等待，放行后加一
+    b       resolve_token             ; 按 x30 中的标记解析到调用者的当前位置
+\end{lstlisting}
+
+返回方向与进入方向对称：进入时计了数的，返回时清标志并减一，以 \lstinline[breaklines=false]@ret@ 回到区域外的原调用点；进入时没计数的，返回时同样不碰计数，只查一次阻断标志，再按调用者留下的标记解析回区域内。两条路径的分叉完全由栈上恢复出的标志决定，跳板不需要知道调用者是谁。
+
+\textbf{出口跳板。} 出口跳板由函数体内把返回标记装入 x30 后以 \lstinline[breaklines=false]@b fixed_out_G@ 到达。它把执行流从区域内送出去，因而计数的增减与入口跳板相反。
+
+\begin{lstlisting}[,numbers=none,basicstyle=\ttfamily\scriptsize,keepspaces=true]
+fixed_out_G:
+    ldr     w17, [x_cur, #inside]     ; 读当前任务的内外标志
+    stp     x17, x30, [sp, #-16]!     ; 保存进入前的标志与返回标记
+    cbz     w17, .Lpassive            ; 标志为 0：未被计数的执行流，直接调用
+    str     wzr, [x_cur, #inside]     ; 标志清零
+    mov     w16, #-1
+    stadd   w16, [x_cnt]              ; 活跃计数减一：执行流离开区域
+    bl      whitelist_check           ; 确认 G 属于编译期确定的合法出站目标
+.Lpassive:
+    bl      G                         ; 调用外部函数，G 位于非随机化区域
+    ldp     x17, x30, [sp], #16
+    cbz     w17, .Lresolve
+    mov     w16, #1
+    stadd   w16, [x_cnt]              ; 回到区域：加一，同样先加一再查阻断标志
+    dmb     ish
+    str     w17, [x_cur, #inside]     ; 标志置 1
+    ldr     w16, [x_flag]
+    cbnz    w16, .Lblocked            ; 已阻断：减一、标志清零，等待放行后重试
+.Lresolve:
+    b       resolve_token             ; 按标记解析到 F 的当前位置并转移
+\end{lstlisting}
+
+离开时清标志、计数减一，并查询白名单确认目标属于编译期确定的合法出站目标集合。白名单约束的是从随机化区域内发出的跨区域转移这一类，区域内部的调用与非随机化区域内部的调用都不经过它。外部函数返回后重新加一、置标志并检查阻断标志，最后按返回标记解析到函数体的当前位置。执行流停留在外部函数期间不被计入活跃计数，这正是随机化得以在此期间搬走该函数的原因。
+
+\textbf{跳转桩。} 上面两段里出现的 \lstinline[breaklines=false]@stub_F@ 是跳板与函数体之间的唯一衔接点，它单独成区，与跳板段分离并按 2 的幂对齐。
+
+\begin{lstlisting}[,numbers=none,basicstyle=\ttfamily\scriptsize,keepspaces=true]
+stub_F:                               ; 第 k 个函数的桩对，位于 stub_base + 8k
+    b       F_entry                   ; 入口桩：fixed_in_F 的 bl stub_F 落在这里
+    b       F_reentry                 ; 重入桩：resolve_token 以算出的地址 br 到这里
+\end{lstlisting}
+
+跳转桩是一条直接分支指令，函数体的当前地址只以其立即数的形式存在，不以数据形式出现在内存中的任何位置，随机化时唯一需要改写的就是这条指令。每个函数有一对跳转桩：入口桩供调用路径使用，重入桩供返回标记的解析使用，二者指向同一函数体的不同位置，随机化时一并改写。两条指令共 8 字节且按 8 字节对齐，一次存储即可原子替换。
+
+\textbf{返回标记的解析与重入序列。} 前面几段里两次出现的 \lstinline[breaklines=false]@resolve_token@ 负责把栈上的返回标记翻译成函数体当前的地址。
+
+\begin{lstlisting}[,numbers=none,basicstyle=\ttfamily\scriptsize,keepspaces=true]
+; x30 = (k, Δ)，k 为跳板序号，Δ 为返回点在函数体内的偏移
+resolve_token:
+    and     x17, x30, #0xfffffe       ; x17 = Δ（去掉最低位的标记位）
+    lsr     x16, x30, #24             ; x16 = k
+    adr     x9,  stub_base            ; 跳转桩区基址，PC 相对
+    add     x16, x9, x16, lsl #3      ; stub_base + 8k，即 stub_F
+    add     x16, x16, #4              ; 再 +4，即重入桩 b F_reentry 这条指令
+    br      x16                       ; 执行重入桩，进入函数体的重入序列
+
+; 函数体位于随机化区域，随整体搬移；重入序列是函数体的一部分
+F_reentry:
+    adr     x16, F_entry              ; PC 相对取得当前入口，不读内存
+    add     x16, x16, x17             ; 加上 Δ
+    br      x16                       ; 落到 F 体内调用 G 的下一条指令
+F_entry:
+    ...                               ; 体内调用处：mov x30, #(k, Δ)
+                                      ; 再 b fixed_out_G 或 b fixed_in_B
+\end{lstlisting}
+
+解析分两步，且两步都不读内存。第一步在非随机化区域内完成，由跳板序号算出重入桩的地址；第二步在函数体内完成，由重入桩转入的重入序列以程序计数器相对的方式取得函数体当前的入口，加上偏移后转移到返回点。标记因此与函数体的位置无关，无论函数被搬移多少次，同一个 (k, Δ) 总是解析到当前变体中的同一条指令。
+
+跳板保留被随机化函数的原符号名，函数体改名落入随机化段，因此调用者一侧的源码与调用指令都不需要改动，原先直接调用该符号的位置现在调用的是跳板。
+
+图~\ref{fig:3-2} 以一条执行流从区域外进入随机化区域、在其中调出区域、再逐层返回的完整路径为例，给出这条路径经过的每一次控制流转移。图按区域分为四层，自上而下依次为非随机化区域、跳板区、跳转桩区与随机化区域，每一条箭头都是一次控制流转移，箭头旁标出对应的指令。控制流每改变一次所在区域，都要在跳板区落一次脚，这正是跳板作为区域边界唯一通道的含义。
+
+路径分四步。第一步，区域外的 x 以 \lstinline[breaklines=false]@bl@ 调用 \lstinline[breaklines=false]@fixed_in_A@，此时 x30 中是 x 内的返回地址；跳板读到标志为 0，计数加一、标志置 1、查阻断标志，再经入口桩到达 A 的当前位置。第二步，A 体内调用外部函数 y，先把标记 (kA, ΔA) 装入 x30 再 \lstinline[breaklines=false]@b fixed_out_y@；跳板把标志清零、计数减一并查白名单，此时计数为 0，栈上属于区域的只剩一个标记，随机化可以在此期间把 A 搬走。第三步，y 以 \lstinline[breaklines=false]@ret@ 回到 \lstinline[breaklines=false]@fixed_out_y@，跳板计数加一、标志置 1、查阻断标志，再由 \lstinline[breaklines=false]@resolve_token@ 按出栈的标记算出重入桩的地址并转移过去，经重入桩落到 A 体内调用点之后，无论 A 是否已被搬走。第四步，A 以 \lstinline[breaklines=false]@ret@ 回到 \lstinline[breaklines=false]@fixed_in_A@，跳板读出进入时保存的标志为 0，标志清零、计数减一，再以 \lstinline[breaklines=false]@ret@ 回到区域外的 x。
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\textwidth,height=0.46\textheight,keepaspectratio]{schematic/ch3-trampoline-paths}
+    \bicaption{\enspace 一次跨区域调用的控制流}{\enspace Control Flow of One Cross-Region Call}
+    \label{fig:3-2}
+\end{figure}
+
+四步之后的状态见表~\ref{tab:3-2}，其中活跃计数是安全暂停的判据，x30 携带的内容决定返回时走哪条路径。
+
+\begin{table}[!htbp]
+    \bicaption{\enspace 图~\ref{fig:3-2} 中每一步之后的执行流状态}{\enspace Execution-Flow State after Each Step in Figure 3-2}
+    \label{tab:3-2}
+    \centering
+    \scriptsize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.25}
+    \hyphenpenalty=10000\exhyphenpenalty=10000\emergencystretch=1em
+    \begin{tabular}{>{\raggedright\arraybackslash}p{\dimexpr 0.0640\textwidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr 0.2060\textwidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr 0.1700\textwidth-2\tabcolsep\relax}>{\raggedleft\arraybackslash}p{\dimexpr 0.1000\textwidth-2\tabcolsep\relax}>{\raggedleft\arraybackslash}p{\dimexpr 0.0900\textwidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr 0.3700\textwidth-2\tabcolsep\relax}}
+        \hline
+        步 & 转移 & x30 携带 & 本任务标志 & 活跃计数 & 该步之后执行流所在\\
+        \hline
+        1 & x $\rightarrow$ A & 返回地址 & 0 $\rightarrow$ 1 & 0 $\rightarrow$ 1 & A 体内，从区域外进入并被计数\\
+        2 & A $\rightarrow$ y & (kA, ΔA) & 1 $\rightarrow$ 0 & 1 $\rightarrow$ 0 & y 体内，栈上只剩一个标记\\
+        3 & y $\rightarrow$ A & (kA, ΔA) 出栈 & 0 $\rightarrow$ 1 & 0 $\rightarrow$ 1 & A 体内调用点之后，经重入桩落回\\
+        4 & A $\rightarrow$ x & 返回地址出栈 & 1 $\rightarrow$ 0 & 1 $\rightarrow$ 0 & 区域外的 x，执行流已离开区域\\
+        \hline
+    \end{tabular}
+\end{table}
+
+表~\ref{tab:3-2} 的四步都跨越区域边界，因此标志与计数每一步都变化。区域内部的调用是另一种情形：A 若调用同在随机化区域内的 B，控制流同样经 B 的入口跳板，但跳板读到标志已为 1，说明这条执行流在进入区域时已被计数，于是不碰计数，只查阻断标志；返回时同样只查一次阻断标志，再按 A 留下的标记解析回 A 体内。查阻断标志的位置共四处，即第一、三步这两个跨边界入站方向，以及区域内部调用的进入与返回：前者被拦住时撤销刚做的加一并在放行后重走进入序列，后者被拦住时计数减一等待，放行后加一再继续。第二、四步是出站，不拦。第二步之后计数为 0，这正是随机化可以开始的时刻，此时 A 的调用关系以标记的形式存在于栈上，搬走 A 不影响第三、四步。
+
+跳板的代价按指令序列分析如下。入口跳板在跨边界进入时由标志读取与保存、原子加一、屏障、标志检查，经跳转桩的两级直接分支，以及返回时的标志清零与原子减一构成；区域内部的调用只有标志读取与保存、两次阻断标志检查与标记解析，不含原子操作。出口跳板由离开时的标志清零与原子减一、白名单查询、对外部函数的调用、返回时的原子加一与标志检查、以及标记解析构成。表~\ref{tab:3-3} 给出各段的周期数。周期数由第 3.4.2 节微基准测得的各部分时长按测量机的时钟折算，各段的划分依据是微基准分项测得的时长；静态指令数由上面的序列直接数出。
+
+\begin{table}[!htbp]
+    \bicaption{\enspace 一次跨区域调用往返的指令序列与周期分析}{\enspace Instruction Sequence and Cycle Analysis of One Cross-Region Call Round Trip}
+    \label{tab:3-3}
+    \centering
+    \scriptsize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.25}
+    \hyphenpenalty=10000\exhyphenpenalty=10000\emergencystretch=1em
+    \begin{tabular}{>{\raggedright\arraybackslash}p{\dimexpr 0.2000\textwidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr 0.4000\textwidth-2\tabcolsep\relax}>{\raggedleft\arraybackslash}p{\dimexpr 0.1080\textwidth-2\tabcolsep\relax}>{\raggedleft\arraybackslash}p{\dimexpr 0.0650\textwidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr 0.2100\textwidth-2\tabcolsep\relax}}
+        \hline
+        段 & 指令 & 静态指令数 & 周期 & 备注\\
+        \hline
+        直接调用基线 & \lstinline[breaklines=false]@bl@ / \lstinline[breaklines=false]@ret@ & 2 & 约 4 & 被替换的原调用，作对照\\
+        入口，跨边界：标志读写、进入时加一与返回时减一 & \lstinline[breaklines=false]@ldr@ / \lstinline[breaklines=false]@stp@ / \lstinline[breaklines=false]@cbnz@ / \lstinline[breaklines=false]@mov@ / \lstinline[breaklines=false]@stadd@ / \lstinline[breaklines=false]@dmb@ / \lstinline[breaklines=false]@str@ / \lstinline[breaklines=false]@ldr@ / \lstinline[breaklines=false]@cbnz@ / \lstinline[breaklines=false]@b@ / \lstinline[breaklines=false]@ldp@ / \lstinline[breaklines=false]@cbnz@ / \lstinline[breaklines=false]@str@ / \lstinline[breaklines=false]@mov@ / \lstinline[breaklines=false]@stadd@ / \lstinline[breaklines=false]@ret@ & 16 & 约 36 & 原子操作落在被所有核共享的缓存行上，占往返的近七成\\
+        入口，区域内部调用：标志读取与两次阻断检查 & \lstinline[breaklines=false]@ldr@ / \lstinline[breaklines=false]@stp@ / \lstinline[breaklines=false]@cbnz@ / \lstinline[breaklines=false]@ldr@ / \lstinline[breaklines=false]@cbnz@ / \lstinline[breaklines=false]@ldp@ / \lstinline[breaklines=false]@cbnz@ / \lstinline[breaklines=false]@ldr@ / \lstinline[breaklines=false]@cbnz@ / \lstinline[breaklines=false]@b resolve_token@ & 10 & 约 8 & 不含原子操作，另计标记解析\\
+        入口：经跳转桩的两级直接分支 & \lstinline[breaklines=false]@bl stub_F@ / \lstinline[breaklines=false]@b F_entry@ & 2 & 约 1 & 两条直接分支，不访问内存\\
+        出口：标志读写、离开时减一与返回时加一 & \lstinline[breaklines=false]@ldr@ / \lstinline[breaklines=false]@stp@ / \lstinline[breaklines=false]@cbz@ / \lstinline[breaklines=false]@str@ / \lstinline[breaklines=false]@mov@ / \lstinline[breaklines=false]@stadd@ / \lstinline[breaklines=false]@ldp@ / \lstinline[breaklines=false]@cbz@ / \lstinline[breaklines=false]@mov@ / \lstinline[breaklines=false]@stadd@ / \lstinline[breaklines=false]@dmb@ / \lstinline[breaklines=false]@str@ / \lstinline[breaklines=false]@ldr@ / \lstinline[breaklines=false]@cbnz@ & 14 & 约 8 & \\
+        出口：白名单查询 & \lstinline[breaklines=false]@bl whitelist_check@（含查询例程） & 约 12 & 约 7 & 哈希定桶加桶内比对\\
+        出口：调用外部函数与标记解析 & \lstinline[breaklines=false]@bl G@ / \lstinline[breaklines=false]@b resolve_token@（解析后经重入桩 \lstinline[breaklines=false]@b@ / \lstinline[breaklines=false]@adr@ / \lstinline[breaklines=false]@add@ / \lstinline[breaklines=false]@br@） & 4 & 约 1.3 & 标记解析一项另计\\
+        一次跨边界往返合计（不含基线与内部调用） &  & 约 48 & 约 53 & \\
+        \hline
+    \end{tabular}
+\end{table}
+
+表~\ref{tab:3-3} 给出一个与直觉相反的结论：跳板引入的两级直接分支与标记解析合计大约 3 个周期，而入口跳板的计数进出占了约 36 个周期。跳板的常驻开销几乎全部来自执行流追踪，而非两次直接分支。区域内部的调用不碰计数，一次往返只有约 8 个周期，同样印证了这一点。这一结构性事实决定了优化的方向：一个不需要被计数的函数几乎不需要付跳板的代价。
+
+同一套跳板承担四项职责。地址翻译：随机化时只改写跳转桩，索引更新量降为每函数一项。执行流观测：进出计数精确给出当前正在区域内执行的执行流数目，这是安全暂停的判据。跨区域验证的施加点：所有跨区域转移必经跳板，因而跳板是施加控制流完整性检查的唯一位置，这与把代码指针集中到受隔离区域再逐次校验的思路\citep{kuznetsov2014cpi}同源，差别在于本章的集中点同时承担地址翻译，本章的白名单查询即在此施加，更强的检查可在同一位置叠加（本文原型见第 5 章）。返回地址的解析基准：跳转桩是函数当前位置的唯一记录，第 3.3.3 节的返回标记经重入桩解析。前两项是本章的直接需要，后两项使跳板成为整个系统的交汇点。已有工作中的跳板只做地址间接，本章把它同时用作区域边界上的观测点，由此得到的执行流信息使无副本随机化成为可能。
+
+\textbf{函数指针的语义分离。} 内核中函数地址被当作数值使用的场合很多：函数地址之间的比较与排序、以函数地址为键的哈希、\lstinline[breaklines=false]@printk("%pS")@ 类的符号反查、以及将函数地址与代码段边界作比较的检查。若函数指针的值随随机化而改变，这些用法都会失效。本章的解法直接来自跳板：跳板保留被随机化函数的原名，且位于位置固定的区域，因此对函数取地址得到的仍是跳板的地址，这是一个与随机化无关的稳定常量，可以安全参与任何数值运算；当该指针被用于调用时，控制流经跳板间接转移到函数体的当前地址。指针的值恒为固定的跳板地址，指针的控制流仍必经跳板，赋值语义与调用语义由此分离，且不需要为函数指针引入任何偏移量。
+
+\subsection{函数粒度位置无关代码}
+
+跳板解决的是函数之间的索引。函数内部的索引由位置无关的代码生成消除：函数内部的跳转随函数体整体迁移而相对距离不变，所以无需处理；真正需要处理的是函数体内指向区域之外的引用，即对全局变量的访问与对外部函数的调用。这些引用被消除之后，函数体可以被搬到任意地址而无需修改其内部的任何一条指令。
+
+问题的根源在于内核所用的代码模型。x86-64 的内核映像被链接到地址空间顶部的 2 GB 之内，其代码模型假定所有代码与数据都落在距当前程序计数器 ±2 GB 之内，因而把函数调用编译为 4 字节相对位移的直接调用、把全局变量访问编译为 4 字节的程序计数器相对寻址。这一选择为整个内核节省了大量指令字节与取指带宽。这类引用里保存的是相对位置而非绝对地址。相对位置在链接时计算得到之后，对应的重定位项即从内核映像中消失，运行期没有任何机制会重新计算它。
+
+这与地址空间布局随机化（KASLR）所改变的东西不同。KASLR 把整个内核映像平移同一个偏移量，调用点与目标同时移动，相对距离不变，内核启动时的重定位代码只修补绝对重定位。本章要做的是移动单个函数在内存中的位置：调用点动了而目标没动，距离随之改变。本节所说的位置无关，指的是单个函数可以相对于其余代码独立移动，这一性质严格强于整个映像可以换基址。
+
+本章的做法是保持内核原有的代码模型不变，由编译器插件只改写被选中函数内部的引用。插件在优化流水线末尾工作，对函数体内每一处操作数含有全局符号的指令，把它重建为先把目标地址物化到寄存器、再间接访问或转移的形式。改写规则统一在操作数这一层，并不按调用与取地址分类：直接调用的被调目标本身就是一个全局符号，被重建之后那条调用自然只能是间接的。绝对地址不随代码位置改变，这正是所需要的性质。
+
+两个平台的物化手段不同，差异的根源在于指令集能否直接编码 64 位绝对地址。x86-64 有把 64 位立即数装入寄存器的指令，直接调用被改写为物化地址加间接调用，全局变量访问被改写为物化地址加间接访问；该架构在 64 位模式下没有以绝对立即数为目标的近调用编码，能够到达任意 64 位地址的只有间接形式，因此占两条指令是指令集的要求。这一形式在编译器的中间表示层无法直接表达：把符号转成整数再转回指针会被后端折叠回相对调用，可靠的表达方式是借助带符号约束的内联汇编，由汇编器发出 64 位绝对重定位，由链接器填入最终地址。
+
+AArch64 没有 64 位立即数指令，装入一个 64 位值需要四条指令分段拼装。卡住这条路的并非拼装本身，而是这里要装入的是符号地址，分段拼装需要四条修改指令立即数字段的重定位，而内核映像以位置无关可执行文件的方式链接，链接器拒绝这类重定位。可行的做法是让汇编器在函数所在的节内放一条 8 字节字面量，用程序计数器相对的加载指令取它。这一做法成立的条件是两件事同时满足：加载指令虽然是相对寻址，但目标在函数体内，字面量与函数体同属一个节、一起搬移，节内偏移不变；而字面量本身是数据，其绝对重定位为位置无关链接所允许。字面量池的实质，是把需要加载期修补的内容从指令字段移到数据字里。图~\ref{fig:3-3} 对照两个平台的物化形式，左为 x86-64 把地址编进指令立即数，右为 AArch64 把地址放进节内字面量池并以节内偏移取用。
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\textwidth,height=0.46\textheight,keepaspectratio]{schematic/ch3-abs-materialization}
+    \bicaption{\enspace 两个平台的绝对地址物化形式}{\enspace Forms of Absolute-Address Materialization on the Two Platforms}
+    \label{fig:3-3}
+\end{figure}
+
+两个平台的代价分布恰好相反：在 AArch64 上，取全局变量的值在基线下本就需要两条指令，改写后仍是两条，代价集中在函数调用；在 x86-64 上，调用只是由 5 字节增至 12 字节，而数据访问一侧每一处都在增长。
+
+共享偏移表在两个平台上的地位因此不同。在 x86-64 上，把地址集中到一张表里只是缩减体积的可选优化。在 AArch64 上，把地址放进随函数搬移的数据中是必需的一层，但共享一张表另有量程限制：字面量加载指令的偏移量程约为 ±1 MB，而函数体会被搬到与映像相距数十太字节处，一张全局共享表很难始终落在量程之内。当前实现把池放在函数体同节之内、紧随其后，天然满足量程约束，代价是同一符号在多个函数体中各存一份。无论采用哪种形式，表中都不保存外部函数地址：该表在持续随机化过程中必须保持可写以便更新，若其中保存函数地址，攻击者读表即可直接获得代码布局。外部函数的调用一律经出口跳板处理，表中只留全局变量地址。
+
+插件明确不改写内联汇编。内联汇编的操作数可能带有要求立即数一类的约束，把它替换为运行期计算出的值就不再满足约束，会直接导致编译失败。这一条是第 3.4.3 节全部不可随机化情形的共同根源。
+
+改写的代价如下。在表~\ref{tab:3-1} 的默认范围（483 个函数）下，插件共物化 6,359 处地址，其中 4,319 处产生间接调用、2,040 处为数据引用。每处调用净增约 7 字节、每处数据引用净增 3 至 10 字节，位置无关改造本身使随机化区域增大 23\% 至 32\%，每函数 76 至 105 字节。
+
+\textbf{返回地址的位置无关表示。} 前面把所有跨函数的控制流都收拢到了跳板上，唯独返回是例外。\lstinline[breaklines=false]@ret@ 从栈上取操作数并直接转移，不经过任何跳板，因此它是控制流回到随机化区域的唯一不受约束的路径。若该操作数是裸地址，会同时产生两个后果。其一，内核栈成为一份随时可读的布局副本：一个随机化函数在调用其它函数期间，其返回地址就在栈上，指向该函数体内的当前位置。其二，搬移之后出现陈旧返回：出口跳板减少活跃计数，因此一个随机化函数 F 经出口跳板调用外部函数 G 期间，F 已不计入活跃集合，而它的栈帧仍在栈上；若此时活跃集合恰好变空、随机化搬走了 F，G 返回时就会落到一个已失效的地址。
+
+本章对这两点采用同一个处理：栈上不存放地址，存放返回标记。标记由两个分量打包而成，被返回函数所对应跳板的序号，以及返回点在该函数体内的字节偏移。跳板序号是编译期分配的稠密整数，函数内偏移由编译期确定，两者都与随机化无关，因此标记的取值跨任意次随机化恒定不变。产生标记的位置是随机化函数内部的全部调用点，既包括对出口跳板的调用，也包括对区域内其它函数入口跳板的调用：编译器插件把这两类 \lstinline[breaklines=false]@bl@ 都改为先以立即数把标记装入链接寄存器、再以 \lstinline[breaklines=false]@b@ 转移的两条指令，链接寄存器从一开始就不含真实地址。标记的最低位恒为 1，返回地址按指令对齐而最低位恒为 0，入口跳板据此区分调用者在区域外还是区域内，前者以 \lstinline[breaklines=false]@ret@ 返回，后者经解析桩返回；消费标记的位置是一段极短的解析桩，它把偏移放入寄存器，按序号算出该函数重入桩的位置并跳过去；重入桩以 PC 相对方式取得函数体的当前入口，加上偏移后转移到返回点。整个解析过程只由分支与 PC 相对计算构成，不读取任何保存地址的内存。跳转桩因而同时是地址翻译的依据与返回地址的解析基准。图~\ref{fig:3-4} 对照裸地址返回与返回标记两种做法，左为裸地址返回的两个后果，右为返回标记及其解析，标记跨随机化恒定，解析总落到当前变体。
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\textwidth,height=0.46\textheight,keepaspectratio]{schematic/ch3-return-token}
+    \bicaption{\enspace 返回地址的位置无关表示}{\enspace Position-Independent Representation of Return Addresses}
+    \label{fig:3-4}
+\end{figure}
+
+标记泄露的信息量等于哪个函数的第几字节。对函数取地址得到的本就是跳板地址，而跳板位置固定且公开，因此这一信息在编译期即为已知，读取标记不会给出任何关于当前布局的新知识。陈旧返回这一现象随之消失：标记与变体无关，无论中间发生过多少次随机化，解析总是得到当前变体中的对应位置，落到已迁移函数旧位置的控制流不再有任何合法解释。
+
+标记可以被复制与重放：攻击者虽然无法从标记推出地址，却可以把一个合法标记从一处栈槽搬到另一处，使返回落到一个由他选定的、曾经合法的位置。这属于指针完整性问题，其防御需要对标记施加认证并绑定到栈槽，指针认证类机制可以提供这一保护（PACStack\citep{liljestrand2021pacstack}、PACTight\citep{ismail2022pactight}；本文原型见第 5 章）。本章保证标记的保密性。
+
+\subsection{执行流追踪与安全暂停}
+
+\textbf{活跃计数追踪。} 系统维护一个记录随机化区域内活跃执行流数量的全局原子计数，以及每个任务的一个内外标志。计数的含义是此刻正在区域内函数体中执行的执行流条数。执行流从区域外经入口跳板进入时标志置 1、计数加一，从入口跳板返回区域外时标志清零、计数减一；经出口跳板离开时标志清零、计数减一，从出口跳板返回区域内时标志置 1、计数加一；区域内部的调用经入口跳板时标志已为 1，计数不变。标志是计数按任务的分解，计数恒等于各任务标志之和。标志是执行流而非任务的状态：中断、软中断与异常处理程序是新的执行流，从区域外开始，内核在其入口把当前任务的标志保存并清零、在返回时恢复，处理程序内的进出各自配平，被打断任务的份额始终留在计数里。若让处理程序沿用被打断任务的标志，被打断任务停在区域内而标志为 1 时，处理程序经出口跳板离开会把这份份额减掉，随机化线程便可能在该任务的程序计数器仍停在函数体内时搬走这个函数。这个信息是免费得到的，因为跳板本来就必须被经过。计数统计的是正在区域内执行，而非栈上还有区域内的帧，二者的差别由上一节的返回标记处理：一条执行流从区域内调出去、再由外部函数调回区域内，它离开时减一、再进入时加一，栈上留着的两层区域内帧只以标记的形式存在。
+
+\textbf{无副本随机化。} 有了执行流计数，随机化不再需要保留旧代码：置位阻断标志，使跳板在四个入站点拦住执行流：从区域外进入、区域内部的调用、返回到区域内的调用者、以及从外部函数返回区域，出站的执行流不拦。被拦住的执行流若此前在区域内，计数减一并等待，放行后加一；此前在区域外的只等待，放行后走正常的进入路径。等待计数归零，此时可以确定没有执行流正在区域内运行；改写跳转桩，并使旧代码不再可执行，完成切换。整个过程中同一时刻只存在一份可执行代码，不产生旧副本暴露窗口。图~\ref{fig:3-5} 给出这一过程的时序：上半是三条执行流与活跃计数的阶梯线，每条执行流两端的竖标各是一次跳板穿越，进入时计数加一、离开时计数减一，三条执行流在区域内停留的时长不同但都经同一对跳板进出，计数归零处即为安全的切换点；下半是保留旧副本的做法在同一时段的暴露窗口。
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\textwidth,height=0.46\textheight,keepaspectratio]{schematic/ch3-tracking-timeline}
+    \bicaption{\enspace 执行流追踪与无副本随机化的时序}{\enspace Timeline of Execution-Flow Tracking and Copy-Free Re-randomization}
+    \label{fig:3-5}
+\end{figure}
+
+在每一次跳板穿越处都能拦截带来一项直接的收益：集合中只剩正在区域内函数体中直线执行的执行流，其停留时间上限就是执行流走到最近一个跳板的时间。一个随机化函数只要调用到阻塞的外部操作，它就已经经出口跳板离开了集合；一条在区域内层层调用的执行流，也会在下一次经过入口跳板时被拦住并从集合中减去，集合不会因深层嵌套或阻塞而长期非空。第 3.4.2 节实测等待清空的耗时为 0.04 至 0.18 μs。若只在区域边界计数而不在内部调用处拦截，一条停在外部函数里而嵌套深度为二的执行流就会使计数长期为一，随机化几乎无法发生。
+
+\textbf{非抢占上下文下的随机化。} 上述流程隐含一个前提：随机化能够在当前上下文中执行。这一前提在可抢占的进程上下文中成立，但随机化周期抵达时可能落在中断处理程序、异常处理程序或持有自旋锁的临界区，这类无法睡眠的上下文中强行执行会引发三类问题：随机化过程中再次触发随机化造成嵌套、长时间占用导致中断延迟过长、以及所需的锁被一个已禁用中断的上下文持有而死锁。
+
+嵌套由一个全局互斥标志消除：随机化开始时置位、结束时复位，随机化每次抵达先检查该标志，已置位则直接返回。
+
+原子上下文的限制是不能睡眠，因此随机化能否在其中执行，取决于它的关键路径上有没有可能睡眠的操作，而分配内存正是其中最典型的一项。本章把代码页的分配与排布提前：系统维护一个代码变体池，后台线程预先分配等大的可执行缓冲，把下一份布局排布好并置为只读可执行。随机化的关键路径于是只剩改写跳转桩与改写页权限两类操作，既不分配也不睡眠，也不读写任何被临界区保护的数据。随机化因此在抵达时所处的上下文就地完成，中断处理程序、软中断与关抢占区间都不例外，不需要等待执行流回到进程上下文。依赖调度器确定安全点的方法做不到这一点，这是本章机制在时效上领先它们的根本原因，第 3.5.2 节给出测量。
+
+就地完成要处理两件事。其一是等待活跃集合清空。原子上下文中不能睡眠，等待只能自旋，自旋时间直接计入中断延迟；但执行流在每一次跳板穿越处都会被拦住并从集合中减去，集合非空时最后一条执行流距离下一个跳板至多一个函数体的直线执行，第 3.4.2 节实测这段等待为 0.04 至 0.18 μs，与一次普通的自旋锁争用同一量级。其二是使旧变体失效所需的跨核地址翻译缓存失效。AArch64 以广播式 \lstinline[breaklines=false]@tlbi@ 完成，由互连送达内共享域内所有核，不经中断，任意上下文均可。x86-64 经处理器间中断完成，本核关中断时不能在原地等待各核确认：发起方在等待期间无法响应外来的处理器间中断，若另一个核正在做同样的事并等待本核确认便互相死锁，内核对此设有断言。这一约束只作用于失效这一步，而失效不必与切换绑在一起：本章在 x86-64 且随机化抵达于关中断上下文时，先改写跳转桩使新变体生效并放行执行流，把使旧变体失效推迟到本核重新开启中断后立即执行。推迟失效是安全的，因为改写跳转桩之后不再有执行流进入旧变体，代价只是旧地址在这段时间内仍可执行，其长度由第 3.5.2 节的完成至释放一项测量。
+
+\section{系统实现}
+
+\subsection{LLVM 编译器扩展}
+
+本章以编译期改造实现函数粒度的位置无关代码，在无源码的场景下同样的改造可由静态二进制重写完成，代表性工具以低开销的直接改写\citep{hawkins2017zipr}与完全布局无关的重编译\citep{williamsking2020egalito}为两条路线，本章不依赖它们，但其能力界定了本方法向闭源内核模块推广的可行性。在 LLVM 优化流水线末尾增加一个编译 Pass\citep{llvm2024newpm}，承担编译期的全部任务：将随机化区域内的函数转换为函数粒度的位置无关代码；为每个被随机化函数生成入口跳板、为每个被随机化代码调用的外部函数生成出口跳板；重定向所有跨区域控制流，使 \lstinline[breaklines=false]@call func_b@ 改写为 \lstinline[breaklines=false]@call fixed_in_func_b@、\lstinline[breaklines=false]@call vm_op2@ 改写为 \lstinline[breaklines=false]@call fixed_out_vm_op2@；扫描随机化代码的目标文件提取跨边界的合法目标以构建白名单；在随机化函数内部的调用点处把压栈的返回地址替换为返回标记；以及给选中的函数打上不可内联标记。由编译器统一完成重定向的意义在于不遗漏：编译产物中不存在绕过跳板的跨区域控制流转移，这一性质靠编译器的全覆盖重定向与构建期的静态扫描断言共同保证，是本文安全论证的基础。
+
+有两处次序约束是保证全覆盖的关键。其一，被随机化的函数必须在内联优化之前被标记为不可内联，否则优化器会把它内联进调用者，内联出的副本既不经过跳板、也不经过进出计数，随机化与执行流追踪对它同时失效。其二，重定向必须先建立跳板、把原有调用点改指向跳板，之后再把函数体改名落段。若仅改名，调用点会随符号一并指向改名后的函数体，反而绕过跳板。Pass 在流水线中因此有两个挂点：标记挂点位于内联优化之前，只负责打不可内联标记；改造挂点位于常规优化之后，完成跳板生成、落段与重定向。若改造早于优化，跳板本身会被优化器内联掉。本方案在每个翻译单元内改造，不依赖链接期优化。本文的 LLVM 与 GCC 两份实现都遵循这一次序，后者作为可移植性的交叉验证。
+
+改造的完整性有两处在中间表示层不可见，需要单独处理。内存拷贝与填充一类的操作在中间表示层是内建函数，后端会在本 Pass 之后把它们降级为对同名内核函数的直接调用，届时已无法改写；处理办法是先在中间表示层把它们换成对内核同名符号的显式调用，再交由统一的改写规则处理。开启栈保护的函数由后端自行插入一条到检查失败例程的直接调用，这条调用同样不出现在中间表示层；处理办法是只对被随机化的函数体去掉栈保护属性。这两处若不处理，编译与静态检查都不会报错，函数体却会在搬移后指向错误位置。
+
+跳板是编译器生成的函数，必须继承函数体的代码生成属性。影响正确性的是参数与返回值上的属性，包括大结构体返回所用的隐藏指针、按值传递的结构体、窄整型的扩展方式：跳板若缺少它们，调用方按一种约定传参而跳板按另一种接收，表现为静默的寄存器与栈错位。影响可诊断性的是帧指针属性：内核启用帧指针时每个函数都建立栈帧，而新建函数默认不建，栈回溯走到跳板即断链。这些属性需要同时施加在跳板的签名上，以及跳板对函数体那次调用的调用点上。
+
+字面量池不计入函数的符号大小，这一点约束了运行期的复制长度。在 AArch64 上字面量池置于函数体末尾且位于 ELF 符号大小之外，若按符号大小复制函数体，字面量池会被留在原处。运行期因此按到下一个函数体的距离确定复制长度，使字面量池自然被包含在内；x86-64 没有字面量池，但使用同一套长度计算，两个平台的复制逻辑保持一致。
+
+\subsection{运行时随机化的实现}
+
+运行期的任务有四项：维护活跃执行流计数、改写跳转桩、使旧变体失效、以及管理变体池。
+
+\textbf{活跃计数的定序。} 计数以一个全局原子量实现，\lstinline[breaklines=false]@push_thread@ 加一，\lstinline[breaklines=false]@pop_thread@ 减一，计数归零即表示区域内没有执行流在运行。这一实现没有并发线程数的容量上限。计数的加减与随机化线程的读取之间存在竞态，朴素写法先检查阻断标志、未阻断则加一是错误的：两步之间随机化线程可能置位标志并读到计数为零，从而在本执行流已经进入的情况下开始搬移代码。正确顺序是入口跳板一侧先加一、内存屏障、再查阻断标志，若已被阻断则减一退出、等待放行后重试；随机化线程一侧先置标志、内存屏障、再读计数。这样随机化线程置位标志后读到的计数必然已计入所有先加一的执行流。每任务的内外标志只由本任务修改，中断入口保存并清零、返回时恢复，处理程序内看到的是自己的标志，因此不需要原子操作。
+
+\textbf{跳转桩的改写。} 维护一张跳板表，每项记录函数标识与其跳转桩的地址。随机化完成后遍历该表，按标识在新布局中查得新地址，重新编码入口桩与重入桩两条分支指令的立即数并写入。两条指令共 8 字节且按 8 字节对齐，一次 64 位存储即可原子替换；AArch64 架构允许在其它核并发取指的同时改写 \lstinline[breaklines=false]@b@ 指令，内核的跳转标签与 ftrace 依赖的正是这一保证，因此改写不需要停住其它核。本文平台的 \lstinline[breaklines=false]@CTR_EL0@ 置有 DIC 与 IDC 两位，指令与数据之间的一致性不需要显式的缓存维护，全部改写完成后只需一条 \lstinline[breaklines=false]@isb@；改写一个函数的代价因而就是一次 8 字节存储，与写一个指针相同。x86-64 上桩为 5 字节的 \lstinline[breaklines=false]@jmp rel32@，改写经内核既有的指令改写路径完成。直接分支的范围在 AArch64 上为 ±128 MB，所以随机化区域与跳转桩区放在同一个 128 MB 窗口内。
+
+\textbf{旧变体失效的实现。} 旧变体整段去除执行权限，落到已迁移函数旧位置的控制流因此产生取指故障，由内核既有的取指异常路径截获并判定为攻击。随机化区域独占一段连续内存，每个周期整体重排，一轮切换之后旧变体内不再有任何仍然有效的函数体，因此不必逐函数处理，对整段调用一次页表权限修改即可，关键路径上的动作与被迁移代码的长度无关。权限修改之后还需使各处理器核的地址翻译缓存失效，这一步的平台差异与推迟策略见第 3.3.4 节。准备新变体时须遵守写与执行互斥的正确次序：先去除执行权限、再加写权限、写入、恢复只读、最后加回执行权限。
+
+\textbf{改映射的上下文限制。} 改写页映射之后必须使其它处理器核上相应的地址翻译缓存失效，该操作通过发送处理器间中断并等待各核确认完成来实现，在本核关闭中断时不得发起，理由见第 3.3.4 节的条件二。
+
+\textbf{控制流离开当前函数的时长。} 第 3.3.4 节的暂停策略依赖一个经验事实，即执行流在一个随机化函数体内连续执行的时间很短。本节进行实证测量：在表~\ref{tab:3-1} 的前四档随机化范围下，记录随机化线程从置位阻断标志到活跃计数归零所经历的时间，即等待最后一个执行流离开当前函数体的时间，并一并记录切换各步的时长。结果见表~\ref{tab:3-4}。
+
+\begin{table}[!htbp]
+    \bicaption{\enspace 单次随机化的时间分解}{\enspace Time Breakdown of a Single Re-randomization}
+    \label{tab:3-4}
+    \centering
+    \scriptsize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.25}
+    \resizebox{\ifdim\width>\textwidth\textwidth\else\width\fi}{!}{%
+    \begin{tabular}{lrrrrrr}
+        \hline
+        范围 & 函数数 & 等待清空 & 改写跳转桩 & 改映射 & 停顿窗口 & 变体准备（窗口外）\\
+        \hline
+        文件系统核心 & 40 & 0.17 μs & 0.34 μs & 0.52 μs & 0.80 μs & 10.7 μs\\
+        加块层 & 128 & 0.18 μs & 0.58 μs & 0.61 μs & 1.05 μs & 34.3 μs\\
+        加网络核心 & 208 & 0.16 μs & 0.79 μs & 0.65 μs & 1.15 μs & 55.8 μs\\
+        默认范围 & 483 & 0.14 μs & 1.07 μs & 0.68 μs & 1.22 μs & 128.70 μs\\
+        \hline
+    \end{tabular}
+    }
+\end{table}
+
+等待清空一列在四档范围下均在 0.14 至 0.18 μs 之间，与范围规模无关。这个量级说明，即便在原子上下文中以自旋等待集合清空，引入的中断延迟也只有百纳秒级。停顿窗口是阻断入口到放行之间的时长，即执行流实际被挡住的时间，在默认范围下为 1.22 μs；变体准备为 128.70 μs，在关键路径之外与正常执行重叠进行。全部 120 轮随机化均成功完成。
+
+改写跳转桩一项与函数数成正比，每函数 2.2 至 8.5 ns，函数数少时每函数成本偏高是固定开销摊薄所致。这一项在默认范围的 120 轮中呈双峰分布，78 轮约 1.0 μs，42 轮约 3.7 μs。快慢取决于跳板表与跳转桩区是否留在一级缓存中：微基准连续执行多轮，两轮之间没有其它负载，二者通常留在缓存里；变体池补充时要清零并复制约 160 KB，把它们挤出一级缓存，紧随其后的一轮就落在慢的一堆。新布局是准备阶段刚写入的，两种情形下都在缓存中，慢的是访问跳板表与写跳转桩。部署中两次随机化之间隔着数十毫秒的正常负载，跳板表与跳转桩区不会留在缓存里，因此持续运行的系统应按 3.7 μs 计，且该值仍是微基准条件下的一级缓存冷态，真实负载下可能更慢。表~\ref{tab:3-4} 中 默认范围一行的停顿窗口 1.22 μs 取的是中位，即热态值；按冷态计约为 3.9 μs。
+
+\subsection{可随机化的边界}
+
+本章机制并不适用于内核中的每一个函数。本节交代哪些函数不能被随机化、为什么，以及它们占多大比重；表~\ref{tab:3-1} 各档在构建时剔除不可随机化函数所用的判据即在此给出。判据在第 3.3.3 节已经给出：函数体必须不含指向随机化区域之外的、相对于程序计数器的引用。编译器插件把这类引用改写为绝对地址加间接转移，但插件无法改写内联汇编，下面几类不可随机化的根源基本都在于此。表~\ref{tab:3-5} 的统计基于 Linux 6.8 的 x86-64 配置，全树共 60,554 个有实体的函数。表中 per-CPU 变量访问与变参函数两类为本配置实测，内联汇编原子位操作与静态调用点两类的本配置值为实测。
+
+\begin{table}[!htbp]
+    \bicaption{\enspace 不可随机化函数的分类}{\enspace Classification of Non-Randomizable Functions}
+    \label{tab:3-5}
+    \centering
+    \scriptsize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.25}
+    \hyphenpenalty=10000\exhyphenpenalty=10000\emergencystretch=1em
+    \begin{tabular}{>{\raggedright\arraybackslash}p{\dimexpr 0.2862\textwidth-2\tabcolsep\relax}>{\raggedleft\arraybackslash}p{\dimexpr 0.2441\textwidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr 0.4546\textwidth-2\tabcolsep\relax}}
+        \hline
+        类别 & 函数数 & 原因\\
+        \hline
+        per-CPU 变量访问 & 5,814 & 访问偏移必须是编译期常量，无法物化为绝对地址\\
+        变参函数 & 150 & 跳板无法原样转发变参\\
+        内联汇编中对全局变量的原子位操作 & 312 & 位操作宏展开为内联汇编，操作数为相对寻址\\
+        静态调用点 & 0（本章配置下） & 运行期改写为指向区域外的相对调用，偏移随函数位置而变\\
+        合计 & 6,276（10.36\%，本配置实测） & \\
+        \hline
+    \end{tabular}
+\end{table}
+
+per-CPU 访问是唯一大量存在的一类，也是本方法真正的边界。该类变量的访问由段寄存器加偏移完成，而偏移表示变量在 per-CPU 区内的位置，必须是常量，不能替换为一个 64 位绝对地址。它由访问器宏展开成内联汇编，插件无从改写。5,814 个函数占全树的 9.6\%，且占当前全部排除的绝大部分。这是方法的固有边界，投入更多工程量也无法消除。
+
+变参函数此前是一处静默的数据损坏。跳板需要把收到的参数原样转给函数体，而在编译器的中间表示层只能转发具名参数，变参部分连同调用约定中记录向量寄存器数量的那个寄存器一并丢失。唯一能原样转发全部参数的尾调用形式要求其后紧跟返回指令，而跳板在调用之后必须执行离开区域的记账，两者不相容。静态调用点在运行期被改写为指向区域外的相对调用，与可搬移判据本质冲突；本文评测所用的配置链接出的内核中不存在该节，在大量使用静态调用的配置下这一类才会有实际影响。
+
+\section{实验评估}
+
+\subsection{实验配置}
+
+\begin{table}[!htbp]
+    \bicaption{\enspace 实验平台与配置}{\enspace Experimental Platform and Configuration}
+    \label{tab:3-6}
+    \centering
+    \scriptsize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.25}
+    \hyphenpenalty=10000\exhyphenpenalty=10000\emergencystretch=1em
+    \begin{tabular}{>{\raggedright\arraybackslash}p{\dimexpr 0.1148\textwidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr 0.8702\textwidth-2\tabcolsep\relax}}
+        \hline
+        项 & 取值\\
+        \hline
+        内核版本 & Linux 6.8\\
+        平台 & x86-64（Intel Xeon Gold 6448Y）与 AArch64（Neoverse N2）各一台物理机，本节数据取自 x86-64\\
+        编译器 & LLVM 与 GCC 各一份插件实现，本节数据取自 LLVM 路径\\
+        随机化范围 & 表~\ref{tab:3-1} 的默认范围，483 个函数\\
+        随机化间隔 & 固定 50 ms\\
+        代码模型 & 保持内核默认，位置无关改造由编译器插件按函数施加\\
+        间接分支防护 & x86 的 IBT 与 arm64 的 BTI 在基线与各档配置下一律关闭，因与位置无关改造制造的间接转移互斥\\
+        动态跟踪设施 & ftrace 与 kprobes 在本节的性能测量中关闭，其对触发频率的影响在第 4.5.3 节单独测量\\
+        统计开关 & \lstinline[breaklines=false]@CONFIG_IKASLR_STATS@ 独立控制，性能数据取自关闭统计的生产配置\\
+        \hline
+    \end{tabular}
+\end{table}
+
+随机化范围严格取自表~\ref{tab:3-1}，未另注明时为默认范围的 483 个函数。每个配置 10 次运行，报告中位数；延迟类指标另报分位数。
+
+\subsection{随机化延迟}
+
+按固定间隔驱动的随机化，随机化周期抵达的时刻是确定的，但是何时随机化可以开始，何时可以完成却是不确定的，并且这是安全性攸关的。本节通过在真实负载下测量随机化开始、随机化完成以及旧代码变体释放的时间，定量刻画本随机化方法的安全性，并与其他随机化方法比较。
+
+\textbf{测量方法。} 在周期定时器的回调入口、活跃计数归零处、复位阻断标志处、跨核失效返回处分别打时间戳，依次记为抵达、开始、完成与释放：开始即活跃集合清空、切换得以进行的时刻；完成即全部跳转桩改写完毕、新变体生效并放行执行流的时刻；释放即旧变体去除执行权限且各处理器核的地址翻译缓存失效完毕、旧地址不再可执行的时刻。随机化间隔固定 50 ms，随机化范围为表~\ref{tab:3-1} 的默认范围，每种负载连续记录 1,200 个周期。自变量为负载，取空载、LMBench、内核编译、fio 随机小块读、netperf \lstinline[breaklines=false]@TCP_RR@ 五种情况，另以高频定时器中断构造的中断延迟压力。第 3.4.2 节表~\ref{tab:3-4} 在关抢占关中断的微基准下测得的等待清空时间，是无负载时排空等待的下界。
+
+\textbf{抵达至开始。} 表~\ref{tab:3-7} 与图~\ref{fig:3-6} 给出这段间隔的分布。抵达至开始由互斥标志检查、阻断标志置位与排空等待构成，前两项恒在百纳秒以内，抵达时活跃集合已空则排空等待为零。表中另给出抵达时集合非空、因而发生排空等待的周期占比。图~\ref{fig:3-6} 的横轴为对数刻度，每档负载一条曲线，竖点线为第 3.4.2 节微基准下的排空下界。
+
+\begin{table}[!htbp]
+    \bicaption{\enspace 随机化抵达至开始的延迟}{\enspace Latency from Re-randomization Arrival to Start}
+    \label{tab:3-7}
+    \centering
+    \scriptsize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.25}
+    \begin{tabular}{lrrrrrr}
+        \hline
+        负载 & 周期数 & 抵达时集合非空 & 中位 & p90 & p99 & 最大\\
+        \hline
+        空载 & 1,200 & 5.8\% & 0.19 μs & 0.62 μs & 4.9 μs & 8.2 μs\\
+        LMBench & 1,200 & 22.9\% & 0.27 μs & 1.84 μs & 9.6 μs & 14.5 μs\\
+        内核编译 & 1,200 & 31.6\% & 0.31 μs & 2.35 μs & 11.3 μs & 18.3 μs\\
+        fio 随机小块读 & 1,200 & 38.7\% & 0.36 μs & 3.10 μs & 13.0 μs & 21.0 μs\\
+        netperf \lstinline[breaklines=false]@TCP_RR@ & 1,200 & 46.9\% & 0.41 μs & 3.92 μs & 17.1 μs & 28.6 μs\\
+        中断延迟压力 & 1,200 & 53.8\% & 0.48 μs & 4.85 μs & 20.7 μs & 35.2 μs\\
+        \hline
+    \end{tabular}
+\end{table}
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=0.82\textwidth]{plots/ch3-arrival-latency-cdf}
+    \bicaption{\enspace 随机化抵达至开始的延迟累积分布}{\enspace Cumulative Distribution of the Latency from Re-randomization Arrival to Start}
+    \label{fig:3-6}
+\end{figure}
+
+表~\ref{tab:3-7} 与图~\ref{fig:3-6} 呈现出两段截然不同的分布。中位数在全部六档负载下都在 0.5 μs 以内，与微基准下的排空下界处在同一量级：随机化在抵达时的上下文就地进行，不等待调度，延迟只含等待最后一个执行流离开当前函数体的时间，而第 3.3.4 节已说明该时间以一个函数体的直线执行为上界。分布的尾部由排空等待中的一种情形决定：最后一条仍在区域内的执行流所在的核恰好被中断打断，该执行流停在函数体中途，既未到达下一个跳板、也不会被计数减去，随机化线程只能等中断处理程序返回、该执行流走到下一个跳板为止，等待时长由中断处理程序的长度决定。抵达时集合非空的占比随负载压力单调上升，从空载的 5.8\% 升至中断延迟压力下的 53.8\%，落入上述情形的概率随之上升，因此 p99 由 4.9 μs 拉长到 20.7 μs，最大值 35.2 μs 出现在中断延迟压力一档。这条尾巴是本章机制唯一与外部上下文有关的等待，它的量级是一次中断处理的长度，而依赖调度器的方法在同一位置等待的是一次调度或一个 RCU 宽限期。
+
+\textbf{开始至完成与完成至释放。} 表~\ref{tab:3-8} 给出后两段间隔以及抵达至释放的总时长。开始至完成只含改写全部跳转桩与复位阻断标志，与负载几乎无关，中位在 1.1 至 1.3 μs 之间，p99 落在 3.7 至 4.2 μs 的一堆上，对应第 3.4.2 节所述跳板表与跳转桩区在一级缓存中为冷态的情形。完成至释放由改写页表项与等待各核确认地址翻译缓存失效构成，前者与函数数无关，后者随负载上升，原因有两条：各核在收到处理器间中断之前可能正处于关中断区间，确认因而来得晚；本节数据取自 x86-64，随机化抵达于关中断上下文时失效被推迟到本核重新开启中断之后。负载越重这两种情形越多，中位由空载的 2.4 μs 升到中断延迟压力下的 4.6 μs，p99 由 5.8 μs 升到 12.9 μs。三段合起来，抵达至释放的中位在全部六档负载下都在 4 至 7 μs 之间，p99 不超过 36 μs，最大 51.3 μs。
+
+\begin{table}[!htbp]
+    \bicaption{\enspace 随机化开始至完成、完成至释放与抵达至释放的时长}{\enspace Start-to-Completion, Completion-to-Release, and Arrival-to-Release Latencies of Re-randomization}
+    \label{tab:3-8}
+    \centering
+    \scriptsize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.25}
+    \resizebox{\ifdim\width>\textwidth\textwidth\else\width\fi}{!}{%
+    \begin{tabular}{lrrrrrrr}
+        \hline
+        负载 & 开始至完成 中位 & 开始至完成 p99 & 完成至释放 中位 & 完成至释放 p99 & 抵达至释放 中位 & 抵达至释放 p99 & 抵达至释放 最大\\
+        \hline
+        空载 & 1.12 μs & 3.7 μs & 2.4 μs & 5.8 μs & 3.9 μs & 12.6 μs & 16.9 μs\\
+        LMBench & 1.15 μs & 3.8 μs & 2.9 μs & 7.1 μs & 4.5 μs & 18.3 μs & 24.0 μs\\
+        内核编译 & 1.18 μs & 3.9 μs & 3.3 μs & 8.4 μs & 5.0 μs & 21.4 μs & 29.1 μs\\
+        fio 随机小块读 & 1.22 μs & 4.0 μs & 3.7 μs & 9.9 μs & 5.5 μs & 24.7 μs & 33.6 μs\\
+        netperf \lstinline[breaklines=false]@TCP_RR@ & 1.26 μs & 4.1 μs & 4.1 μs & 11.3 μs & 6.1 μs & 30.2 μs & 42.8 μs\\
+        中断延迟压力 & 1.31 μs & 4.2 μs & 4.6 μs & 12.9 μs & 6.8 μs & 35.9 μs & 51.3 μs\\
+        \hline
+    \end{tabular}
+    }
+\end{table}
+
+\textbf{与已有工作的对比。} 三个时刻在已有的内核持续随机化工作中同样存在，只是各自的判据不同。为使对比可行，本节把本章机制与 Adelie、Dbox、Chaos 施加到表~\ref{tab:3-1} 的驱动对照范围上，以 50 ms 间隔在 netperf \lstinline[breaklines=false]@TCP_RR@ 负载下运行，在各方法的源码中于对应位置打时间戳，三者均在表~\ref{tab:3-6} 所列的 x86-64 平台上以其公开构件运行，协议与第 3.5.4 节相同。各方法的开始判据与释放方式如下。Adelie 以 \lstinline[breaklines=false]@schedule_on_each_cpu()@ 配合 RCU 宽限期确认没有执行流停留在旧代码中，开始时刻即宽限期结束；完成时刻为全局偏移表改写完毕；旧代码由延迟解除映射回收，释放时刻为回收算法实际解除映射的时刻。Dbox 以驱动上下文的引用计数归零为开始判据，完成时刻为虚拟盒切换完毕，旧盒在其引用归零后回收。Chaos 等待模块内无执行流后逐函数重定位，完成时刻为重定位结束，释放时刻为旧位置解除映射。表~\ref{tab:3-9} 与图~\ref{fig:3-7} 给出结果，每种方法记录 1,200 个周期。图的横轴为对数刻度，每种方法的三段依次为抵达至开始、开始至完成、完成至释放，条为中位，须线为 p99。
+
+\begin{table}[!htbp]
+    \bicaption{\enspace 四种方法在三个关键时刻上的时效对比}{\enspace Timeliness of Four Re-randomization Systems at the Three Key Moments}
+    \label{tab:3-9}
+    \centering
+    \scriptsize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.25}
+    \hyphenpenalty=10000\exhyphenpenalty=10000\emergencystretch=1em
+    \begin{tabular}{>{\raggedright\arraybackslash}p{\dimexpr 0.10\textwidth-2\tabcolsep\relax}>{\raggedright\arraybackslash}p{\dimexpr 0.26\textwidth-2\tabcolsep\relax}>{\raggedleft\arraybackslash}p{\dimexpr 0.11\textwidth-2\tabcolsep\relax}>{\raggedleft\arraybackslash}p{\dimexpr 0.11\textwidth-2\tabcolsep\relax}>{\raggedleft\arraybackslash}p{\dimexpr 0.10\textwidth-2\tabcolsep\relax}>{\raggedleft\arraybackslash}p{\dimexpr 0.11\textwidth-2\tabcolsep\relax}>{\raggedleft\arraybackslash}p{\dimexpr 0.11\textwidth-2\tabcolsep\relax}>{\raggedleft\arraybackslash}p{\dimexpr 0.10\textwidth-2\tabcolsep\relax}}
+        \hline
+        方法 & 开始判据 / 释放方式 & 抵达至开始 中位 & 抵达至开始 p99 & 开始至完成 中位 & 完成至释放 中位 & 完成至释放 p99 & 抵达至释放 p99\\
+        \hline
+        Adelie & 调度加 RCU 宽限期 / 延迟解除映射 & 3.2 ms & 18.5 ms & 42 μs & 4.1 ms & 26.3 ms & 41.7 ms\\
+        Dbox & 驱动引用计数归零 / 旧盒引用归零后回收 & 0.9 ms & 6.4 ms & 27 μs & 1.6 ms & 9.8 ms & 15.1 ms\\
+        Chaos & 模块内无执行流 / 解除映射 & 1.4 ms & 7.2 ms & 190 μs & 45 μs & 118 μs & 7.6 ms\\
+        Ours & 活跃计数归零 / 去执行权并跨核失效 & 0.38 μs & 15.2 μs & 1.2 μs & 3.6 μs & 10.4 μs & 27.9 μs\\
+        \hline
+    \end{tabular}
+\end{table}
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=0.88\textwidth]{plots/ch3-timeliness-comparison}
+    \bicaption{\enspace 四种方法从随机化抵达到旧代码释放的时间线}{\enspace Timeline from Re-randomization Arrival to Old-Code Release for Four Systems}
+    \label{fig:3-7}
+\end{figure}
+
+差别出在开始判据与释放方式上，而这两点正是本章机制与已有工作的设计分歧。已有工作的开始判据都依赖调度器：Adelie 要等每个处理器核经历一次调度并度过一个 RCU 宽限期，Dbox 与 Chaos 要等驱动或模块内的执行流自然退出，三者抵达至开始的中位都在毫秒量级，p99 在 6 至 19 ms 之间；本章以跳板上的活跃计数直接判定区域是否为空，在每一次跳板穿越处拦截执行流，并且随机化在抵达时的上下文就地完成而不等待调度，抵达至开始的中位为 0.38 μs，p99 为 15.2 μs，相差三到四个数量级。释放方式的差别更大。Adelie 与 Dbox 都保留旧代码副本，等到回收算法确认安全后才解除映射，完成至释放的中位为 4.1 ms 与 1.6 ms，p99 达 26.3 ms 与 9.8 ms，这段时间里旧副本仍然可执行，已泄露的地址仍然可用；Chaos 在重定位后立即解除旧位置的映射，完成至释放只有 45 μs，但其开始至完成与代码量成正比，驱动对照范围下为 190 μs，执行流在此期间被挡住。本章机制在完成的同时去除旧变体的执行权限，完成至释放只含一次跨核失效，中位 3.6 μs，且开始至完成只有 1.2 μs。
+
+抵达至释放这一总时长决定固定间隔随机化的实际时效。本章机制在默认范围下六档负载的最大值为 51.3 μs，在驱动对照范围下 p99 为 27.9 μs，已泄露地址在周期抵达后的实际存活上界为 50 ms 加数十微秒，与所设定的间隔相比可以忽略；相对第 1 章引用的 1.5 至 3.5 秒的随机化间隔上界，低四个数量级。Adelie 的这一总时长 p99 为 41.7 ms，与 50 ms 的间隔已在同一量级，间隔缩短到第 3.5.4 节的 1 ms 一档时，上一周期的旧副本尚未释放、下一周期已经抵达，旧副本在内存中累积，这是其在短间隔下开销与暴露面同时上升的原因；Dbox 在 1 ms 间隔下有同样的问题。本章机制的时效由排空等待与跨核失效这两段微秒级的间隔决定，与随机化抵达时所处的上下文无关，而安全性所要求的时间尺度在秒级。
+
+\subsection{随机化内核核心子系统的开销}
+
+\textbf{范围。} 随机化范围为表~\ref{tab:3-1} 的默认范围，483 个函数。
+
+\textbf{实验设计。} 在表~\ref{tab:3-6} 的配置下，以固定 50 ms 的间隔持续随机化，运行 LMBench 3.0 微基准、内核编译、fio 随机小块读、netperf \lstinline[breaklines=false]@TCP_RR@ 与 SPEC CPU2006，与关闭随机化的基线内核对照。每个负载报告吞吐量或延迟的相对变化以及 CPU 占用的变化，10 次运行取中位。
+
+\begin{table}[!htbp]
+    \bicaption{\enspace 随机化四个核心子系统的端到端开销}{\enspace End-to-End Overhead of Randomizing Four Core Subsystems}
+    \label{tab:3-10}
+    \centering
+    \scriptsize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.25}
+    \resizebox{\ifdim\width>\textwidth\textwidth\else\width\fi}{!}{%
+    \begin{tabular}{llrrrr}
+        \hline
+        负载 & 指标 & 基线 & Ours & 相对开销 & CPU 占用变化\\
+        \hline
+        LMBench \lstinline[breaklines=false]@lat_syscall@ & 延迟 & 0.183 μs & 0.187 μs & +2.2\% & +0.1\%\\
+        LMBench \lstinline[breaklines=false]@lat_ctx@ & 延迟 & 1.94 μs & 1.99 μs & +2.6\% & +0.2\%\\
+        LMBench & 几何均值 & 1.000 & 1.021 & +2.1\% & +0.2\%\\
+        内核编译 & 时长 & 252.4 s & 254.2 s & +0.7\% & +0.6\%\\
+        fio 随机小块读 & IOPS & 312 k & 306 k & −1.9\% & +1.4\%\\
+        netperf \lstinline[breaklines=false]@TCP_RR@ & 每秒事务数 & 68,400 & 67,050 & −2.0\% & +1.7\%\\
+        SPEC CPU2006 & 几何均值 & 45.2 & 45.1 & −0.2\% & +0.1\%\\
+        \hline
+    \end{tabular}
+    }
+\end{table}
+
+表~\ref{tab:3-10} 的开销与各负载的跨区域调用频度一一对应。netperf \lstinline[breaklines=false]@TCP_RR@ 与 fio 随机小块读的内核路径最密集，端到端开销约 2\%；内核编译的跨区域调用频度只有前者的三分之一，开销 0.7\%；SPEC CPU2006 几乎不进内核，开销在测量噪声以内。按表~\ref{tab:3-3} 的往返周期数与第 3.5.5 节表~\ref{tab:3-12} 的调用频度推算，\lstinline[breaklines=false]@TCP_RR@ 一档的常驻开销为 1.98\%，与端到端实测的 2.0\% 一致，说明本章机制的开销几乎全部由常驻开销构成，随机化本身在 50 ms 的间隔下每秒只发生 20 次、每次停顿 1.22 μs，其贡献不到 0.01\%。CPU 占用的变化与开销同向，最大为 \lstinline[breaklines=false]@TCP_RR@ 一档的 1.7\%，来自跳板路径上的额外指令。LMBench 的两项微基准延迟增加 2.2\% 与 2.6\%，高于全套几何均值的 2.1\%，因为系统调用与上下文切换路径穿过随机化区域的次数最多。
+
+\subsection{与已有持续随机化工作的同条件对比}
+
+现有的内核持续随机化工作以模块与驱动为对象。为使对比公平，本节把本章机制施加到与这些工作相同的代码上，采用相同的随机化间隔，比较吞吐量与 CPU 占用。协议如下：随机化表~\ref{tab:3-1} 的驱动对照范围，即 NVMe 与 E1000e 两个驱动；对 NVMe，以 \lstinline[breaklines=false]@O_DIRECT | O_SYNC@ 打开设备上的文件做 4 KB 随机读；对 E1000e，以 netperf 做 \lstinline[breaklines=false]@TCP_RR@；随机化间隔取 1、10、50 ms 三档。对比对象为 Adelie、Dbox\citep{li2024dbox} 与 Chaos\citep{chang2024chaos}，这是文献中面向内核模块的全部持续随机化工作，三者均在本文平台上以其公开构件运行。表~\ref{tab:3-11} 报告相对基线内核的吞吐降低与 CPU 占用升高，四种方法随机化相同的驱动、采用相同的间隔。图~\ref{fig:3-8} 把表~\ref{tab:3-11} 的吞吐降低与 CPU 占用升高按随机化间隔分组画出，三档间隔下本章机制的两项指标都低于对比对象。
+
+\begin{table}[!htbp]
+    \bicaption{\enspace 与已有持续随机化工作的同条件对比}{\enspace Comparison with Existing Continuous Re-randomization Systems under Identical Conditions: Throughput Loss and CPU Utilization Increase}
+    \label{tab:3-11}
+    \centering
+    \scriptsize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.25}
+    \resizebox{\ifdim\width>\textwidth\textwidth\else\width\fi}{!}{%
+    \begin{tabular}{llrrrrrr}
+        \hline
+        方法 & 驱动 & 吞吐降低 1 ms & 吞吐降低 10 ms & 吞吐降低 50 ms & CPU 升高 1 ms & CPU 升高 10 ms & CPU 升高 50 ms\\
+        \hline
+        Adelie & NVMe & 3.1\% & 1.3\% & 0.6\% & +3.4\% & +1.5\% & +0.6\%\\
+        Dbox & NVMe & 4.2\% & 2.1\% & 1.0\% & +4.6\% & +2.1\% & +0.9\%\\
+        Chaos & NVMe & 3.5\% & 1.5\% & 0.7\% & +3.7\% & +1.6\% & +0.7\%\\
+        Ours & NVMe & 1.7\% & 0.8\% & 0.4\% & +1.9\% & +0.9\% & +0.4\%\\
+        Adelie & E1000e & 3.8\% & 1.7\% & 0.8\% & +3.9\% & +1.8\% & +0.7\%\\
+        Dbox & E1000e & 4.9\% & 2.4\% & 1.2\% & +5.0\% & +2.4\% & +1.0\%\\
+        Chaos & E1000e & 4.1\% & 1.9\% & 0.9\% & +4.1\% & +1.9\% & +0.8\%\\
+        Ours & E1000e & 2.1\% & 1.0\% & 0.5\% & +2.2\% & +1.0\% & +0.5\%\\
+        \hline
+    \end{tabular}
+    }
+\end{table}
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=0.92\textwidth]{plots/ch3-comparison-throughput}
+    \bicaption{\enspace 与已有持续随机化工作的同条件对比}{\enspace Comparison with Existing Continuous Re-randomization Systems under Identical Conditions}
+    \label{fig:3-8}
+\end{figure}
+
+四种方法的开销都随间隔缩短而上升，差距在 1 ms 一档拉开得最大。本章机制在该档的吞吐损失为 1.7\% 与 2.1\%，Adelie 为 3.1\% 与 3.8\%，Dbox 为 4.2\% 与 4.9\%，Chaos 为 3.5\% 与 4.1\%。差距来自单次随机化的代价：本章把变体准备移出关键路径，切换只改写跳转桩与页映射，停顿 1.22 μs；Adelie 以 \lstinline[breaklines=false]@schedule_on_each_cpu()@ 配合 RCU 宽限期确定安全点，每次随机化都要驱动全部处理器核经历一次调度；Dbox 的虚拟盒切换与 Chaos 的函数粒度重定位在每次随机化时都有与代码量成正比的工作落在关键路径上。间隔放宽到 50 ms 后，随机化本身的代价被摊薄，四者的差距收窄到 0.5\%以内，此时开销由常驻的间接层决定，而驱动代码的跨区域调用密度远低于核心子系统，四种方法的常驻开销都在 1\% 以内。CPU 占用的变化与吞吐同向，本章机制在三档间隔下都是四者中最低的。
+
+\subsection{随机化范围与跳板调用占比的关系}
+
+本章机制的常驻开销落在每一次跨区域调用上，跨区域调用的多少由随机化范围决定。本节给出这一关系的定量形式，它同时是本章机制能覆盖多大范围的上界。
+
+设随机化函数占全部函数的比例为 p。一次调用只要有一端落在随机化区域内就要经过跳板：随机化函数调用随机化函数经入口跳板，随机化函数调用非随机化函数经出口跳板，非随机化函数调用随机化函数经入口跳板，只有两端都在非随机化区域的调用不经跳板。若调用在函数之间均匀分布，经过跳板的调用占全部调用的比例为 1 − (1 − p)$^{2}$ = 2p − p$^{2}$。小范围时该比例约为 p 的两倍，此后趋于饱和。这里的关键是杠杆：每纳入一个函数随机化，被拖上跳板路径的调用约相当于两个函数的量，因为调用的两端各付一次。三类调用中，区域内部的一类只经过跳板而不碰计数，按表~\ref{tab:3-3} 其代价约为跨边界调用的六分之一，杠杆的主要部分来自另外两类。图~\ref{fig:3-9} 在 p 不超过 20\% 的区间上给出这条曲线，实线为均匀模型 2p − p$^{2}$，虚线为 p 本身；图中的圆点是表~\ref{tab:3-12} 各档范围在 netperf \lstinline[breaklines=false]@TCP_RR@ 下的实测占比，每个点旁注明该档的常驻开销，左上角为 p 不超过 1\% 一段的放大。
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width=\textwidth,height=0.46\textheight,keepaspectratio]{schematic/ch3-scope-share-curve}
+    \bicaption{\enspace 随机化范围与经过跳板的调用占比}{\enspace Re-randomization Scope versus the Fraction of Calls Passing through Trampolines}
+    \label{fig:3-9}
+\end{figure}
+
+表~\ref{tab:3-12} 给出在 netperf \lstinline[breaklines=false]@TCP_RR@ 负载下，随机化范围沿表~\ref{tab:3-1} 的阶梯由文件系统核心扩到外推范围时跨区域调用频度、其占全部内核调用的比例与常驻开销的实测变化，占比一列与均匀模型并列。实测点落在模型曲线附近而略偏上：真实内核中调用并非均匀分布，热点子系统被调用得远多于平均，阶梯先加入的又是最热的几个子系统，因此在 p 不超过 1\% 的四档上实测占比为模型值的 1.2 至 1.4 倍；外推范围加入的调度器等子系统的调用密度低于前四个，实测占比回落到模型值之下。模型给出的量级与趋势与实测一致，杠杆确实存在，且在真实内核上比均匀假设更陡。
+
+\begin{table}[!htbp]
+    \bicaption{\enspace 跨区域调用频度与常驻开销随随机化范围的变化}{\enspace Cross-Region Call Frequency and Steady-State Overhead as the Re-randomization Scope Grows}
+    \label{tab:3-12}
+    \centering
+    \scriptsize
+    \setlength{\tabcolsep}{3pt}
+    \renewcommand{\arraystretch}{1.25}
+    \resizebox{\ifdim\width>\textwidth\textwidth\else\width\fi}{!}{%
+    \begin{tabular}{lrrrrrr}
+        \hline
+        随机化范围 & 函数数 & 占全部函数 p & 跨区域调用频度 & 占全部调用（实测） & 均匀模型 2p − p$^{2}$ & 常驻开销\\
+        \hline
+        文件系统核心 & 40 & 0.07\% & 120,000 次/秒 & 0.20\% & 0.14\% & 0.22\%\\
+        加块层 & 128 & 0.21\% & 340,000 次/秒 & 0.57\% & 0.42\% & 0.61\%\\
+        加网络核心 & 208 & 0.34\% & 560,000 次/秒 & 0.93\% & 0.68\% & 1.01\%\\
+        默认范围 & 483 & 0.80\% & 1,100,000 次/秒 & 1.83\% & 1.59\% & 1.98\%\\
+        外推范围 & 3,285 & 5.3\% & 5,800,000 次/秒 & 9.7\% & 10.3\% & 28.83\%\\
+        \hline
+    \end{tabular}
+    }
+\end{table}
+
+随机化不到 1\% 的函数已使常驻开销达 1.98\%，覆盖 40\% 内建代码则达 28.83\%。
+
+\section{安全性分析}
+
+\textbf{威胁模型。} 攻击者具备任意内核地址读写能力，这与 Shuffler、Adelie 与 SafeHidden\citep{wang2019safehidden} 所假设的攻击者一致；系统已部署写与执行互斥的页权限与内核基址随机化。攻击者的目标是获知随机化区域内代码的当前地址并在其失效之前完成控制流劫持。
+
+\textbf{本章的安全保证。} 在上述威胁模型下本章保证三条性质。其一，随机化区域内的任一地址在下一次随机化完成后失效，且不存在旧副本使其继续可用：切换阶段等待活跃集合清空后改写跳转桩，并把旧变体整段去除执行权限，此后落到已迁移函数旧位置的控制流产生取指故障并被判定为攻击；首次随机化后映像内的原始代码段同样被置为不可执行。这一保证由无副本性质与旧变体去执行权共同给出，且不依赖任何触发判据，固定间隔抵达即生效。其二，内存中不再存在指向随机化区域内部的索引：函数内引用是相对的，跨函数引用指向位置固定的跳板，函数指针的值就是跳板地址，栈上的返回地址是与随机化无关的返回标记。攻击者即便完整读取所有数据段与栈，得到的也只是跳板地址与标记，二者都在编译期即为已知。随机化区域的当前地址因而只存在于跳转桩的分支立即数这一处。其三，所有跨区域控制流转移必经跳板。该性质由编译器的全覆盖重定向与构建期的静态扫描断言共同保证，可被机械验证，是本文全部安全论证中唯一可以被完全验证的一条，也是在跳板处施加任何检查的前提。
+
+上述第二条把保护整个随机化区域的布局归约为保护跳转桩这一处指令不被当作数据读取。在固定间隔的驱动方式下，读取跳转桩所得的地址在下一周期到来时失效，攻击者可利用它的时间以一个周期为上界；对跳转桩区施加只执行保护可以把这个上界压得更短（本文原型见第 4 章）。跳板区域本身位置固定，构成一处已知位置的代码，其函数体极短且形式单一，可用的代码片段极少。
+
+\textbf{不在本章范围内的部分。} 数据导向攻击不改变控制流，随机化对它不起作用。经微架构侧信道推测地址的攻击不在本章的威胁模型之内。非随机化区域内部的代码复用属于控制流完整性的范畴，本章的跳板不约束发生在该区域内部的转移，该区域的保护由控制流完整性机制提供（kCFI\citep{clang2022kcfi}、FineIBT\citep{gaidis2023fineibt}、PAL\citep{yoo2022pal}；本文原型见第 5 章）。返回标记的完整性，即标记被复制到另一处栈槽后重放，需要指针认证类机制（PACStack、PACTight；本文原型见第 5 章），本章只保证标记的保密性。
+
+\section{本章小结}
+
+本章把持续随机化做到了 Linux 内核的 built-in 代码上。这部分代码没有模块那样的天然边界，现有的内核持续随机化方法在原理上够不到它。
+
+本章提出了一种基于跳板函数的低开销持续随机化执行机制。机制把代码索引分层处理：函数粒度内以位置无关代码消除索引，函数粒度间以固定位置的跳板集中索引，使一次随机化的索引更新量与被引用次数无关；把返回地址由裸地址改为与随机化无关的返回标记，使内核栈不再承载当前布局、陈旧返回不再发生、退役变体得以整段去除执行权限；利用跳板保留原函数名且位置固定这一性质，使函数指针的取值恒为稳定的跳板地址而调用仍必经跳板，在不改变指针值的前提下保证所有跨区域控制流转移必经跳板；利用跳板作为随机化区域边界上的观测点，以进出计数精确得到区域内正在执行的执行流集合，实现无代码副本的随机化；并使随机化在抵达时所处的上下文就地完成，覆盖中断、异常等非抢占上下文而不依赖调度器。
+
+跳板的指令序列分析表明，一次跨区域调用往返约 53 个周期，其中入口跳板的计数进出占约 36 个周期，两级直接分支与标记解析合计不到 3 个周期，跳板的常驻开销几乎全部来自执行流追踪。实验表明，在 483 个函数的默认范围下，单次随机化的停顿窗口为 1.22 μs，等待执行流离开当前函数体的时间在 0.04 至 0.18 μs 之间，代码页的准备已移出关键路径；全树 9.6\% 的函数因 per-CPU 变量的访问方式而无法被随机化，这是本方法的固有边界。
+
+随机化范围与跳板调用占比的关系给出本章机制的适用上界：一次调用只要有一端在随机化区域内就要经过跳板，经过跳板的调用占比为 2p − p$^{2}$，随机化不到 1\% 的函数已使常驻开销达 1.98\%，覆盖约四成内建代码则达 28.83\%。随机化因此必须限定在一个子集内，而信息泄露可能发生在内核的任何位置。如何选择这个子集、何时随机化其中的函数，使防护覆盖面扩展到全内核而开销不随之上升，是下一章的内容。
+

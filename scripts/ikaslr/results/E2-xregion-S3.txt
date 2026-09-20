@@ -1,0 +1,43 @@
+# I-KASLR 跨区域控制流静态扫描 (E2)
+# 映像: ../ik/vmlinux  架构: x86-64  objdump: objdump
+# 随机化区域: 0xffffffff81eba000–0xffffffff81ed253f (99647 字节)
+# 跳板区域:   0xffffffff81eb2000–0xffffffff81eb9203
+
+表 6-3　跨区域控制流转移的静态验证结果
+  扫描的控制流转移指令总数      : 836,016
+    其中直接转移                : 814,295
+    其中间接转移                : 21,721
+  跨随机化边界的（直接）转移    : 0
+    经由跳板                    : 0
+    未经跳板（应为 0）          : 0
+  随机化区域内的间接转移（复核）: 1,722
+
+OK：不存在绕过跳板的直接跨区域转移。
+
+需人工核对：随机化区域内 1722 处间接转移（应全部为跳板派发；按设计编译器已将其重定向到 fixed_out）：
+   0xffffffff81eba073: call *%rax
+   0xffffffff81eba077: call *%r14
+   0xffffffff81eba086: call *%rax
+   0xffffffff81eba0d1: call *%rax
+   0xffffffff81eba0e4: call *%rax
+   0xffffffff81eba0f5: call *%rax
+   0xffffffff81eba104: call *%rax
+   0xffffffff81eba13c: call *%rax
+   0xffffffff81eba150: call *%rax
+   0xffffffff81eba162: call *%rax
+   0xffffffff81eba193: call *%rax
+   0xffffffff81eba212: call *%rax
+   0xffffffff81eba237: call *%rax
+   0xffffffff81eba297: call *%rax
+   0xffffffff81eba324: call *%rax
+   0xffffffff81eba349: call *%rax
+   0xffffffff81eba358: call *%rax
+   0xffffffff81eba36d: call *%rax
+   0xffffffff81eba393: call *%rax
+   0xffffffff81eba3a9: call *%rax
+   … 另有 1702 处，完整清单见 --json
+
+注意（论文 §6.4 W-64 要求单独交代，本工具不覆盖）：
+  · 手写汇编中的跳转/调用不经编译器 Pass，需另行扫描其目标文件；
+  · 运行时生成的代码（BPF JIT、alternative、static key、text_poke）
+    在编译期不存在，其是否产生跨区域转移需运行时约束，不在本工具范围。

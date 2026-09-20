@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 620" width="720" height="620"
+     font-family="PingFang SC, Hiragino Sans GB, Noto Sans CJK SC, Microsoft YaHei, sans-serif">
+<!-- 图 3-1 本章机制的总体架构 -->
+<defs>
+  <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#000"/></marker>
+  <marker id="ahs" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#000"/></marker>
+  <marker id="oah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0.6,0.6 L7,4 L0.6,7.4 z" fill="#fff" stroke="#000" stroke-width="1"/></marker>
+  <marker id="ahb" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#0072B2"/></marker>
+  <marker id="ahr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#D55E00"/></marker>
+  <marker id="ahg" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#555"/></marker>
+  <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#fff"/><line x1="0" y1="0" x2="0" y2="6" stroke="#000" stroke-width="1"/></pattern>
+  <pattern id="hatch2" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><rect width="5" height="5" fill="#fff"/><line x1="0" y1="0" x2="0" y2="5" stroke="#000" stroke-width="0.7"/></pattern>
+  <pattern id="dots" width="5" height="5" patternUnits="userSpaceOnUse"><rect width="5" height="5" fill="#fff"/><circle cx="2.5" cy="2.5" r="0.9" fill="#000"/></pattern>
+</defs>
+<style>
+  text  { fill:#000; }
+  .lbl  { font-size:11.5px; letter-spacing:.06em; }
+  .box  { fill:#fff; stroke:#000; stroke-width:1.2; }
+  .thick{ fill:#fff; stroke:#000; stroke-width:2; }
+  .plain{ fill:#fff; stroke:#000; stroke-width:0.8; }
+  .nr   { fill:#fff; stroke:#000; stroke-width:1.2; stroke-dasharray:6 3; }
+  .tr   { fill:#fff; stroke:#0072B2; stroke-width:2; }
+  .rd   { fill:#F0F0F0; stroke:#000; stroke-width:1.2; stroke-dasharray:1.5 2.5; }
+  .dt   { fill:#E3EEF7; stroke:#0072B2; stroke-width:2; }
+  .hw   { fill:#EDEDED; stroke:#555; stroke-width:1.2; }
+  .ours { fill:#E3EEF7; stroke:#0072B2; stroke-width:2; }
+  .dis  { fill:#fff; stroke:#000; stroke-width:0.8; stroke-dasharray:2 2; }
+  .concl{ fill:#E3EEF7; stroke:#0072B2; stroke-width:1.6; }
+  .ghost{ fill:#fff; stroke:#D55E00; stroke-width:1.2; stroke-dasharray:4 3; }
+  .trap { fill:url(#hatch); stroke:#000; stroke-width:1.2; }
+  .shade{ fill:url(#hatch2); stroke:#000; stroke-width:1; }
+  .dotf { fill:url(#dots); stroke:#000; stroke-width:1.2; }
+  .c5   { fill:#fff; stroke:#000; stroke-width:1.2; }
+  .bt   { font-size:12.5px; text-anchor:middle; }
+  .btl  { font-size:12.5px; }
+  .bs   { font-size:11px; text-anchor:middle; }
+  .bsl  { font-size:11px; }
+  .ttl  { font-size:13.5px; font-weight:bold; text-anchor:middle; }
+  .ttll { font-size:13.5px; font-weight:bold; }
+  .mono { font-family:"SF Mono",Menlo,Consolas,"Courier New",monospace; font-size:11.5px; }
+  .monos{ font-family:"SF Mono",Menlo,Consolas,"Courier New",monospace; font-size:10.5px; }
+  .mn   { fill:#000; font-weight:bold; }
+  .off  { fill:#555; }
+  .cap  { font-size:11px; fill:#333; }
+  .capc { font-size:11px; fill:#333; text-anchor:middle; }
+  .note { font-size:11.5px; }
+  .key  { font-size:11.5px; font-weight:bold; fill:#0072B2; }
+  .keyc { font-size:11.5px; font-weight:bold; text-anchor:middle; fill:#0072B2; }
+  .red  { font-size:11.5px; font-weight:bold; fill:#D55E00; }
+  .redc { font-size:11.5px; font-weight:bold; text-anchor:middle; fill:#D55E00; }
+  .good { font-size:11.5px; font-weight:bold; }
+  .goodc{ font-size:11.5px; font-weight:bold; text-anchor:middle; }
+  .gold { font-size:11.5px; font-weight:bold; }
+  .cf   { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#ah); }
+  .cfb  { fill:none; stroke:#0072B2; stroke-width:2; marker-end:url(#ahb); }
+  .cfg  { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#ah); }
+  .cfr  { fill:none; stroke:#D55E00; stroke-width:1.6; stroke-dasharray:7 3; marker-end:url(#ahr); }
+  .cfy  { fill:none; stroke:#0072B2; stroke-width:2; marker-end:url(#ahb); }
+  .cfm  { fill:none; stroke:#000; stroke-width:0.9; marker-end:url(#ahs); }
+  .cfo  { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#oah); }
+  .df   { fill:none; stroke:#555; stroke-width:1.1; stroke-dasharray:4 3; marker-end:url(#ahg); }
+  .dfb  { fill:none; stroke:#0072B2; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahb); }
+  .dfr  { fill:none; stroke:#D55E00; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahr); }
+  .dfy  { fill:none; stroke:#0072B2; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahb); }
+  .dep  { fill:none; stroke:#000; stroke-width:1.1; stroke-dasharray:6 4; marker-end:url(#ahs); }
+  .ln   { fill:none; stroke:#000; stroke-width:1.1; }
+  .lnr  { fill:none; stroke:#D55E00; stroke-width:1.6; }
+  .lng  { fill:none; stroke:#000; stroke-width:1.3; }
+  .dash { fill:none; stroke:#000; stroke-width:1; stroke-dasharray:5 4; }
+  .div  { stroke:#000; stroke-width:0.6; }
+  .axis { stroke:#000; stroke-width:1.1; fill:none; }
+  .grid { stroke:#999; stroke-width:0.5; stroke-dasharray:2 3; }
+</style>
+<rect width="720" height="620" fill="#fff"/>
+<text class="lbl" x="30" y="40">编译期</text>
+<rect class="box" x="30" y="84" width="96" height="40"/>
+<text class="bt" x="78" y="108">内核源码</text>
+<path class="cf" d="M126,104 L152,104"/>
+<rect class="plain" x="154" y="54" width="330" height="140"/>
+<text class="ttll" x="166" y="74">LLVM 编译 Pass</text>
+<rect class="box" x="166" y="84" width="306" height="26"/>
+<text class="bsl" x="176" y="101">标记挂点（内联之前）：为选中函数打不可内联标记</text>
+<text class="bsl" x="166" y="128">改造挂点（常规优化之后）：</text>
+<rect class="box" x="166" y="136" width="96" height="48"/>
+<text class="bt" x="214" y="156">函数粒度</text>
+<text class="bs" x="214" y="173">位置无关改造</text>
+<circle cx="167" cy="136" r="8.5" fill="#0072B2"/><text x="167" y="139.8" text-anchor="middle" fill="#fff" font-weight="600" font-size="11">1</text>
+<rect class="box" x="270" y="136" width="96" height="48"/>
+<text class="bt" x="318" y="156">生成跳板</text>
+<text class="bs" x="318" y="173">fixed_in / out</text>
+<circle cx="271" cy="136" r="8.5" fill="#0072B2"/><text x="271" y="139.8" text-anchor="middle" fill="#fff" font-weight="600" font-size="11">2</text>
+<rect class="box" x="374" y="136" width="96" height="48"/>
+<text class="bt" x="422" y="156">跨区域控制流</text>
+<text class="bs" x="422" y="173">重定向到跳板</text>
+<circle cx="375" cy="136" r="8.5" fill="#0072B2"/><text x="375" y="139.8" text-anchor="middle" fill="#fff" font-weight="600" font-size="11">3</text>
+<path class="cf" d="M484,104 L510,104"/>
+<rect class="box" x="512" y="54" width="178" height="140"/>
+<text class="ttll" x="524" y="74">内核映像</text>
+<rect class="tr" x="524" y="84" width="154" height="22"/>
+<text class="bs" x="601" y="99">跳板段（位置固定）</text>
+<rect class="dt" x="524" y="110" width="154" height="22"/>
+<text class="bs" x="601" y="125">跳转桩区 stub_*</text>
+<rect class="rd" x="524" y="136" width="154" height="22"/>
+<text class="bs" x="601" y="151">.rand.text 母本</text>
+<rect class="box" x="524" y="162" width="154" height="22"/>
+<text class="bs" x="601" y="177">白名单（合法出站目标）</text>
+<line class="div" x1="30" y1="212" x2="690" y2="212"/>
+<text class="lbl" x="30" y="234">运行期：内核地址空间</text>
+<text class="lbl" x="500" y="234">随机化线程（固定间隔）</text>
+<rect class="nr" x="30" y="248" width="440" height="60"/>
+<text class="ttll" x="42" y="267">非随机化区域（位置固定）</text>
+<text class="mono" x="240" y="294" xml:space="preserve"><tspan class="mn">bl</tspan> fixed_in_F</text>
+<text class="mono" x="50" y="294" xml:space="preserve">G:<tspan class="off">   ; 外部函数</tspan></text>
+<rect class="tr" x="30" y="326" width="440" height="118"/>
+<text class="ttll" x="42" y="345">跳板区域（位置固定）</text>
+<rect class="box" x="46" y="358" width="150" height="60"/>
+<text class="bt" x="121" y="382">fixed_out_G</text>
+<text class="bs" x="121" y="400">出口跳板</text>
+<rect class="box" x="216" y="358" width="140" height="60"/>
+<text class="bt" x="286" y="382">fixed_in_F</text>
+<text class="bs" x="286" y="400">入口跳板</text>
+<rect class="dt" x="366" y="375" width="94" height="26"/>
+<text class="bt" x="413" y="392">stub_F: b F</text>
+<rect class="rd" x="30" y="462" width="440" height="90"/>
+<text class="ttll" x="42" y="481">随机化区域（每周期重排）</text>
+<rect class="box" x="46" y="490" width="190" height="34"/>
+<text class="bt" x="141" y="511">当前变体 F_body</text>
+<rect class="trap" x="256" y="490" width="190" height="34"/>
+<text class="bt" x="351" y="511">旧变体不可执行</text>
+<path class="cf" d="M286,308 L286,358"/>
+<path class="cf" d="M286,418 L286,462"/>
+<path class="cf" d="M121,462 L121,418"/>
+<path class="cf" d="M121,358 L121,308"/>
+<text class="cap" x="292" y="452">进入</text>
+<text class="cap" x="115" y="452" text-anchor="end">离开</text>
+<rect class="box" x="500" y="248" width="190" height="304"/>
+<rect class="ours" x="510" y="258" width="170" height="176"/>
+<text class="bsl" x="520" y="276" font-weight="bold">切换阶段</text>
+<circle cx="530" cy="300" r="8.5" fill="#0072B2"/><text x="530" y="303.8" text-anchor="middle" fill="#fff" font-weight="600" font-size="11">1</text>
+<text class="bsl" x="546" y="304">置阻断标志</text>
+<circle cx="530" cy="326" r="8.5" fill="#0072B2"/><text x="530" y="329.8" text-anchor="middle" fill="#fff" font-weight="600" font-size="11">2</text>
+<text class="bsl" x="546" y="330">等待活跃计数归零</text>
+<circle cx="530" cy="352" r="8.5" fill="#0072B2"/><text x="530" y="355.8" text-anchor="middle" fill="#fff" font-weight="600" font-size="11">3</text>
+<text class="bsl" x="546" y="356">改写全部跳转桩</text>
+<circle cx="530" cy="378" r="8.5" fill="#0072B2"/><text x="530" y="381.8" text-anchor="middle" fill="#fff" font-weight="600" font-size="11">4</text>
+<text class="bsl" x="546" y="382">旧变体整段去执行权</text>
+<circle cx="530" cy="404" r="8.5" fill="#0072B2"/><text x="530" y="407.8" text-anchor="middle" fill="#fff" font-weight="600" font-size="11">5</text>
+<text class="bsl" x="546" y="408">复位阻断标志</text>
+<rect class="plain" x="510" y="444" width="170" height="100"/>
+<text class="bsl" x="520" y="462" font-weight="bold">准备阶段</text>
+<text class="bsl" x="520" y="484">· 生成新布局</text>
+<text class="bsl" x="520" y="504">· 在变体池中排布新变体</text>
+<text class="bsl" x="520" y="524">· 函数内重定位，置只读可执行</text>
+<path class="cfb" d="M510,352 L486,352 L486,388 L462,388"/>
+<text class="cap" x="482" y="346" text-anchor="end">③</text>
+<path class="cfb" d="M510,384 L496,384 L496,507 L458,507"/>
+<text class="cap" x="492" y="440" text-anchor="end">④</text>
+<path class="df" d="M510,520 L472,520"/>
+<rect class="nr" x="30" y="568" width="22" height="13"/>
+<text class="cap" x="58" y="578">非随机化区域</text>
+<rect class="tr" x="142" y="568" width="22" height="13"/>
+<text class="cap" x="170" y="578">跳板区域</text>
+<rect class="rd" x="232" y="568" width="22" height="13"/>
+<text class="cap" x="260" y="578">随机化区域</text>
+<rect class="dt" x="333" y="568" width="22" height="13"/>
+<text class="cap" x="361" y="578">跳转桩</text>
+<rect class="trap" x="412" y="568" width="22" height="13"/>
+<text class="cap" x="440" y="578">不可执行</text>
+<path class="cf" d="M30,598 L60,598"/>
+<text class="cap" x="66" y="602">控制流</text>
+<path class="cfb" d="M117,598 L147,598"/>
+<text class="cap" x="153" y="602">随机化线程的改写（③ 跳转桩，④ 页权限）</text>
+<path class="df" d="M384.4,598 L414.4,598"/>
+<text class="cap" x="420.4" y="602">准备变体</text>
+</svg>

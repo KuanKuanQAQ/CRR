@@ -1,0 +1,14 @@
+; 4K 随机读，走 VFS/块层热路径（§6.6.3）
+[global]
+ioengine=libaio
+direct=1
+runtime=30
+time_based=1
+group_reporting=1
+[randread-4k]
+rw=randread
+bs=4k
+iodepth=32
+numjobs=4
+size=2G
+filename=/tmp/fio-test.dat

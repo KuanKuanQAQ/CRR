@@ -1,0 +1,6 @@
+# 预测值
+workload,paper_pct,ours_before_pct,ours_after_pct
+virtio-net TCP,2.76,2.5,3.5
+virtio-net UDP,4.48,4.1,5.2
+virtio-scsi 读,4.95,4.5,5.3
+virtio-scsi 写,0.34,0.3,1

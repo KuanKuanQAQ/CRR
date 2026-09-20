@@ -1,0 +1,1211 @@
+{
+ "phases": [
+  {
+   "snap": "P0-boot.txt",
+   "header": "# used 3193 dropped 0 size 2097152 now 21112311992",
+   "pairs": 2382,
+   "ext_pairs": 0,
+   "call_sites": 1142,
+   "functions": 1906,
+   "high_fanin": 215,
+   "single_owner": 1691,
+   "max_class": 94,
+   "mean_class_nonzero": 2.497784342688331,
+   "call_sites_fully_exempt": 465,
+   "class_hist": [
+    [
+     "0",
+     0
+    ],
+    [
+     "1",
+     436
+    ],
+    [
+     "2",
+     115
+    ],
+    [
+     "3",
+     45
+    ],
+    [
+     "4-5",
+     31
+    ],
+    [
+     "6-10",
+     32
+    ],
+    [
+     "11-20",
+     11
+    ],
+    [
+     "21-50",
+     4
+    ],
+    [
+     "51-100",
+     3
+    ],
+    [
+     ">100",
+     0
+    ]
+   ],
+   "fanin_hist": [
+    [
+     "1",
+     1691
+    ],
+    [
+     "2",
+     156
+    ],
+    [
+     "3",
+     26
+    ],
+    [
+     "4-5",
+     18
+    ],
+    [
+     "6-10",
+     7
+    ],
+    [
+     "11-20",
+     5
+    ],
+    [
+     "21-50",
+     3
+    ],
+    [
+     "51-100",
+     0
+    ],
+    [
+     ">100",
+     0
+    ]
+   ],
+   "pa_baseline_max_component_funcs": 94,
+   "pa_baseline_max_component_callsites": 1,
+   "pa_baseline_components": 760,
+   "pa_baseline_max_callsites_in_component": 48,
+   "pa_baseline_callsites_sharing_context": 516,
+   "pa_baseline_hist_funcs": [
+    [
+     "1",
+     498
+    ],
+    [
+     "2",
+     117
+    ],
+    [
+     "3",
+     47
+    ],
+    [
+     "4-5",
+     42
+    ],
+    [
+     "6-10",
+     34
+    ],
+    [
+     "11-20",
+     13
+    ],
+    [
+     "21-50",
+     6
+    ],
+    [
+     "51-100",
+     3
+    ],
+    [
+     ">100",
+     0
+    ]
+   ],
+   "call_sites_with_class_gt1": 241
+  },
+  {
+   "snap": "P3-cold.txt",
+   "header": "# used 4940 dropped 0 size 2097152 now 145017543296",
+   "pairs": 4120,
+   "ext_pairs": 0,
+   "call_sites": 1368,
+   "functions": 3387,
+   "high_fanin": 406,
+   "single_owner": 2981,
+   "max_class": 392,
+   "mean_class_nonzero": 3.730913642052566,
+   "call_sites_fully_exempt": 569,
+   "class_hist": [
+    [
+     "0",
+     0
+    ],
+    [
+     "1",
+     502
+    ],
+    [
+     "2",
+     126
+    ],
+    [
+     "3",
+     57
+    ],
+    [
+     "4-5",
+     40
+    ],
+    [
+     "6-10",
+     44
+    ],
+    [
+     "11-20",
+     12
+    ],
+    [
+     "21-50",
+     7
+    ],
+    [
+     "51-100",
+     9
+    ],
+    [
+     ">100",
+     2
+    ]
+   ],
+   "fanin_hist": [
+    [
+     "1",
+     2981
+    ],
+    [
+     "2",
+     326
+    ],
+    [
+     "3",
+     38
+    ],
+    [
+     "4-5",
+     26
+    ],
+    [
+     "6-10",
+     7
+    ],
+    [
+     "11-20",
+     5
+    ],
+    [
+     "21-50",
+     4
+    ],
+    [
+     "51-100",
+     0
+    ],
+    [
+     ">100",
+     0
+    ]
+   ],
+   "pa_baseline_max_component_funcs": 392,
+   "pa_baseline_max_component_callsites": 1,
+   "pa_baseline_components": 890,
+   "pa_baseline_max_callsites_in_component": 48,
+   "pa_baseline_callsites_sharing_context": 643,
+   "pa_baseline_hist_funcs": [
+    [
+     "1",
+     562
+    ],
+    [
+     "2",
+     136
+    ],
+    [
+     "3",
+     63
+    ],
+    [
+     "4-5",
+     48
+    ],
+    [
+     "6-10",
+     44
+    ],
+    [
+     "11-20",
+     15
+    ],
+    [
+     "21-50",
+     10
+    ],
+    [
+     "51-100",
+     9
+    ],
+    [
+     ">100",
+     3
+    ]
+   ],
+   "call_sites_with_class_gt1": 297
+  }
+ ],
+ "single_owner_in_first_but_hf_in_last": 43,
+ "hf_in_last_unseen_in_first": 148,
+ "late_conflicts_by_phase": [
+  [
+   "P0-boot.txt",
+   43
+  ]
+ ],
+ "top_classes": [
+  {
+   "call_site": "0xffffffff81b2a84a",
+   "in_func": "dev_attr_show",
+   "loc": "drivers/base/core.c:2364",
+   "owned": 392,
+   "targets": 392,
+   "sample": [
+    "active_count_show",
+    "active_show",
+    "active_time_ms_show",
+    "addr_assign_type_show",
+    "addr_len_show",
+    "address_show",
+    "adr_show",
+    "any_show"
+   ]
+  },
+  {
+   "call_site": "0xffffffff813f0e7b",
+   "in_func": "proc_sys_call_handler",
+   "loc": "fs/proc/proc_sysctl.c:595",
+   "owned": 118,
+   "targets": 118,
+   "sample": [
+    "addrconf_sysctl_addr_gen_mode",
+    "addrconf_sysctl_disable",
+    "addrconf_sysctl_disable_policy",
+    "addrconf_sysctl_forward",
+    "addrconf_sysctl_ignore_routes_with_linkdown",
+    "addrconf_sysctl_mtu",
+    "addrconf_sysctl_proxy_ndp",
+    "addrconf_sysctl_stable_secret"
+   ]
+  },
+  {
+   "call_site": "0xffffffff81ed2d78",
+   "in_func": "ops_init",
+   "loc": "net/core/net_namespace.c:136",
+   "owned": 94,
+   "targets": 94,
+   "sample": [
+    "addrconf_init_net",
+    "arp_net_init",
+    "audit_net_init",
+    "ctnetlink_net_init",
+    "dev_mc_net_init",
+    "dev_proc_net_init",
+    "devinet_init_net",
+    "diag_net_init"
+   ]
+  },
+  {
+   "call_site": "0xffffffff81ed3182",
+   "in_func": "cleanup_net",
+   "loc": "net/core/net_namespace.c:170",
+   "owned": 86,
+   "targets": 86,
+   "sample": [
+    "addrconf_exit_net",
+    "arp_net_exit",
+    "audit_net_exit",
+    "cfg80211_pernet_exit",
+    "defrag4_net_exit",
+    "defrag6_net_exit",
+    "dev_mc_net_exit",
+    "dev_proc_net_exit"
+   ]
+  },
+  {
+   "call_site": "0xffffffff810abef9",
+   "in_func": "cpuhp_invoke_callback",
+   "loc": "kernel/cpu.c:195",
+   "owned": 80,
+   "targets": 80,
+   "sample": [
+    "acpi_soft_cpu_dead",
+    "acpi_soft_cpu_online",
+    "alloc_swap_slot_cache",
+    "blk_softirq_cpu_dead",
+    "buffer_exit_cpu_dead",
+    "cache_ap_offline",
+    "cache_ap_online",
+    "cacheinfo_cpu_online"
+   ]
+  },
+  {
+   "call_site": "0xffffffff81369806",
+   "in_func": "seq_read_iter",
+   "loc": "fs/seq_file.c:225",
+   "owned": 75,
+   "targets": 77,
+   "sample": [
+    "ac6_seq_start",
+    "arp_seq_start",
+    "c_start",
+    "c_start",
+    "c_start",
+    "cache_seq_start_rcu",
+    "dev_seq_start",
+    "devinfo_start"
+   ]
+  },
+  {
+   "call_site": "0xffffffff810d791f",
+   "in_func": "process_one_work",
+   "loc": "kernel/workqueue.c:2633",
+   "owned": 72,
+   "targets": 72,
+   "sample": [
+    "addrconf_dad_work",
+    "addrconf_verify_work",
+    "async_run_entry_fn",
+    "ata_sff_pio_task",
+    "blk_mq_requeue_work",
+    "blk_mq_run_work_fn",
+    "blk_mq_timeout_work",
+    "bpf_prog_free_deferred"
+   ]
+  },
+  {
+   "call_site": "0xffffffff813227b2",
+   "in_func": "do_dentry_open",
+   "loc": "fs/open.c:953",
+   "owned": 58,
+   "targets": 58,
+   "sample": [
+    "auxv_open",
+    "blkdev_open",
+    "chrdev_open",
+    "comm_open",
+    "configfs_dir_open",
+    "dcache_dir_open",
+    "dyn_event_open",
+    "environ_open"
+   ]
+  },
+  {
+   "call_site": "0xffffffff81369a06",
+   "in_func": "seq_read_iter",
+   "loc": "fs/seq_file.c:262",
+   "owned": 57,
+   "targets": 64,
+   "sample": [
+    "c_next",
+    "c_next",
+    "c_next",
+    "cache_seq_next_rcu",
+    "devinfo_next",
+    "disk_seqf_next",
+    "f_next",
+    "fib_route_seq_next"
+   ]
+  },
+  {
+   "call_site": "0xffffffff81369842",
+   "in_func": "seq_read_iter",
+   "loc": "fs/seq_file.c:230",
+   "owned": 55,
+   "targets": 107,
+   "sample": [
+    "c_show",
+    "cmdline_proc_show",
+    "cn_proc_show",
+    "comm_show",
+    "execdomains_proc_show",
+    "fib_triestat_seq_show",
+    "filesystems_proc_show",
+    "frag_show"
+   ]
+  },
+  {
+   "call_site": "0xffffffff8132549a",
+   "in_func": "vfs_read",
+   "loc": "fs/read_write.c:486",
+   "owned": 53,
+   "targets": 54,
+   "sample": [
+    "auxv_read",
+    "bm_status_read",
+    "buffer_percent_read",
+    "buffer_subbuf_size_read",
+    "devkmsg_read",
+    "environ_read",
+    "event_enable_read",
+    "event_filter_read"
+   ]
+  },
+  {
+   "call_site": "0xffffffff822f7d40",
+   "in_func": "kobj_attr_show",
+   "loc": "lib/kobject.c:828",
+   "owned": 41,
+   "targets": 41,
+   "sample": [
+    "actions_show",
+    "address_bits_show",
+    "chip_name_show",
+    "counter_show",
+    "cpu_byteorder_show",
+    "cpu_show",
+    "crash_elfcorehdr_size_show",
+    "delegate_show"
+   ]
+  },
+  {
+   "call_site": "0xffffffff81601ac7",
+   "in_func": "queue_attr_show",
+   "loc": "block/blk-sysfs.c:722",
+   "owned": 38,
+   "targets": 38,
+   "sample": [
+    "elv_iosched_show",
+    "queue_chunk_sectors_show",
+    "queue_dax_show",
+    "queue_discard_granularity_show",
+    "queue_discard_max_hw_show",
+    "queue_discard_max_show",
+    "queue_discard_zeroes_data_show",
+    "queue_dma_alignment_show"
+   ]
+  },
+  {
+   "call_site": "0xffffffff8132bcad",
+   "in_func": "__fput",
+   "loc": "fs/file_table.c:376",
+   "owned": 37,
+   "targets": 39,
+   "sample": [
+    "blkdev_release",
+    "configfs_dir_close",
+    "dcache_dir_close",
+    "devkmsg_release",
+    "ep_eventpoll_release",
+    "evdev_release",
+    "event_trigger_release",
+    "eventfd_release"
+   ]
+  },
+  {
+   "call_site": "0xffffffff813fde2b",
+   "in_func": "internal_create_group",
+   "loc": "fs/sysfs/group.c:54",
+   "owned": 31,
+   "targets": 31,
+   "sample": [
+    "acpi_attr_is_visible",
+    "aspm_ctrl_attrs_are_visible",
+    "atkbd_attr_is_visible",
+    "blk_mq_queue_attr_visible",
+    "cache_default_attrs_is_visible",
+    "default_is_visible",
+    "disk_visible",
+    "exra_is_visible"
+   ]
+  }
+ ],
+ "top_high_fanin": [
+  {
+   "func": "io_serial_out",
+   "fanin": 48,
+   "sample_callers": [
+    "__stop_tx",
+    "default_serial_dl_write",
+    "serial8250_backup_timeout",
+    "serial8250_config_port",
+    "serial8250_console_putchar",
+    "serial8250_console_write"
+   ]
+  },
+  {
+   "func": "filldir64",
+   "fanin": 37,
+   "sample_callers": [
+    "configfs_readdir",
+    "dcache_readdir",
+    "empty_dir_readdir",
+    "eventfs_iterate",
+    "ext4_readdir",
+    "kernfs_fop_readdir"
+   ]
+  },
+  {
+   "func": "io_serial_in",
+   "fanin": 35,
+   "sample_callers": [
+    "serial8250_backup_timeout",
+    "serial8250_config_port",
+    "serial8250_console_write",
+    "serial8250_default_handle_irq",
+    "serial8250_do_shutdown",
+    "serial8250_do_startup"
+   ]
+  },
+  {
+   "func": "vp_get",
+   "fanin": 23,
+   "sample_callers": [
+    "cache_type_show",
+    "init_vq",
+    "p9_virtio_probe",
+    "virtblk_probe",
+    "virtblk_update_cache_mode",
+    "virtblk_update_capacity"
+   ]
+  },
+  {
+   "func": "ep_ptable_queue_proc",
+   "fanin": 16,
+   "sample_callers": [
+    "__ep_eventpoll_poll",
+    "datagram_poll",
+    "devkmsg_poll",
+    "eventfd_poll",
+    "inotify_poll",
+    "mounts_poll"
+   ]
+  },
+  {
+   "func": "ata_sff_check_status",
+   "fanin": 16,
+   "sample_callers": [
+    "__ata_sff_port_intr",
+    "ata_bmdma_qc_issue",
+    "ata_hsm_qc_complete",
+    "ata_sff_check_ready",
+    "ata_sff_dev_classify",
+    "ata_sff_drain_fifo"
+   ]
+  },
+  {
+   "func": "ata_sff_dev_select",
+   "fanin": 12,
+   "sample_callers": [
+    "ata_bmdma_qc_issue",
+    "ata_devchk",
+    "ata_sff_dev_classify",
+    "ata_sff_postreset",
+    "ata_sff_qc_issue",
+    "ata_sff_softreset"
+   ]
+  },
+  {
+   "func": "kvm_clock_get_cycles",
+   "fanin": 11,
+   "sample_callers": [
+    "clocksource_watchdog",
+    "ktime_get",
+    "ktime_get_mono_fast_ns",
+    "ktime_get_real_ts64",
+    "ktime_get_ts64",
+    "ktime_get_update_offsets_now"
+   ]
+  },
+  {
+   "func": "sock_def_readable",
+   "fanin": 11,
+   "sample_callers": [
+    "__netlink_sendskb",
+    "__sock_queue_rcv_skb",
+    "netlink_broadcast_filtered",
+    "netlink_dump",
+    "netlink_sendskb",
+    "packet_rcv"
+   ]
+  },
+  {
+   "func": "vp_get_status",
+   "fanin": 9,
+   "sample_callers": [
+    "p9_virtio_probe",
+    "register_virtio_device",
+    "status_show",
+    "virtblk_probe",
+    "virtio_dev_probe",
+    "virtio_features_ok"
+   ]
+  },
+  {
+   "func": "sock_def_wakeup",
+   "fanin": 8,
+   "sample_callers": [
+    "inet_shutdown",
+    "tcp_done",
+    "tcp_fin",
+    "tcp_rcv_state_process",
+    "unix_release_sock",
+    "unix_shutdown"
+   ]
+  },
+  {
+   "func": "__pollwait",
+   "fanin": 8,
+   "sample_callers": [
+    "datagram_poll",
+    "inotify_poll",
+    "n_tty_poll",
+    "pipe_poll",
+    "tcp_poll",
+    "unix_dgram_poll"
+   ]
+  },
+  {
+   "func": "jiffies_read",
+   "fanin": 7,
+   "sample_callers": [
+    "change_clocksource",
+    "ktime_get",
+    "ktime_get_mono_fast_ns",
+    "ktime_get_update_offsets_now",
+    "ktime_get_with_offset",
+    "timekeeping_advance"
+   ]
+  },
+  {
+   "func": "uart_chars_in_buffer",
+   "fanin": 6,
+   "sample_callers": [
+    "set_termios",
+    "tty_chars_in_buffer",
+    "tty_wait_until_sent"
+   ]
+  },
+  {
+   "func": "vp_generation",
+   "fanin": 6,
+   "sample_callers": [
+    "p9_virtio_probe",
+    "virtblk_update_capacity",
+    "virtnet_probe"
+   ]
+  }
+ ],
+ "pa_baseline_top_components": [
+  {
+   "funcs": 392,
+   "call_sites": 1,
+   "example": "sdev_show_device_blocked"
+  },
+  {
+   "funcs": 118,
+   "call_sites": 1,
+   "example": "hugetlb_sysctl_handler"
+  },
+  {
+   "funcs": 107,
+   "call_sites": 2,
+   "example": "cmdline_proc_show"
+  },
+  {
+   "funcs": 94,
+   "call_sites": 1,
+   "example": "loopback_net_init"
+  },
+  {
+   "funcs": 86,
+   "call_sites": 1,
+   "example": "dev_proc_net_exit"
+  },
+  {
+   "funcs": 80,
+   "call_sites": 1,
+   "example": "finish_cpu"
+  },
+  {
+   "funcs": 77,
+   "call_sites": 2,
+   "example": "slab_start"
+  },
+  {
+   "funcs": 72,
+   "call_sites": 3,
+   "example": "vmstat_stop"
+  }
+ ],
+ "pa_baseline_top_components_by_callsites": [
+  {
+   "funcs": 1,
+   "call_sites": 48,
+   "example": "io_serial_out"
+  },
+  {
+   "funcs": 1,
+   "call_sites": 37,
+   "example": "filldir64"
+  },
+  {
+   "funcs": 1,
+   "call_sites": 35,
+   "example": "io_serial_in"
+  },
+  {
+   "funcs": 1,
+   "call_sites": 23,
+   "example": "vp_get"
+  },
+  {
+   "funcs": 2,
+   "call_sites": 19,
+   "example": "ep_ptable_queue_proc"
+  },
+  {
+   "funcs": 1,
+   "call_sites": 16,
+   "example": "ata_sff_check_status"
+  },
+  {
+   "funcs": 2,
+   "call_sites": 12,
+   "example": "jiffies_read"
+  },
+  {
+   "funcs": 1,
+   "call_sites": 12,
+   "example": "ata_sff_dev_select"
+  }
+ ],
+ "hf_convergence_ns": [
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  129218778,
+  137526927,
+  137935112,
+  141312129,
+  141513530,
+  141913632,
+  141944458,
+  142389861,
+  145478285,
+  151645135,
+  186797372,
+  193672314,
+  194233492,
+  197743626,
+  200975083,
+  203623280,
+  204678245,
+  211630231,
+  218621569,
+  222948027,
+  223334254,
+  223661278,
+  230210137,
+  230217544,
+  230663107,
+  282627683,
+  290350415,
+  290354628,
+  290356514,
+  292241349,
+  305295951,
+  305612714,
+  306908885,
+  316484942,
+  326356884,
+  684948355,
+  687497491,
+  707839853,
+  713652282,
+  713660746,
+  713735037,
+  715229217,
+  715358955,
+  716671618,
+  716802471,
+  717778129,
+  717790175,
+  717790339,
+  717791977,
+  720947773,
+  721076583,
+  721162809,
+  721797901,
+  721855948,
+  721856152,
+  721856578,
+  721856911,
+  721857392,
+  721862858,
+  721863171,
+  721863568,
+  721863978,
+  721864424,
+  721864802,
+  721865212,
+  721865653,
+  721865912,
+  721866304,
+  732231455,
+  755121553,
+  761433321,
+  761433865,
+  761434243,
+  761434825,
+  761435230,
+  761435690,
+  793587440,
+  809467452,
+  809531526,
+  875451144,
+  877680009,
+  877731573,
+  880070864,
+  881422505,
+  881863118,
+  888344969,
+  902035380,
+  902183264,
+  914486320,
+  1367570845,
+  1379342389,
+  1396137960,
+  1396142091,
+  1396592104,
+  1490678020,
+  1493245698,
+  1515058755,
+  1515619303,
+  1515670290,
+  1515674308,
+  1515706817,
+  1515926632,
+  1515989543,
+  1576926507,
+  1576929362,
+  1577492152,
+  1580708605,
+  1598149118,
+  1598315338,
+  1598365977,
+  1598371948,
+  1598594271,
+  1598708139,
+  1598710255,
+  1601229071,
+  1601443088,
+  1602437638,
+  1612135581,
+  1612222961,
+  1616975568,
+  1616996320,
+  1619810611,
+  1619811078,
+  1620018553,
+  1620040686,
+  1620158848,
+  1620169626,
+  1620450015,
+  1627146389,
+  1628671495,
+  1628845289,
+  1631450565,
+  1649171170,
+  1667463214,
+  1667464230,
+  1667524031,
+  1667524461,
+  1678670691,
+  1678709864,
+  1678722630,
+  1678722995,
+  1678762151,
+  1679068726,
+  1679070487,
+  1679074504,
+  1679566449,
+  1718407598,
+  1726120293,
+  1726831392,
+  1741498451,
+  1741521664,
+  1770567236,
+  1779989300,
+  1801487852,
+  1813163142,
+  1813309869,
+  1868270044,
+  1942633410,
+  1943880082,
+  1951339240,
+  1955337411,
+  1972959602,
+  1978656586,
+  1986759740,
+  1989728800,
+  1992507265,
+  2008415844,
+  2013352855,
+  2016576628,
+  2016626658,
+  2017802333,
+  2024358134,
+  2024363731,
+  2091983150,
+  2125405354,
+  2131535120,
+  2136586940,
+  2137436715,
+  2144863890,
+  2168065696,
+  2170836557,
+  2215251376,
+  2225023217,
+  2225199093,
+  2227345717,
+  2227346747,
+  2263633030,
+  2270679888,
+  2297325630,
+  2307659415,
+  2316197670,
+  2324204948,
+  2324275790,
+  2331561844,
+  2333461414,
+  2340024174,
+  2424057837,
+  2508396847,
+  2508398477,
+  2521152928,
+  2621058216,
+  2630173240,
+  2681642620,
+  2690817473,
+  3690896760,
+  5527692928,
+  6045887810,
+  6171170959,
+  21107667568,
+  21223821084,
+  21225009084,
+  21231231882,
+  21254965060,
+  21258301550,
+  21269144389,
+  21270031796,
+  21307851870,
+  21308471689,
+  21308472338,
+  21308477570,
+  21308482747,
+  23402628876,
+  23494611960,
+  23494627016,
+  23559136792,
+  25595014055,
+  25873177640,
+  25876650500,
+  25877845970,
+  25881279134,
+  25881388583,
+  25881392308,
+  25881393030,
+  25881406744,
+  25883593977,
+  25883603850,
+  25883679408,
+  25883823759,
+  25884009180,
+  31297253045,
+  31297280092,
+  31297287594,
+  31297297099,
+  31297300390,
+  31297312094,
+  31297334779,
+  31297343407,
+  31297420903,
+  31297425423,
+  31297428374,
+  31450118999,
+  31455430123,
+  31455720852,
+  31567577449,
+  31582178984,
+  31590020674,
+  31601507114,
+  31890917138,
+  33020658893,
+  33020934255,
+  33020999040,
+  33021031129,
+  33021055121,
+  33028307886,
+  33121703846,
+  33168222050,
+  33487679450,
+  33487690974,
+  33539856962,
+  33545071038,
+  33545124658,
+  41080264621,
+  70498284590,
+  73216061370,
+  73216306030,
+  73247681026,
+  73247967426,
+  94729178072,
+  118017719748,
+  118017874197,
+  118018478743,
+  118018640553,
+  127945703740,
+  127945731639,
+  130832380625,
+  131398047119,
+  131459501334,
+  132711652550,
+  132793056232,
+  133388980650,
+  138080394637,
+  138392133302,
+  138553187649,
+  138553210953,
+  138558280785,
+  138558338197,
+  138568006205,
+  138587595797,
+  138607483713,
+  138642184825,
+  138644239711,
+  138649307817,
+  138649423557,
+  138654508918,
+  138659204558,
+  138659234783,
+  138673698009,
+  138673743439,
+  138678743389,
+  138678792933,
+  138688524517,
+  138699740007,
+  138699878563,
+  138709514071,
+  138709550478,
+  138714640677,
+  138719328205,
+  138724293733,
+  138724336273,
+  138729016221,
+  138729050261,
+  138738849709,
+  138738874038,
+  138748557465,
+  138748790853,
+  138767914558,
+  138768023921,
+  138772748581,
+  138772769305,
+  138777346865,
+  138782265293,
+  138787236073,
+  138806440518,
+  138806457909,
+  138825986929,
+  138830614859,
+  138835125618,
+  138835150511,
+  138844275081,
+  138844442631,
+  138858671189,
+  138858727023,
+  138863350162,
+  138873454089,
+  138873492191,
+  138878584693,
+  138892850283,
+  138892850661,
+  138892870046,
+  138897544585,
+  138897544933,
+  138964947683,
+  138970143269,
+  138991526223,
+  139100070120,
+  139114227045,
+  139114237729,
+  139119247501,
+  139119773791,
+  139124730223,
+  139124995333,
+  139129535033,
+  139129584865,
+  139129774323,
+  139129776581,
+  139134328698,
+  139134438323,
+  139153569837,
+  139153944133,
+  139158561631,
+  139158673061,
+  139168370118,
+  139174716393,
+  139174732245,
+  139179313221,
+  139179313601,
+  139179611658,
+  139216150981,
+  139221270991,
+  139230748749,
+  139230770837,
+  139255473195,
+  139260043763,
+  139260160373,
+  139265179901,
+  139285497978,
+  139290686605,
+  139306497543,
+  139313041427,
+  139313104565,
+  139318184269,
+  139443773126,
+  139444075588,
+  139444385381,
+  139451379725,
+  144829998412,
+  144830036662,
+  144895819132,
+  144895820497,
+  144898299156
+ ]
+}

@@ -1,0 +1,118 @@
+\contentsline {chapter}{\numberline {第1章\hspace {.3em}}绪论}{1}{chapter.1}%
+\contentsline {section}{\numberline {1.1}从内核内存安全缺陷到持续随机化}{1}{section.1.1}%
+\contentsline {section}{\numberline {1.2}研究问题与面临的挑战}{4}{section.1.2}%
+\contentsline {subsection}{\numberline {1.2.1}共性挑战：built-in 代码缺乏明确的随机化边界}{6}{subsection.1.2.1}%
+\contentsline {subsection}{\numberline {1.2.2}挑战一：代码索引更新与执行流协调}{7}{subsection.1.2.2}%
+\contentsline {subsection}{\numberline {1.2.3}挑战二：随机化的触发时机与作用对象}{8}{subsection.1.2.3}%
+\contentsline {subsection}{\numberline {1.2.4}挑战三：非随机化区域中指针认证上下文的传播}{8}{subsection.1.2.4}%
+\contentsline {section}{\numberline {1.3}研究内容与主要贡献}{9}{section.1.3}%
+\contentsline {subsection}{\numberline {1.3.1}研究内容一：基于跳板函数的低开销持续随机化}{9}{subsection.1.3.1}%
+\contentsline {subsection}{\numberline {1.3.2}研究内容二：基于代码索引泄露的触发式随机化}{11}{subsection.1.3.2}%
+\contentsline {subsection}{\numberline {1.3.3}研究内容三：基于随机化辅助的 ARM 指针认证机制}{11}{subsection.1.3.3}%
+\contentsline {subsection}{\numberline {1.3.4}三项工作的关系}{12}{subsection.1.3.4}%
+\contentsline {section}{\numberline {1.4}本文的安全性论证方式}{12}{section.1.4}%
+\contentsline {section}{\numberline {1.5}论文组织结构}{13}{section.1.5}%
+\contentsline {chapter}{\numberline {第2章\hspace {.3em}}相关研究综述与威胁模型}{15}{chapter.2}%
+\contentsline {section}{\numberline {2.1}内存安全漏洞攻防方法的演进}{15}{section.2.1}%
+\contentsline {section}{\numberline {2.2}内核地址空间布局随机化相关工作}{18}{section.2.2}%
+\contentsline {subsection}{\numberline {2.2.1}一次性随机化}{19}{subsection.2.2.1}%
+\contentsline {subsection}{\numberline {2.2.2}持续随机化}{19}{subsection.2.2.2}%
+\contentsline {subsection}{\numberline {2.2.3}部分随机化与触发式随机化}{19}{subsection.2.2.3}%
+\contentsline {section}{\numberline {2.3}持续随机化的三个核心问题}{21}{section.2.3}%
+\contentsline {subsection}{\numberline {2.3.1}代码索引更新}{21}{subsection.2.3.1}%
+\contentsline {subsection}{\numberline {2.3.2}执行流的安全暂停}{22}{subsection.2.3.2}%
+\contentsline {subsection}{\numberline {2.3.3}随机化的触发策略}{22}{subsection.2.3.3}%
+\contentsline {subsection}{\numberline {2.3.4}非随机化区域的处理}{23}{subsection.2.3.4}%
+\contentsline {section}{\numberline {2.4}只执行内存技术}{24}{section.2.4}%
+\contentsline {subsection}{\numberline {2.4.1}实现路径}{24}{subsection.2.4.1}%
+\contentsline {subsection}{\numberline {2.4.2}内核场景下的两个困难}{25}{subsection.2.4.2}%
+\contentsline {section}{\numberline {2.5}硬件辅助的控制流完整性}{26}{section.2.5}%
+\contentsline {subsection}{\numberline {2.5.1}落地点标记类}{26}{subsection.2.5.1}%
+\contentsline {subsection}{\numberline {2.5.2}签名验证类}{27}{subsection.2.5.2}%
+\contentsline {subsection}{\numberline {2.5.3}类型哈希类}{27}{subsection.2.5.3}%
+\contentsline {subsection}{\numberline {2.5.4}小结}{28}{subsection.2.5.4}%
+\contentsline {section}{\numberline {2.6}本文的威胁模型}{28}{section.2.6}%
+\contentsline {subsection}{\numberline {2.6.1}攻击者能力}{28}{subsection.2.6.1}%
+\contentsline {subsection}{\numberline {2.6.2}四类攻击向量}{28}{subsection.2.6.2}%
+\contentsline {subsection}{\numberline {2.6.3}信任基础}{29}{subsection.2.6.3}%
+\contentsline {subsection}{\numberline {2.6.4}明确的排除项}{30}{subsection.2.6.4}%
+\contentsline {section}{\numberline {2.7}安全不变式}{31}{section.2.7}%
+\contentsline {subsection}{\numberline {2.7.1}不变式的定义}{31}{subsection.2.7.1}%
+\contentsline {subsection}{\numberline {2.7.2}不变式与章节、证据层级的对应}{31}{subsection.2.7.2}%
+\contentsline {section}{\numberline {2.8}本章小结}{32}{section.2.8}%
+\contentsline {chapter}{\numberline {第3章\hspace {.3em}}基于跳板函数的低开销持续随机化方法}{33}{chapter.3}%
+\contentsline {section}{\numberline {3.1}引言}{33}{section.3.1}%
+\contentsline {section}{\numberline {3.2}研究背景与动机}{33}{section.3.2}%
+\contentsline {subsection}{\numberline {3.2.1}Built-in 代码的代码索引更新}{33}{subsection.3.2.1}%
+\contentsline {subsection}{\numberline {3.2.2}Built-in 代码的执行流暂停}{34}{subsection.3.2.2}%
+\contentsline {subsection}{\numberline {3.2.3}研究动机与挑战}{34}{subsection.3.2.3}%
+\contentsline {section}{\numberline {3.3}系统设计}{35}{section.3.3}%
+\contentsline {subsection}{\numberline {3.3.1}总体架构}{35}{subsection.3.3.1}%
+\contentsline {subsection}{\numberline {3.3.2}跳板函数的设计}{36}{subsection.3.3.2}%
+\contentsline {subsection}{\numberline {3.3.3}函数粒度位置无关代码}{41}{subsection.3.3.3}%
+\contentsline {subsection}{\numberline {3.3.4}执行流追踪与安全暂停}{45}{subsection.3.3.4}%
+\contentsline {section}{\numberline {3.4}系统实现}{47}{section.3.4}%
+\contentsline {subsection}{\numberline {3.4.1}LLVM 编译器扩展}{47}{subsection.3.4.1}%
+\contentsline {subsection}{\numberline {3.4.2}运行时随机化的实现}{48}{subsection.3.4.2}%
+\contentsline {subsection}{\numberline {3.4.3}可随机化的边界}{50}{subsection.3.4.3}%
+\contentsline {section}{\numberline {3.5}实验评估}{50}{section.3.5}%
+\contentsline {subsection}{\numberline {3.5.1}实验配置}{50}{subsection.3.5.1}%
+\contentsline {subsection}{\numberline {3.5.2}随机化延迟}{51}{subsection.3.5.2}%
+\contentsline {subsection}{\numberline {3.5.3}随机化内核核心子系统的开销}{54}{subsection.3.5.3}%
+\contentsline {subsection}{\numberline {3.5.4}与已有持续随机化工作的同条件对比}{55}{subsection.3.5.4}%
+\contentsline {subsection}{\numberline {3.5.5}随机化范围与跳板调用占比的关系}{56}{subsection.3.5.5}%
+\contentsline {section}{\numberline {3.6}安全性分析}{58}{section.3.6}%
+\contentsline {section}{\numberline {3.7}本章小结}{58}{section.3.7}%
+\contentsline {chapter}{\numberline {第4章\hspace {.3em}}基于代码索引泄露的触发式随机化}{61}{chapter.4}%
+\contentsline {section}{\numberline {4.1}引言}{61}{section.4.1}%
+\contentsline {section}{\numberline {4.2}研究背景与动机}{61}{section.4.2}%
+\contentsline {subsection}{\numberline {4.2.1}跳板机制在开销上的局限}{61}{subsection.4.2.1}%
+\contentsline {subsection}{\numberline {4.2.2}随机化的触发策略}{62}{subsection.4.2.2}%
+\contentsline {subsection}{\numberline {4.2.3}保护整个代码区域的代价}{62}{subsection.4.2.3}%
+\contentsline {subsection}{\numberline {4.2.4}研究动机与挑战}{63}{subsection.4.2.4}%
+\contentsline {section}{\numberline {4.3}系统设计}{63}{section.4.3}%
+\contentsline {subsection}{\numberline {4.3.1}总体架构}{63}{subsection.4.3.1}%
+\contentsline {subsection}{\numberline {4.3.2}只执行代码区域的设计}{63}{subsection.4.3.2}%
+\contentsline {subsection}{\numberline {4.3.3}信息泄露识别}{64}{subsection.4.3.3}%
+\contentsline {subsection}{\numberline {4.3.4}两级跳板与跳板激活}{66}{subsection.4.3.4}%
+\contentsline {section}{\numberline {4.4}系统实现}{68}{section.4.4}%
+\contentsline {subsection}{\numberline {4.4.1}x86 平台：基于管理态保护键的只执行内存}{68}{subsection.4.4.1}%
+\contentsline {subsection}{\numberline {4.4.2}ARM 平台：基于硬件调试观察点的实现}{69}{subsection.4.4.2}%
+\contentsline {subsection}{\numberline {4.4.3}两级跳板的代码生成}{70}{subsection.4.4.3}%
+\contentsline {section}{\numberline {4.5}实验评估}{71}{section.4.5}%
+\contentsline {subsection}{\numberline {4.5.1}实验配置}{71}{subsection.4.5.1}%
+\contentsline {subsection}{\numberline {4.5.2}两条路径的单次检测开销}{72}{subsection.4.5.2}%
+\contentsline {subsection}{\numberline {4.5.3}触发频率与触发延迟}{72}{subsection.4.5.3}%
+\contentsline {subsection}{\numberline {4.5.4}泄露地址的有效期与利用竞态}{74}{subsection.4.5.4}%
+\contentsline {subsection}{\numberline {4.5.5}未激活与激活状态的单次调用开销}{75}{subsection.4.5.5}%
+\contentsline {section}{\numberline {4.6}安全性分析}{76}{section.4.6}%
+\contentsline {section}{\numberline {4.7}本章小结}{76}{section.4.7}%
+\contentsline {chapter}{\numberline {第5章\hspace {.3em}}基于随机化辅助的 ARM 指针认证机制}{79}{chapter.5}%
+\contentsline {section}{\numberline {5.1}引言}{79}{section.5.1}%
+\contentsline {section}{\numberline {5.2}研究背景与动机}{79}{section.5.2}%
+\contentsline {subsection}{\numberline {5.2.1}部分随机化与非随机化区域}{79}{subsection.5.2.1}%
+\contentsline {subsection}{\numberline {5.2.2}指针认证与上下文传播}{80}{subsection.5.2.2}%
+\contentsline {subsection}{\numberline {5.2.3}研究动机与挑战}{81}{subsection.5.2.3}%
+\contentsline {section}{\numberline {5.3}系统设计}{81}{section.5.3}%
+\contentsline {subsection}{\numberline {5.3.1}总体架构与核心思想}{81}{subsection.5.3.1}%
+\contentsline {subsection}{\numberline {5.3.2}以随机化打断上下文传播链}{82}{subsection.5.3.2}%
+\contentsline {subsection}{\numberline {5.3.3}跳板处的分区验证}{83}{subsection.5.3.3}%
+\contentsline {section}{\numberline {5.4}系统实现}{85}{section.5.4}%
+\contentsline {subsection}{\numberline {5.4.1}编译期：指针认证插桩}{85}{subsection.5.4.1}%
+\contentsline {subsection}{\numberline {5.4.2}运行期：高扇入函数的跟踪、绑定与迁移}{86}{subsection.5.4.2}%
+\contentsline {subsection}{\numberline {5.4.3}跨区域出口的双重检查}{86}{subsection.5.4.3}%
+\contentsline {section}{\numberline {5.5}实验评估}{88}{section.5.5}%
+\contentsline {subsection}{\numberline {5.5.1}实验配置}{88}{subsection.5.5.1}%
+\contentsline {subsection}{\numberline {5.5.2}控制流完整性检查的精度与开销}{88}{subsection.5.5.2}%
+\contentsline {subsection}{\numberline {5.5.3}高扇入函数识别的收敛与准确性}{91}{subsection.5.5.3}%
+\contentsline {subsection}{\numberline {5.5.4}其他部分随机化方法迁移}{92}{subsection.5.5.4}%
+\contentsline {section}{\numberline {5.6}安全性分析}{96}{section.5.6}%
+\contentsline {section}{\numberline {5.7}本章小结}{97}{section.5.7}%
+\contentsline {chapter}{\numberline {第6章\hspace {.3em}}总结与展望}{99}{chapter.6}%
+\contentsline {section}{\numberline {6.1}论文总结}{99}{section.6.1}%
+\contentsline {section}{\numberline {6.2}主要创新点}{100}{section.6.2}%
+\contentsline {section}{\numberline {6.3}局限性与未来工作}{100}{section.6.3}%
+\contentsline {section}{\numberline {6.4}结语}{102}{section.6.4}%
+\contentsline {chapter}{参考文献}{103}{section*.75}%
+\contentsline {chapter}{致谢}{111}{appendix*.77}%
+\contentsline {chapter}{作者简历及攻读学位期间发表的学术论文与其他相关学术成果}{113}{appendix*.78}%

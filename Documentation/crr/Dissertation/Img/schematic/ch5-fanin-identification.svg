@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 390" width="720" height="390"
+     font-family="PingFang SC, Hiragino Sans GB, Noto Sans CJK SC, Microsoft YaHei, sans-serif">
+<!-- 图 5-4 高扇入函数的识别与绑定 -->
+<defs>
+  <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#000"/></marker>
+  <marker id="ahs" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#000"/></marker>
+  <marker id="oah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0.6,0.6 L7,4 L0.6,7.4 z" fill="#fff" stroke="#000" stroke-width="1"/></marker>
+  <marker id="ahb" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#0072B2"/></marker>
+  <marker id="ahr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#D55E00"/></marker>
+  <marker id="ahg" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#555"/></marker>
+  <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#fff"/><line x1="0" y1="0" x2="0" y2="6" stroke="#000" stroke-width="1"/></pattern>
+  <pattern id="hatch2" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><rect width="5" height="5" fill="#fff"/><line x1="0" y1="0" x2="0" y2="5" stroke="#000" stroke-width="0.7"/></pattern>
+  <pattern id="dots" width="5" height="5" patternUnits="userSpaceOnUse"><rect width="5" height="5" fill="#fff"/><circle cx="2.5" cy="2.5" r="0.9" fill="#000"/></pattern>
+</defs>
+<style>
+  text  { fill:#000; }
+  .lbl  { font-size:11.5px; letter-spacing:.06em; }
+  .box  { fill:#fff; stroke:#000; stroke-width:1.2; }
+  .thick{ fill:#fff; stroke:#000; stroke-width:2; }
+  .plain{ fill:#fff; stroke:#000; stroke-width:0.8; }
+  .nr   { fill:#fff; stroke:#000; stroke-width:1.2; stroke-dasharray:6 3; }
+  .tr   { fill:#fff; stroke:#0072B2; stroke-width:2; }
+  .rd   { fill:#F0F0F0; stroke:#000; stroke-width:1.2; stroke-dasharray:1.5 2.5; }
+  .dt   { fill:#E3EEF7; stroke:#0072B2; stroke-width:2; }
+  .hw   { fill:#EDEDED; stroke:#555; stroke-width:1.2; }
+  .ours { fill:#E3EEF7; stroke:#0072B2; stroke-width:2; }
+  .dis  { fill:#fff; stroke:#000; stroke-width:0.8; stroke-dasharray:2 2; }
+  .concl{ fill:#E3EEF7; stroke:#0072B2; stroke-width:1.6; }
+  .ghost{ fill:#fff; stroke:#D55E00; stroke-width:1.2; stroke-dasharray:4 3; }
+  .trap { fill:url(#hatch); stroke:#000; stroke-width:1.2; }
+  .shade{ fill:url(#hatch2); stroke:#000; stroke-width:1; }
+  .dotf { fill:url(#dots); stroke:#000; stroke-width:1.2; }
+  .c5   { fill:#fff; stroke:#000; stroke-width:1.2; }
+  .bt   { font-size:12.5px; text-anchor:middle; }
+  .btl  { font-size:12.5px; }
+  .bs   { font-size:11px; text-anchor:middle; }
+  .bsl  { font-size:11px; }
+  .ttl  { font-size:13.5px; font-weight:bold; text-anchor:middle; }
+  .ttll { font-size:13.5px; font-weight:bold; }
+  .mono { font-family:"SF Mono",Menlo,Consolas,"Courier New",monospace; font-size:11.5px; }
+  .monos{ font-family:"SF Mono",Menlo,Consolas,"Courier New",monospace; font-size:10.5px; }
+  .mn   { fill:#000; font-weight:bold; }
+  .off  { fill:#555; }
+  .cap  { font-size:11px; fill:#333; }
+  .capc { font-size:11px; fill:#333; text-anchor:middle; }
+  .note { font-size:11.5px; }
+  .key  { font-size:11.5px; font-weight:bold; fill:#0072B2; }
+  .keyc { font-size:11.5px; font-weight:bold; text-anchor:middle; fill:#0072B2; }
+  .red  { font-size:11.5px; font-weight:bold; fill:#D55E00; }
+  .redc { font-size:11.5px; font-weight:bold; text-anchor:middle; fill:#D55E00; }
+  .good { font-size:11.5px; font-weight:bold; }
+  .goodc{ font-size:11.5px; font-weight:bold; text-anchor:middle; }
+  .gold { font-size:11.5px; font-weight:bold; }
+  .cf   { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#ah); }
+  .cfb  { fill:none; stroke:#0072B2; stroke-width:2; marker-end:url(#ahb); }
+  .cfg  { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#ah); }
+  .cfr  { fill:none; stroke:#D55E00; stroke-width:1.6; stroke-dasharray:7 3; marker-end:url(#ahr); }
+  .cfy  { fill:none; stroke:#0072B2; stroke-width:2; marker-end:url(#ahb); }
+  .cfm  { fill:none; stroke:#000; stroke-width:0.9; marker-end:url(#ahs); }
+  .cfo  { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#oah); }
+  .df   { fill:none; stroke:#555; stroke-width:1.1; stroke-dasharray:4 3; marker-end:url(#ahg); }
+  .dfb  { fill:none; stroke:#0072B2; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahb); }
+  .dfr  { fill:none; stroke:#D55E00; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahr); }
+  .dfy  { fill:none; stroke:#0072B2; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahb); }
+  .dep  { fill:none; stroke:#000; stroke-width:1.1; stroke-dasharray:6 4; marker-end:url(#ahs); }
+  .ln   { fill:none; stroke:#000; stroke-width:1.1; }
+  .lnr  { fill:none; stroke:#D55E00; stroke-width:1.6; }
+  .lng  { fill:none; stroke:#000; stroke-width:1.3; }
+  .dash { fill:none; stroke:#000; stroke-width:1; stroke-dasharray:5 4; }
+  .div  { stroke:#000; stroke-width:0.6; }
+  .axis { stroke:#000; stroke-width:1.1; fill:none; }
+  .grid { stroke:#999; stroke-width:0.5; stroke-dasharray:2 3; }
+</style>
+<rect width="720" height="390" fill="#fff"/>
+<text class="btl" x="30" y="74">CallSite1</text>
+<line class="grid" x1="150" y1="70" x2="690" y2="70"/>
+<text class="btl" x="30" y="154">函数指针 ptr</text>
+<line class="grid" x1="150" y1="150" x2="690" y2="150"/>
+<text class="btl" x="30" y="234">归属记录</text>
+<line class="grid" x1="150" y1="230" x2="690" y2="230"/>
+<text class="btl" x="30" y="314">CallSite2</text>
+<line class="grid" x1="150" y1="310" x2="690" y2="310"/>
+<line x1="177" y1="50" x2="177" y2="330" stroke="#000" stroke-width="0.6" stroke-dasharray="3 3"/>
+<text class="capc" x="177" y="46">t0 签名</text>
+<line x1="285" y1="50" x2="285" y2="330" stroke="#000" stroke-width="0.6" stroke-dasharray="3 3"/>
+<text class="capc" x="285" y="46">t1 CS1 认证</text>
+<line x1="393" y1="50" x2="393" y2="330" stroke="#000" stroke-width="0.6" stroke-dasharray="3 3"/>
+<text class="capc" x="393" y="46">t2 CS1 再用</text>
+<line x1="501" y1="50" x2="501" y2="330" stroke="#000" stroke-width="0.6" stroke-dasharray="3 3"/>
+<text class="capc" x="501" y="46">t3 CS2 触及</text>
+<line x1="625.2" y1="50" x2="625.2" y2="330" stroke="#000" stroke-width="0.6" stroke-dasharray="3 3"/>
+<text class="capc" x="625.2" y="46">t4 绑定</text>
+<rect class="box" x="166.2" y="136" width="448.2" height="28"/>
+<text class="bt" x="390.3" y="154">ptr 的签名恒为类型上下文 ctx = H(type)，识别阶段不改写</text>
+<rect class="thick" x="614.4" y="136" width="75.6" height="28"/>
+<text class="bs" x="652.2" y="154">ctx = H(&amp;CS1)</text>
+<rect class="box" x="245" y="56" width="80" height="28"/>
+<text class="bs" x="285" y="74">以 type 认证</text>
+<path class="cf" d="M285,84 L285,136"/>
+<path class="df" d="M285,164 L285,216"/>
+<rect class="box" x="241" y="216" width="88" height="28"/>
+<text class="bs" x="285" y="234">owner = CS1</text>
+<rect class="box" x="353" y="56" width="80" height="28"/>
+<text class="bs" x="393" y="74">再次使用</text>
+<path class="cf" d="M393,84 L393,136"/>
+<path class="df" d="M393,164 L393,216"/>
+<rect class="box" x="349" y="216" width="88" height="28"/>
+<text class="bs" x="393" y="234">命中，正常</text>
+<rect class="box" x="461" y="296" width="80" height="28"/>
+<text class="bs" x="501" y="314">以 type 认证</text>
+<path class="cf" d="M501,296 L501,164"/>
+<path class="df" d="M501,164 L501,244"/>
+<rect class="thick" x="449" y="216" width="104" height="28"/>
+<text class="bs" x="501" y="234">owner 已是 CS1</text>
+<text class="key" x="559" y="226">→ 判为高扇入</text>
+<text class="key" x="559" y="242">移入随机化区域</text>
+<text class="key" x="615.2" y="190" text-anchor="middle">绑定：单一归属函数重签为 H(&amp;CS1)</text>
+<text class="cap" x="615.2" y="206" text-anchor="middle">精度在此刻才提升</text>
+<rect class="box" x="30" y="364" width="22" height="13"/>
+<text class="cap" x="58" y="374">类型上下文</text>
+<rect class="thick" x="131" y="364" width="22" height="13"/>
+<text class="cap" x="159" y="374">调用点唯一上下文 / 归属冲突</text>
+<path class="cf" d="M328.8,370 L358.8,370"/>
+<text class="cap" x="364.8" y="374">认证</text>
+<path class="df" d="M404.8,370 L434.8,370"/>
+<text class="cap" x="440.8" y="374">读写归属记录</text>
+</svg>

@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 432" width="720" height="432"
+     font-family="PingFang SC, Hiragino Sans GB, Noto Sans CJK SC, Microsoft YaHei, sans-serif">
+<!-- 图 4-4 只执行保护施加的映射与跳转桩的改写路径 -->
+<defs>
+  <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#000"/></marker>
+  <marker id="ahs" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#000"/></marker>
+  <marker id="oah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0.6,0.6 L7,4 L0.6,7.4 z" fill="#fff" stroke="#000" stroke-width="1"/></marker>
+  <marker id="ahb" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#0072B2"/></marker>
+  <marker id="ahr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#D55E00"/></marker>
+  <marker id="ahg" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#555"/></marker>
+  <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#fff"/><line x1="0" y1="0" x2="0" y2="6" stroke="#000" stroke-width="1"/></pattern>
+  <pattern id="hatch2" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><rect width="5" height="5" fill="#fff"/><line x1="0" y1="0" x2="0" y2="5" stroke="#000" stroke-width="0.7"/></pattern>
+  <pattern id="dots" width="5" height="5" patternUnits="userSpaceOnUse"><rect width="5" height="5" fill="#fff"/><circle cx="2.5" cy="2.5" r="0.9" fill="#000"/></pattern>
+</defs>
+<style>
+  text  { fill:#000; }
+  .lbl  { font-size:11.5px; letter-spacing:.06em; }
+  .box  { fill:#fff; stroke:#000; stroke-width:1.2; }
+  .thick{ fill:#fff; stroke:#000; stroke-width:2; }
+  .plain{ fill:#fff; stroke:#000; stroke-width:0.8; }
+  .nr   { fill:#fff; stroke:#000; stroke-width:1.2; stroke-dasharray:6 3; }
+  .tr   { fill:#fff; stroke:#0072B2; stroke-width:2; }
+  .rd   { fill:#F0F0F0; stroke:#000; stroke-width:1.2; stroke-dasharray:1.5 2.5; }
+  .dt   { fill:#E3EEF7; stroke:#0072B2; stroke-width:2; }
+  .hw   { fill:#EDEDED; stroke:#555; stroke-width:1.2; }
+  .ours { fill:#E3EEF7; stroke:#0072B2; stroke-width:2; }
+  .dis  { fill:#fff; stroke:#000; stroke-width:0.8; stroke-dasharray:2 2; }
+  .concl{ fill:#E3EEF7; stroke:#0072B2; stroke-width:1.6; }
+  .ghost{ fill:#fff; stroke:#D55E00; stroke-width:1.2; stroke-dasharray:4 3; }
+  .trap { fill:url(#hatch); stroke:#000; stroke-width:1.2; }
+  .shade{ fill:url(#hatch2); stroke:#000; stroke-width:1; }
+  .dotf { fill:url(#dots); stroke:#000; stroke-width:1.2; }
+  .c5   { fill:#fff; stroke:#000; stroke-width:1.2; }
+  .bt   { font-size:12.5px; text-anchor:middle; }
+  .btl  { font-size:12.5px; }
+  .bs   { font-size:11px; text-anchor:middle; }
+  .bsl  { font-size:11px; }
+  .ttl  { font-size:13.5px; font-weight:bold; text-anchor:middle; }
+  .ttll { font-size:13.5px; font-weight:bold; }
+  .mono { font-family:"SF Mono",Menlo,Consolas,"Courier New",monospace; font-size:11.5px; }
+  .monos{ font-family:"SF Mono",Menlo,Consolas,"Courier New",monospace; font-size:10.5px; }
+  .mn   { fill:#000; font-weight:bold; }
+  .off  { fill:#555; }
+  .cap  { font-size:11px; fill:#333; }
+  .capc { font-size:11px; fill:#333; text-anchor:middle; }
+  .note { font-size:11.5px; }
+  .key  { font-size:11.5px; font-weight:bold; fill:#0072B2; }
+  .keyc { font-size:11.5px; font-weight:bold; text-anchor:middle; fill:#0072B2; }
+  .red  { font-size:11.5px; font-weight:bold; fill:#D55E00; }
+  .redc { font-size:11.5px; font-weight:bold; text-anchor:middle; fill:#D55E00; }
+  .good { font-size:11.5px; font-weight:bold; }
+  .goodc{ font-size:11.5px; font-weight:bold; text-anchor:middle; }
+  .gold { font-size:11.5px; font-weight:bold; }
+  .cf   { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#ah); }
+  .cfb  { fill:none; stroke:#0072B2; stroke-width:2; marker-end:url(#ahb); }
+  .cfg  { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#ah); }
+  .cfr  { fill:none; stroke:#D55E00; stroke-width:1.6; stroke-dasharray:7 3; marker-end:url(#ahr); }
+  .cfy  { fill:none; stroke:#0072B2; stroke-width:2; marker-end:url(#ahb); }
+  .cfm  { fill:none; stroke:#000; stroke-width:0.9; marker-end:url(#ahs); }
+  .cfo  { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#oah); }
+  .df   { fill:none; stroke:#555; stroke-width:1.1; stroke-dasharray:4 3; marker-end:url(#ahg); }
+  .dfb  { fill:none; stroke:#0072B2; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahb); }
+  .dfr  { fill:none; stroke:#D55E00; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahr); }
+  .dfy  { fill:none; stroke:#0072B2; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahb); }
+  .dep  { fill:none; stroke:#000; stroke-width:1.1; stroke-dasharray:6 4; marker-end:url(#ahs); }
+  .ln   { fill:none; stroke:#000; stroke-width:1.1; }
+  .lnr  { fill:none; stroke:#D55E00; stroke-width:1.6; }
+  .lng  { fill:none; stroke:#000; stroke-width:1.3; }
+  .dash { fill:none; stroke:#000; stroke-width:1; stroke-dasharray:5 4; }
+  .div  { stroke:#000; stroke-width:0.6; }
+  .axis { stroke:#000; stroke-width:1.1; fill:none; }
+  .grid { stroke:#999; stroke-width:0.5; stroke-dasharray:2 3; }
+</style>
+<rect width="720" height="432" fill="#fff"/>
+<text class="lbl" x="30" y="34">做法：撤去直接映射，只执行保护施加在唯一剩下的映像映射上</text>
+<rect class="box" x="30" y="50" width="200" height="40"/>
+<text class="bt" x="130" y="74">内核映像映射（只执行）</text>
+<rect class="ghost" x="30" y="110" width="200" height="40"/>
+<text class="bt" x="130" y="134">直接映射：撤去</text>
+<rect class="thick" x="300" y="70" width="150" height="60"/>
+<text class="bt" x="375" y="94">物理页</text>
+<text class="bs" x="375" y="112">跳转桩区</text>
+<path class="cf" d="M230,70 L300,90"/>
+<line x1="230" y1="130" x2="300" y2="110" stroke="#D55E00" stroke-width="1.2" stroke-dasharray="4 3"/>
+<line x1="260" y1="115" x2="270" y2="125" stroke="#000" stroke-width="2"/><line x1="260" y1="125" x2="270" y2="115" stroke="#000" stroke-width="2"/>
+<text class="cap" x="30" y="172">复用内核既有接口，与 memfd_secret、vmalloc 释放路径同源</text>
+<rect class="hw" x="470" y="50" width="220" height="58"/>
+<text class="bt" x="580" y="70">x86-64：管理态保护键</text>
+<text class="bs" x="580" y="87">页表项标键，每核 PKRS 置禁止</text>
+<text class="bs" x="580" y="102">取指不查键，数据读即异常</text>
+<rect class="hw" x="470" y="126" width="220" height="58"/>
+<text class="bt" x="580" y="146">AArch64：硬件调试观察点</text>
+<text class="bs" x="580" y="163">每核调试寄存器盯映像映射区间</text>
+<text class="bs" x="580" y="178">取指不触发，数据读即异常</text>
+<path class="cfo" d="M230,62 L460,62 L460,79 L470,79"/>
+<path class="cfo" d="M460,79 L460,155 L470,155"/>
+<text class="cap" x="236" y="56">保护施加于此</text>
+<line class="div" x1="30" y1="200" x2="690" y2="200"/>
+<text class="lbl" x="30" y="224">改写跳转桩：切换阶段经 text_poke 建立每核私有的临时可写映射</text>
+<rect class="box" x="30" y="240" width="200" height="40"/>
+<text class="bt" x="130" y="264">内核映像映射（只执行）</text>
+<rect class="ours" x="30" y="300" width="200" height="40"/>
+<text class="bt" x="130" y="324">临时可写映射（fixmap）</text>
+<rect class="thick" x="300" y="260" width="150" height="60"/>
+<text class="bt" x="375" y="284">物理页</text>
+<text class="bs" x="375" y="302">跳转桩区</text>
+<path class="cf" d="M230,260 L300,280"/>
+<path class="cfb" d="M230,320 L300,300"/>
+<rect class="ours" x="470" y="240" width="220" height="82"/>
+<text class="bt" x="580" y="260">随机化线程</text>
+<text class="bsl" x="480" y="280">① 关中断，建本核私有可写别名</text>
+<text class="bsl" x="480" y="298">② 改写入口桩与重入桩</text>
+<text class="bsl" x="480" y="316">③ 撤去别名，isb，开中断</text>
+<path class="cfb" d="M470,300 L458,300 L458,354 L130,354 L130,342"/>
+<text class="cap" x="30" y="382">该临时别名只在本核可见、关中断期间存在、寿命为一次写入，列入第 4.6 节的安全前提。</text>
+<rect class="box" x="30" y="402" width="22" height="13"/>
+<text class="cap" x="58" y="412">常驻映射</text>
+<rect class="ghost" x="120" y="402" width="22" height="13"/>
+<text class="cap" x="148" y="412">已撤去</text>
+<rect class="ours" x="199" y="402" width="22" height="13"/>
+<text class="cap" x="227" y="412">临时（每核私有）</text>
+<rect class="hw" x="333" y="402" width="22" height="13"/>
+<text class="cap" x="361" y="412">硬件部件</text>
+<path class="cfb" d="M423,408 L453,408"/>
+<text class="cap" x="459" y="412">写入</text>
+</svg>

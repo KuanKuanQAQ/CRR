@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 432" width="720" height="432"
+     font-family="PingFang SC, Hiragino Sans GB, Noto Sans CJK SC, Microsoft YaHei, sans-serif">
+<!-- 图 4-2 跳转桩读取事件的处置与失效窗口 -->
+<defs>
+  <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#000"/></marker>
+  <marker id="ahs" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#000"/></marker>
+  <marker id="oah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0.6,0.6 L7,4 L0.6,7.4 z" fill="#fff" stroke="#000" stroke-width="1"/></marker>
+  <marker id="ahb" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#0072B2"/></marker>
+  <marker id="ahr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#D55E00"/></marker>
+  <marker id="ahg" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#555"/></marker>
+  <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#fff"/><line x1="0" y1="0" x2="0" y2="6" stroke="#000" stroke-width="1"/></pattern>
+  <pattern id="hatch2" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><rect width="5" height="5" fill="#fff"/><line x1="0" y1="0" x2="0" y2="5" stroke="#000" stroke-width="0.7"/></pattern>
+  <pattern id="dots" width="5" height="5" patternUnits="userSpaceOnUse"><rect width="5" height="5" fill="#fff"/><circle cx="2.5" cy="2.5" r="0.9" fill="#000"/></pattern>
+</defs>
+<style>
+  text  { fill:#000; }
+  .lbl  { font-size:11.5px; letter-spacing:.06em; }
+  .box  { fill:#fff; stroke:#000; stroke-width:1.2; }
+  .thick{ fill:#fff; stroke:#000; stroke-width:2; }
+  .plain{ fill:#fff; stroke:#000; stroke-width:0.8; }
+  .nr   { fill:#fff; stroke:#000; stroke-width:1.2; stroke-dasharray:6 3; }
+  .tr   { fill:#fff; stroke:#0072B2; stroke-width:2; }
+  .rd   { fill:#F0F0F0; stroke:#000; stroke-width:1.2; stroke-dasharray:1.5 2.5; }
+  .dt   { fill:#E3EEF7; stroke:#0072B2; stroke-width:2; }
+  .hw   { fill:#EDEDED; stroke:#555; stroke-width:1.2; }
+  .ours { fill:#E3EEF7; stroke:#0072B2; stroke-width:2; }
+  .dis  { fill:#fff; stroke:#000; stroke-width:0.8; stroke-dasharray:2 2; }
+  .concl{ fill:#E3EEF7; stroke:#0072B2; stroke-width:1.6; }
+  .ghost{ fill:#fff; stroke:#D55E00; stroke-width:1.2; stroke-dasharray:4 3; }
+  .trap { fill:url(#hatch); stroke:#000; stroke-width:1.2; }
+  .shade{ fill:url(#hatch2); stroke:#000; stroke-width:1; }
+  .dotf { fill:url(#dots); stroke:#000; stroke-width:1.2; }
+  .c5   { fill:#fff; stroke:#000; stroke-width:1.2; }
+  .bt   { font-size:12.5px; text-anchor:middle; }
+  .btl  { font-size:12.5px; }
+  .bs   { font-size:11px; text-anchor:middle; }
+  .bsl  { font-size:11px; }
+  .ttl  { font-size:13.5px; font-weight:bold; text-anchor:middle; }
+  .ttll { font-size:13.5px; font-weight:bold; }
+  .mono { font-family:"SF Mono",Menlo,Consolas,"Courier New",monospace; font-size:11.5px; }
+  .monos{ font-family:"SF Mono",Menlo,Consolas,"Courier New",monospace; font-size:10.5px; }
+  .mn   { fill:#000; font-weight:bold; }
+  .off  { fill:#555; }
+  .cap  { font-size:11px; fill:#333; }
+  .capc { font-size:11px; fill:#333; text-anchor:middle; }
+  .note { font-size:11.5px; }
+  .key  { font-size:11.5px; font-weight:bold; fill:#0072B2; }
+  .keyc { font-size:11.5px; font-weight:bold; text-anchor:middle; fill:#0072B2; }
+  .red  { font-size:11.5px; font-weight:bold; fill:#D55E00; }
+  .redc { font-size:11.5px; font-weight:bold; text-anchor:middle; fill:#D55E00; }
+  .good { font-size:11.5px; font-weight:bold; }
+  .goodc{ font-size:11.5px; font-weight:bold; text-anchor:middle; }
+  .gold { font-size:11.5px; font-weight:bold; }
+  .cf   { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#ah); }
+  .cfb  { fill:none; stroke:#0072B2; stroke-width:2; marker-end:url(#ahb); }
+  .cfg  { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#ah); }
+  .cfr  { fill:none; stroke:#D55E00; stroke-width:1.6; stroke-dasharray:7 3; marker-end:url(#ahr); }
+  .cfy  { fill:none; stroke:#0072B2; stroke-width:2; marker-end:url(#ahb); }
+  .cfm  { fill:none; stroke:#000; stroke-width:0.9; marker-end:url(#ahs); }
+  .cfo  { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#oah); }
+  .df   { fill:none; stroke:#555; stroke-width:1.1; stroke-dasharray:4 3; marker-end:url(#ahg); }
+  .dfb  { fill:none; stroke:#0072B2; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahb); }
+  .dfr  { fill:none; stroke:#D55E00; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahr); }
+  .dfy  { fill:none; stroke:#0072B2; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahb); }
+  .dep  { fill:none; stroke:#000; stroke-width:1.1; stroke-dasharray:6 4; marker-end:url(#ahs); }
+  .ln   { fill:none; stroke:#000; stroke-width:1.1; }
+  .lnr  { fill:none; stroke:#D55E00; stroke-width:1.6; }
+  .lng  { fill:none; stroke:#000; stroke-width:1.3; }
+  .dash { fill:none; stroke:#000; stroke-width:1; stroke-dasharray:5 4; }
+  .div  { stroke:#000; stroke-width:0.6; }
+  .axis { stroke:#000; stroke-width:1.1; fill:none; }
+  .grid { stroke:#999; stroke-width:0.5; stroke-dasharray:2 3; }
+</style>
+<rect width="720" height="432" fill="#fff"/>
+<text class="ttll" x="30" y="60">已激活函数：读取事件的处置与失效窗口</text>
+<path class="cf" d="M60,200 L696,200"/>
+<text class="cap" x="686" y="216" text-anchor="end">时间</text>
+<line x1="91.5" y1="100" x2="91.5" y2="200" stroke="#D55E00" stroke-width="1.4"/>
+<circle cx="91.5" cy="200" r="4.5" fill="#D55E00" stroke="#000" stroke-width="0.8"/>
+<line x1="135.6" y1="126" x2="135.6" y2="200" stroke="#0072B2" stroke-width="1.4"/>
+<circle cx="135.6" cy="200" r="4.5" fill="#0072B2" stroke="#000" stroke-width="0.8"/>
+<line x1="406.5" y1="100" x2="406.5" y2="200" stroke="#0072B2" stroke-width="1.4"/>
+<circle cx="406.5" cy="200" r="4.5" fill="#0072B2" stroke="#000" stroke-width="0.8"/>
+<text class="bsl" x="91.5" y="94" fill="#D55E00">攻击者读取 stub_F</text>
+<text class="bsl" x="139.6" y="120" fill="#0072B2">硬件事件：记录 / 通知 / 放行</text>
+<text class="bsl" x="410.5" y="94" fill="#0072B2">切换完成</text>
+<text class="bsl" x="410.5" y="110">stub_F 改为 b 新变体</text>
+<text class="bsl" x="410.5" y="126">旧副本填陷阱</text>
+<rect x="91.5" y="158" width="315" height="24" fill="#FAE4D6" stroke="#D55E00" stroke-width="1.2"/>
+<text class="bt" x="249" y="174" fill="#D55E00">攻击者手中的值有效：失效窗口 = 触发延迟</text>
+<rect x="406.5" y="158" width="283.5" height="24" fill="#E3EEF7" stroke="#0072B2" stroke-width="1.2"/>
+<text class="bt" x="548.25" y="174" fill="#0072B2">使用旧值 → 落到软件断点 → 判为攻击</text>
+<text class="cap" x="91.5" y="236">放行发生在窗口之内：读取者得到当前值，机制不判定读取者身份</text>
+<text class="cap" x="91.5" y="254">窗口长度实测：中位 18 μs，99 分位 92 μs；窗口内的利用竞态见第 4.5.4 节</text>
+<line class="div" x1="30" y1="276" x2="690" y2="276"/>
+<text class="ttll" x="30" y="300">未激活函数：窗口分两段</text>
+<path class="cf" d="M60,380 L696,380"/>
+<line x1="91.5" y1="330" x2="91.5" y2="380" stroke="#D55E00" stroke-width="1.4"/>
+<circle cx="91.5" cy="380" r="4.5" fill="#D55E00" stroke="#000" stroke-width="0.8"/>
+<text class="bsl" x="95.5" y="324" fill="#D55E00">攻击者读取</text>
+<line x1="249" y1="330" x2="249" y2="380" stroke="#0072B2" stroke-width="1.4"/>
+<circle cx="249" cy="380" r="4.5" fill="#0072B2" stroke="#000" stroke-width="0.8"/>
+<text class="bsl" x="253" y="324" fill="#0072B2">激活：一级跳板改指二级跳板</text>
+<line x1="406.5" y1="330" x2="406.5" y2="380" stroke="#0072B2" stroke-width="1.4"/>
+<circle cx="406.5" cy="380" r="4.5" fill="#0072B2" stroke="#000" stroke-width="0.8"/>
+<text class="bsl" x="410.5" y="324" fill="#0072B2">搬移，桩指向新变体</text>
+<line x1="595.5" y1="330" x2="595.5" y2="380" stroke="#0072B2" stroke-width="1.4"/>
+<circle cx="595.5" cy="380" r="4.5" fill="#0072B2" stroke="#000" stroke-width="0.8"/>
+<text class="bsl" x="599.5" y="324" fill="#0072B2">扫描通过，旧副本填陷阱</text>
+<rect x="91.5" y="340" width="315" height="22" fill="#FAE4D6" stroke="#D55E00" stroke-width="1.2"/>
+<text class="bs" x="249" y="355" fill="#D55E00">重定向延迟：值仍有效</text>
+<rect x="406.5" y="340" width="189" height="22" fill="url(#hatch)" stroke="#D55E00" stroke-width="1.2"/>
+<rect x="450.6" y="343" width="100.8" height="16" fill="#fff" fill-opacity="0.85" stroke="none"/>
+<text class="bs" x="501" y="355" fill="#D55E00">撤销延迟</text>
+<rect x="595.5" y="340" width="94.5" height="22" fill="#E3EEF7" stroke="#0072B2" stroke-width="1.2"/>
+<text class="bs" x="642.75" y="355" fill="#0072B2">旧地址失效</text>
+<rect x="30" y="406" width="22" height="13" fill="#FAE4D6" stroke="#D55E00" stroke-width="1"/>
+<text class="cap" x="58" y="416">值仍有效</text>
+<rect x="120" y="406" width="22" height="13" fill="url(#hatch)" stroke="#D55E00" stroke-width="1"/>
+<text class="cap" x="148" y="416">旧副本可执行但无合法入口</text>
+<rect x="298" y="406" width="22" height="13" fill="#E3EEF7" stroke="#0072B2" stroke-width="1"/>
+<text class="cap" x="326" y="416">旧地址失效</text>
+<circle cx="407" cy="412" r="4.5" fill="#D55E00" stroke="#000" stroke-width="0.8"/>
+<text class="cap" x="421" y="416">攻击者的动作</text>
+<circle cx="513" cy="412" r="4.5" fill="#0072B2" stroke="#000" stroke-width="0.8"/>
+<text class="cap" x="527" y="416">本章机制的动作</text>
+</svg>
