@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 396" width="720" height="396"
+     font-family="PingFang SC, Hiragino Sans GB, Noto Sans CJK SC, Microsoft YaHei, sans-serif">
+<!-- 图 3-8 随机化抵达至开始的延迟累积分布（预测值） -->
+<defs>
+  <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#000"/></marker>
+  <marker id="ahs" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#000"/></marker>
+  <marker id="oah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0.6,0.6 L7,4 L0.6,7.4 z" fill="#fff" stroke="#000" stroke-width="1"/></marker>
+  <marker id="ahb" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#0072B2"/></marker>
+  <marker id="ahr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#D55E00"/></marker>
+  <marker id="ahg" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#555"/></marker>
+  <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#fff"/><line x1="0" y1="0" x2="0" y2="6" stroke="#000" stroke-width="1"/></pattern>
+  <pattern id="hatch2" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><rect width="5" height="5" fill="#fff"/><line x1="0" y1="0" x2="0" y2="5" stroke="#000" stroke-width="0.7"/></pattern>
+  <pattern id="dots" width="5" height="5" patternUnits="userSpaceOnUse"><rect width="5" height="5" fill="#fff"/><circle cx="2.5" cy="2.5" r="0.9" fill="#000"/></pattern>
+</defs>
+<style>
+  text  { fill:#000; }
+  .lbl  { font-size:11.5px; letter-spacing:.06em; }
+  .box  { fill:#fff; stroke:#000; stroke-width:1.2; }
+  .thick{ fill:#fff; stroke:#000; stroke-width:2; }
+  .plain{ fill:#fff; stroke:#000; stroke-width:0.8; }
+  .nr   { fill:#fff; stroke:#000; stroke-width:1.2; stroke-dasharray:6 3; }
+  .tr   { fill:#fff; stroke:#0072B2; stroke-width:2; }
+  .rd   { fill:#F0F0F0; stroke:#000; stroke-width:1.2; stroke-dasharray:1.5 2.5; }
+  .dt   { fill:#E3EEF7; stroke:#0072B2; stroke-width:2; }
+  .hw   { fill:#EDEDED; stroke:#555; stroke-width:1.2; }
+  .ours { fill:#E3EEF7; stroke:#0072B2; stroke-width:2; }
+  .dis  { fill:#fff; stroke:#000; stroke-width:0.8; stroke-dasharray:2 2; }
+  .concl{ fill:#E3EEF7; stroke:#0072B2; stroke-width:1.6; }
+  .ghost{ fill:#fff; stroke:#D55E00; stroke-width:1.2; stroke-dasharray:4 3; }
+  .trap { fill:url(#hatch); stroke:#000; stroke-width:1.2; }
+  .shade{ fill:url(#hatch2); stroke:#000; stroke-width:1; }
+  .dotf { fill:url(#dots); stroke:#000; stroke-width:1.2; }
+  .c5   { fill:#fff; stroke:#000; stroke-width:1.2; }
+  .bt   { font-size:12.5px; text-anchor:middle; }
+  .btl  { font-size:12.5px; }
+  .bs   { font-size:11px; text-anchor:middle; }
+  .bsl  { font-size:11px; }
+  .ttl  { font-size:13.5px; font-weight:bold; text-anchor:middle; }
+  .ttll { font-size:13.5px; font-weight:bold; }
+  .mono { font-family:"SF Mono",Menlo,Consolas,"Courier New",monospace; font-size:11.5px; }
+  .monos{ font-family:"SF Mono",Menlo,Consolas,"Courier New",monospace; font-size:10.5px; }
+  .mn   { fill:#000; font-weight:bold; }
+  .off  { fill:#555; }
+  .cap  { font-size:11px; fill:#333; }
+  .capc { font-size:11px; fill:#333; text-anchor:middle; }
+  .note { font-size:11.5px; }
+  .key  { font-size:11.5px; font-weight:bold; fill:#0072B2; }
+  .keyc { font-size:11.5px; font-weight:bold; text-anchor:middle; fill:#0072B2; }
+  .red  { font-size:11.5px; font-weight:bold; fill:#D55E00; }
+  .redc { font-size:11.5px; font-weight:bold; text-anchor:middle; fill:#D55E00; }
+  .good { font-size:11.5px; font-weight:bold; }
+  .goodc{ font-size:11.5px; font-weight:bold; text-anchor:middle; }
+  .gold { font-size:11.5px; font-weight:bold; }
+  .cf   { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#ah); }
+  .cfb  { fill:none; stroke:#0072B2; stroke-width:2; marker-end:url(#ahb); }
+  .cfg  { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#ah); }
+  .cfr  { fill:none; stroke:#D55E00; stroke-width:1.6; stroke-dasharray:7 3; marker-end:url(#ahr); }
+  .cfy  { fill:none; stroke:#0072B2; stroke-width:2; marker-end:url(#ahb); }
+  .cfm  { fill:none; stroke:#000; stroke-width:0.9; marker-end:url(#ahs); }
+  .cfo  { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#oah); }
+  .df   { fill:none; stroke:#555; stroke-width:1.1; stroke-dasharray:4 3; marker-end:url(#ahg); }
+  .dfb  { fill:none; stroke:#0072B2; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahb); }
+  .dfr  { fill:none; stroke:#D55E00; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahr); }
+  .dfy  { fill:none; stroke:#0072B2; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahb); }
+  .dep  { fill:none; stroke:#000; stroke-width:1.1; stroke-dasharray:6 4; marker-end:url(#ahs); }
+  .ln   { fill:none; stroke:#000; stroke-width:1.1; }
+  .lnr  { fill:none; stroke:#D55E00; stroke-width:1.6; }
+  .lng  { fill:none; stroke:#000; stroke-width:1.3; }
+  .dash { fill:none; stroke:#000; stroke-width:1; stroke-dasharray:5 4; }
+  .div  { stroke:#000; stroke-width:0.6; }
+  .axis { stroke:#000; stroke-width:1.1; fill:none; }
+  .grid { stroke:#999; stroke-width:0.5; stroke-dasharray:2 3; }
+</style>
+<rect width="720" height="396" fill="#fff"/>
+<path class="axis" d="M80,40 L80,300 L668,300"/>
+<line class="grid" x1="138.199" y1="40" x2="138.199" y2="300"/>
+<text class="capc" x="138.199" y="316">0.1 μs</text>
+<line class="grid" x1="331.532" y1="40" x2="331.532" y2="300"/>
+<text class="capc" x="331.532" y="316">1 μs</text>
+<line class="grid" x1="524.866" y1="40" x2="524.866" y2="300"/>
+<text class="capc" x="524.866" y="316">10 μs</text>
+<line class="grid" x1="80" y1="248" x2="660" y2="248"/>
+<text class="cap" x="72" y="252" text-anchor="end">20%</text>
+<line class="grid" x1="80" y1="196" x2="660" y2="196"/>
+<text class="cap" x="72" y="200" text-anchor="end">40%</text>
+<line class="grid" x1="80" y1="144" x2="660" y2="144"/>
+<text class="cap" x="72" y="148" text-anchor="end">60%</text>
+<line class="grid" x1="80" y1="92" x2="660" y2="92"/>
+<text class="cap" x="72" y="96" text-anchor="end">80%</text>
+<line class="grid" x1="80" y1="40" x2="660" y2="40"/>
+<text class="cap" x="72" y="44" text-anchor="end">100%</text>
+<path d="M86.4619,300 L91.8233,296.75 L97.1846,293.5 L102.546,290.25 L107.907,287 L113.269,283.75 L118.63,280.5 L123.991,277.25 L129.353,274 L137.195,261 L145.037,248 L152.88,235 L160.722,222 L168.564,209 L176.407,196 L184.249,183 L192.091,170 L204.504,157 L216.917,144 L229.33,131 L241.743,118 L254.156,105 L266.569,92 L278.982,79 L291.395,66 L313.092,63.075 L334.789,60.15 L356.486,57.225 L378.183,54.3 L399.88,51.375 L421.576,48.45 L443.273,45.525 L464.97,42.6 L470.374,42.275 L475.779,41.95 L481.183,41.625 L486.587,41.3 L491.991,40.975 L497.395,40.65 L502.799,40.325 L508.203,40" fill="none" stroke="#000" stroke-width="1.5"/>
+<path d="M103.311,300 L108.672,296.75 L114.034,293.5 L119.395,290.25 L124.756,287 L130.118,283.75 L135.479,280.5 L140.84,277.25 L146.202,274 L155.626,261 L165.05,248 L174.475,235 L183.899,222 L193.323,209 L202.748,196 L212.172,183 L221.596,170 L241.738,157 L261.88,144 L282.022,131 L302.163,118 L322.305,105 L342.447,92 L362.589,79 L382.731,66 L400.069,63.075 L417.407,60.15 L434.746,57.225 L452.084,54.3 L469.423,51.375 L486.761,48.45 L504.1,45.525 L521.438,42.6 L525.766,42.275 L530.095,41.95 L534.423,41.625 L538.751,41.3 L543.079,40.975 L547.407,40.65 L551.735,40.325 L556.064,40" fill="none" stroke="#000" stroke-width="1.5" stroke-dasharray="6 3"/>
+<path d="M110.617,300 L115.978,296.75 L121.339,293.5 L126.701,290.25 L132.062,287 L137.423,283.75 L142.785,280.5 L148.146,277.25 L153.508,274 L163.469,261 L173.43,248 L183.391,235 L193.352,222 L203.313,209 L213.274,196 L223.235,183 L233.196,170 L254.455,157 L275.715,144 L296.974,131 L318.234,118 L339.494,105 L360.753,92 L382.013,79 L403.272,66 L419.754,63.075 L436.236,60.15 L452.718,57.225 L469.2,54.3 L485.682,51.375 L502.164,48.45 L518.646,45.525 L535.128,42.6 L540.187,42.275 L545.247,41.95 L550.307,41.625 L555.367,41.3 L560.427,40.975 L565.487,40.65 L570.547,40.325 L575.606,40" fill="none" stroke="#000" stroke-width="1.5" stroke-dasharray="2 3"/>
+<path d="M117.337,300 L122.699,296.75 L128.06,293.5 L133.421,290.25 L138.783,287 L144.144,283.75 L149.505,280.5 L154.867,277.25 L160.228,274 L170.919,261 L181.609,248 L192.299,235 L202.99,222 L213.68,209 L224.37,196 L235.061,183 L245.751,170 L268.348,157 L290.945,144 L313.543,131 L336.14,118 L358.737,105 L381.335,92 L403.932,79 L426.529,66 L441.575,63.075 L456.621,60.15 L471.666,57.225 L486.712,54.3 L501.758,51.375 L516.803,48.45 L531.849,45.525 L546.895,42.6 L551.928,42.275 L556.962,41.95 L561.995,41.625 L567.028,41.3 L572.062,40.975 L577.095,40.65 L582.128,40.325 L587.162,40" fill="none" stroke="#000" stroke-width="1.5" stroke-dasharray="8 3 2 3"/>
+<path d="M123.56,300 L128.921,296.75 L134.282,293.5 L139.644,290.25 L145.005,287 L150.367,283.75 L155.728,280.5 L161.089,277.25 L166.451,274 L177.728,261 L189.006,248 L200.283,235 L211.561,222 L222.838,209 L234.116,196 L245.393,183 L256.671,170 L280.366,157 L304.062,144 L327.757,131 L351.453,118 L375.148,105 L398.843,92 L422.539,79 L446.234,66 L461.694,63.075 L477.154,60.15 L492.613,57.225 L508.073,54.3 L523.533,51.375 L538.992,48.45 L554.452,45.525 L569.912,42.6 L575.31,42.275 L580.708,41.95 L586.106,41.625 L591.504,41.3 L596.902,40.975 L602.3,40.65 L607.698,40.325 L613.097,40" fill="none" stroke="#000" stroke-width="1.5" stroke-dasharray="4 2"/>
+<path d="M134.772,300 L140.133,296.75 L145.494,293.5 L150.856,290.25 L156.217,287 L161.578,283.75 L166.94,280.5 L172.301,277.25 L177.662,274 L189.193,261 L200.723,248 L212.254,235 L223.784,222 L235.314,209 L246.845,196 L258.375,183 L269.906,170 L294.181,157 L318.457,144 L342.732,131 L367.007,118 L391.283,105 L415.558,92 L439.834,79 L464.109,66 L479.34,63.075 L494.57,60.15 L509.801,57.225 L525.031,54.3 L540.262,51.375 L555.492,48.45 L570.723,45.525 L585.953,42.6 L591.526,42.275 L597.098,41.95 L602.67,41.625 L608.242,41.3 L613.814,40.975 L619.386,40.65 L624.959,40.325 L630.531,40" fill="none" stroke="#000" stroke-width="1.5" stroke-dasharray="10 4"/>
+<line x1="166.451" y1="40" x2="166.451" y2="300" stroke="#000" stroke-width="1" stroke-dasharray="1.5 2.5"/>
+<text class="cap" x="170.451" y="52">微基准排空下界 0.14 μs</text>
+<text class="capc" x="370" y="334">随机化抵达至开始的时长（对数轴）</text>
+<text class="cap" x="30" y="170" transform="rotate(-90 30 170)" text-anchor="middle">累积占比</text>
+<line x1="90" y1="350" x2="120" y2="350" stroke="#000" stroke-width="1.5"/>
+<text class="cap" x="126" y="354">空载</text>
+<line x1="290" y1="350" x2="320" y2="350" stroke="#000" stroke-width="1.5" stroke-dasharray="6 3"/>
+<text class="cap" x="326" y="354">LMBench</text>
+<line x1="490" y1="350" x2="520" y2="350" stroke="#000" stroke-width="1.5" stroke-dasharray="2 3"/>
+<text class="cap" x="526" y="354">内核编译</text>
+<line x1="90" y1="370" x2="120" y2="370" stroke="#000" stroke-width="1.5" stroke-dasharray="8 3 2 3"/>
+<text class="cap" x="126" y="374">fio 随机小块读</text>
+<line x1="290" y1="370" x2="320" y2="370" stroke="#000" stroke-width="1.5" stroke-dasharray="4 2"/>
+<text class="cap" x="326" y="374">netperf TCP_RR</text>
+<line x1="490" y1="370" x2="520" y2="370" stroke="#000" stroke-width="1.5" stroke-dasharray="10 4"/>
+<text class="cap" x="526" y="374">中断延迟压力</text>
+</svg>

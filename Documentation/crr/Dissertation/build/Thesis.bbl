@@ -1,0 +1,930 @@
+\begin{thebibliography}{109}
+\providecommand{\biband}{和}
+\providecommand{\bibetal}{等}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{#1}
+\expandafter\ifx\csname urlstyle\endcsname\relax\else
+  \urlstyle{same}\fi
+\expandafter\ifx\csname href\endcsname\relax
+  \DeclareUrlCommand\doi{\urlstyle{rm}}
+  \def\eprint#1#2{#2}
+\else
+  \def\doi#1{\href{https://doi.org/#1}{\nolinkurl{#1}}}
+  \let\eprint\href
+\fi
+
+\bibitem[Peng {\bibetal}(2025)Peng, Tian, Zhang, Li, Chen, Jiang, Xian, Wang,
+  Xu, Zhou, Luo, Yan, and Zhang]{peng2025asterinas}
+Peng~Y, Tian~H, Zhang~J, et~al.
+\newblock {Asterinas}: A {Linux} {ABI}-compatible, {Rust}-based framekernel
+  {OS} with a small and sound {TCB} [C]//\allowbreak
+Proceedings of the 2025 USENIX Annual Technical Conference (ATC).
+\newblock 2025.
+
+\bibitem[Cho {\bibetal}(2023)Cho, An, Jin, and Kwon]{cho2023bokasan}
+Cho~M, An~D, Jin~H, et~al.
+\newblock {BoKASAN}: Binary-only kernel address sanitizer for effective kernel
+  fuzzing [C]//\allowbreak
+Proceedings of the 32nd USENIX Security Symposium.
+\newblock 2023: 4985-5002.
+
+\bibitem[Wu {\bibetal}(2018)Wu, Chen, Xu, Xing, Gong, and Zou]{wu2018fuze}
+Wu~W, Chen~Y, Xu~J, et~al.
+\newblock {FUZE}: Towards facilitating exploit generation for kernel
+  use-after-free vulnerabilities [C]//\allowbreak
+Proceedings of the 27th USENIX Security Symposium.
+\newblock 2018: 781-797.
+
+\bibitem[Chen {\bibetal}(2020)Chen, Zou, Li, and Qian]{chen2020koobe}
+Chen~W, Zou~X, Li~G, et~al.
+\newblock {KOOBE}: Towards facilitating exploit generation of kernel
+  out-of-bounds write vulnerabilities [C]//\allowbreak
+Proceedings of the 29th USENIX Security Symposium.
+\newblock 2020: 1093-1110.
+
+\bibitem[Zeng {\bibetal}(2022)Zeng, Chen, Cho, Xing, Doup{\'e},
+  Shoshitaishvili, and Bao]{zeng2022playing}
+Zeng~K, Chen~Y, Cho~H, et~al.
+\newblock Playing for {K(H)eaps}: Understanding and improving linux kernel
+  exploit reliability [C]//\allowbreak
+Proceedings of the 31st USENIX Security Symposium.
+\newblock 2022: 71-88.
+
+\bibitem[Lee {\bibetal}(2023)Lee, Kwak, Kang, Jeon, and Lee]{lee2023pspray}
+Lee~Y, Kwak~J, Kang~J, et~al.
+\newblock {PSPRAY}: Timing side-channel based linux kernel heap exploitation
+  technique [C]//\allowbreak
+Proceedings of the 32nd USENIX Security Symposium.
+\newblock 2023: 6825-6842.
+
+\bibitem[Liang {\bibetal}(2024)Liang, Zou, Song, and Qian]{liang2024kleak}
+Liang~Z, Zou~X, Song~C, et~al.
+\newblock {K-LEAK}: Towards automating the generation of multi-step infoleak
+  exploits against the linux kernel [C/OL]//\allowbreak
+Proceedings of the 2024 Network and Distributed System Security Symposium
+  (NDSS).
+\newblock 2024.
+\newblock DOI: \doi{10.14722/ndss.2024.24935}.
+
+\bibitem[Shacham(2007)]{shacham2007geometry}
+Shacham~H.
+\newblock The geometry of innocent flesh on the bone: Return-into-libc without
+  function calls (on the x86) [C/OL]//\allowbreak
+Proceedings of the 14th ACM Conference on Computer and Communications Security
+  (CCS).
+\newblock 2007: 552-561.
+\newblock DOI: \doi{10.1145/1315245.1315313}.
+
+\bibitem[Accardi(2021)]{kernel2021fgkaslr}
+Accardi~K~C.
+\newblock Function granular {KASLR} ({FG-KASLR}) patch series, v10 [Z].
+\newblock 2021.
+
+\bibitem[Abadi {\bibetal}(2005)Abadi, Budiu, Erlingsson, and
+  Ligatti]{abadi2005cfi}
+Abadi~M, Budiu~M, Erlingsson~{\'U}, et~al.
+\newblock Control-flow integrity [C/OL]//\allowbreak
+Proceedings of the 12th ACM Conference on Computer and Communications Security
+  (CCS).
+\newblock 2005: 340-353.
+\newblock DOI: \doi{10.1145/1102120.1102165}.
+
+\bibitem[Shanbhogue {\bibetal}(2019)Shanbhogue, Gupta, and
+  Sahita]{shanbhogue2019cet}
+Shanbhogue~V, Gupta~D, Sahita~R.
+\newblock Security analysis of processor instruction set architecture for
+  enforcing control-flow integrity [C/OL]//\allowbreak
+Proceedings of the 8th International Workshop on Hardware and Architectural
+  Support for Security and Privacy (HASP).
+\newblock 2019: 1-11.
+\newblock DOI: \doi{10.1145/3337167.3337175}.
+
+\bibitem[arm(2023)]{arm2023armv8}
+{Arm} architecture reference manual for {A}-profile architecture [M].
+\newblock Arm Limited, 2023.
+
+\bibitem[{The LLVM Project}(2022)]{clang2022kcfi}
+{The LLVM Project}.
+\newblock Kernel control flow integrity ({KCFI}) [Z].
+\newblock 2022.
+
+\bibitem[Gaidis {\bibetal}(2023)Gaidis, Atlidakis, and
+  Kemerlis]{gaidis2023fineibt}
+Gaidis~A~J, Atlidakis~V, Kemerlis~V~P.
+\newblock {FineIBT}: Fine-grain control-flow enforcement with indirect branch
+  tracking [C/OL]//\allowbreak
+Proceedings of the 26th International Symposium on Research in Attacks,
+  Intrusions and Defenses (RAID).
+\newblock 2023: 527-546.
+\newblock DOI: \doi{10.1145/3607199.3607219}.
+
+\bibitem[Burow {\bibetal}(2017)Burow, Carr, Nash, Larsen, Franz, Brunthaler,
+  and Payer]{burow2017cfi}
+Burow~N, Carr~S~A, Nash~J, et~al.
+\newblock Control-flow integrity: Precision, security, and performance [J/OL].
+\newblock ACM Computing Surveys, 2017, 50\penalty0 (1): 16:1-16:33.
+\newblock DOI: \doi{10.1145/3054924}.
+
+\bibitem[Liljestrand {\bibetal}(2019)Liljestrand, Nyman, Wang, Perez, Ekberg,
+  and Asokan]{liljestrand2019pac}
+Liljestrand~H, Nyman~T, Wang~K, et~al.
+\newblock {PAC} it up: Towards pointer integrity using {ARM} pointer
+  authentication [C]//\allowbreak
+Proceedings of the 28th USENIX Security Symposium.
+\newblock 2019: 177-194.
+
+\bibitem[Vahldiek-Oberwagner {\bibetal}(2019)Vahldiek-Oberwagner, Elnikety,
+  Duarte, Sammler, Druschel, and Garg]{vahldiek2019erim}
+Vahldiek-Oberwagner~A, Elnikety~E, Duarte~N~O, et~al.
+\newblock {ERIM}: Secure, efficient in-process isolation with protection keys
+  ({MPK}) [C]//\allowbreak
+Proceedings of the 28th USENIX Security Symposium.
+\newblock 2019: 1221-1238.
+
+\bibitem[Hedayati {\bibetal}(2019)Hedayati, Gravani, Johnson, Criswell, Scott,
+  Shen, and Marty]{hedayati2019hodor}
+Hedayati~M, Gravani~S, Johnson~E, et~al.
+\newblock Hodor: Intra-process isolation for high-throughput data plane
+  libraries [C]//\allowbreak
+Proceedings of the 2019 USENIX Annual Technical Conference (ATC).
+\newblock 2019: 489-504.
+
+\bibitem[Dautenhahn {\bibetal}(2015)Dautenhahn, Kasampalis, Dietz, Criswell,
+  and Adve]{dautenhahn2015nested}
+Dautenhahn~N, Kasampalis~T, Dietz~W, et~al.
+\newblock Nested kernel: An operating system architecture for intra-kernel
+  privilege separation [C/OL]//\allowbreak
+Proceedings of the 20th International Conference on Architectural Support for
+  Programming Languages and Operating Systems (ASPLOS).
+\newblock 2015: 191-206.
+\newblock DOI: \doi{10.1145/2775054.2694386}.
+
+\bibitem[Huang {\bibetal}(2022)Huang, Narayanan, Detweiler, Huang, Tan, Jaeger,
+  and Burtsev]{huang2022ksplit}
+Huang~Y, Narayanan~V, Detweiler~D, et~al.
+\newblock {KSplit}: Automating device driver isolation [C]//\allowbreak
+Proceedings of the 16th USENIX Symposium on Operating Systems Design and
+  Implementation (OSDI).
+\newblock 2022: 613-631.
+
+\bibitem[Guo {\bibetal}(2025)Guo, Wang, Bai, Zeng, and Lu]{guo2025bulkhead}
+Guo~Y, Wang~Z, Bai~W, et~al.
+\newblock {BULKHEAD}: Secure, scalable, and efficient kernel
+  compartmentalization with {PKS} [C]//\allowbreak
+Proceedings of the 32nd Network and Distributed System Security Symposium
+  (NDSS).
+\newblock 2025.
+
+\bibitem[Lefeuvre {\bibetal}(2025)Lefeuvre, Dautenhahn, Chisnall, and
+  Olivier]{lefeuvre2025sok}
+Lefeuvre~H, Dautenhahn~N, Chisnall~D, et~al.
+\newblock {SoK}: Software compartmentalization [C]//\allowbreak
+Proceedings of the 2025 IEEE Symposium on Security and Privacy.
+\newblock 2025.
+
+\bibitem[Hund {\bibetal}(2013)Hund, Willems, and Holz]{hund2013practical}
+Hund~R, Willems~C, Holz~T.
+\newblock Practical timing side channel attacks against kernel space {ASLR}
+  [C/OL]//\allowbreak
+Proceedings of the 2013 IEEE Symposium on Security and Privacy.
+\newblock 2013: 191-205.
+\newblock DOI: \doi{10.1109/SP.2013.23}.
+
+\bibitem[Jang {\bibetal}(2016)Jang, Lee, and Kim]{jang2016drk}
+Jang~Y, Lee~S, Kim~T.
+\newblock Breaking kernel address space layout randomization with {Intel TSX}
+  [C/OL]//\allowbreak
+Proceedings of the 2016 ACM SIGSAC Conference on Computer and Communications
+  Security (CCS).
+\newblock 2016: 380-392.
+\newblock DOI: \doi{10.1145/2976749.2978321}.
+
+\bibitem[Evtyushkin {\bibetal}(2016)Evtyushkin, Ponomarev, and
+  Abu-Ghazaleh]{evtyushkin2016jump}
+Evtyushkin~D, Ponomarev~D, Abu-Ghazaleh~N.
+\newblock Jump over {ASLR}: Attacking branch predictors to bypass {ASLR}
+  [C/OL]//\allowbreak
+Proceedings of the 49th Annual IEEE/ACM International Symposium on
+  Microarchitecture (MICRO).
+\newblock 2016: 1-13.
+\newblock DOI: \doi{10.1109/MICRO.2016.7783743}.
+
+\bibitem[Liu {\bibetal}(2023)Liu, Ravichandran, and Yan]{liu2023entrybleed}
+Liu~W, Ravichandran~J, Yan~M.
+\newblock {EntryBleed}: A universal {KASLR} bypass against {KPTI} on linux
+  [C/OL]//\allowbreak
+Proceedings of the 12th International Workshop on Hardware and Architectural
+  Support for Security and Privacy (HASP).
+\newblock 2023: 10-18.
+\newblock DOI: \doi{10.1145/3623652.3623669}.
+
+\bibitem[Lipp {\bibetal}(2022)Lipp, Gruss, and Schwarz]{lipp2022amd}
+Lipp~M, Gruss~D, Schwarz~M.
+\newblock {AMD} prefetch attacks through power and time [C]//\allowbreak
+Proceedings of the 31st USENIX Security Symposium.
+\newblock 2022: 643-660.
+
+\bibitem[Maar {\bibetal}(2025)Maar, Juffinger, Steinbauer, Gruss, and
+  Mangard]{maar2025kernelsnitch}
+Maar~L, Juffinger~J, Steinbauer~T, et~al.
+\newblock {KernelSnitch}: Side channel-attacks on kernel data structures
+  [C/OL]//\allowbreak
+Proceedings of the 2025 Network and Distributed System Security Symposium
+  (NDSS).
+\newblock 2025.
+\newblock DOI: \doi{10.14722/ndss.2025.240223}.
+
+\bibitem[Canella {\bibetal}(2019)Canella, Van~Bulck, Schwarz, Lipp, von Berg,
+  Ortner, Piessens, Evtyushkin, and Gruss]{canella2019transient}
+Canella~C, Van~Bulck~J, Schwarz~M, et~al.
+\newblock A systematic evaluation of transient execution attacks and defenses
+  [C]//\allowbreak
+Proceedings of the 28th USENIX Security Symposium.
+\newblock 2019: 249-266.
+
+\bibitem[Gens {\bibetal}(2017)Gens, Arias, Sullivan, Liebchen, Jin, and
+  Sadeghi]{gens2017lazarus}
+Gens~D, Arias~O, Sullivan~D, et~al.
+\newblock {LAZARUS}: Practical side-channel resilient kernel-space
+  randomization [C/OL]//\allowbreak
+Proceedings of the 20th International Symposium on Research in Attacks,
+  Intrusions, and Defenses (RAID).
+\newblock 2017: 238-258.
+\newblock DOI: \doi{10.1007/978-3-319-66332-6_11}.
+
+\bibitem[Snow {\bibetal}(2013)Snow, Monrose, Davi, Dmitrienko, Liebchen, and
+  Sadeghi]{snow2013just}
+Snow~K~Z, Monrose~F, Davi~L, et~al.
+\newblock Just-in-time code reuse: On the effectiveness of fine-grained address
+  space layout randomization [C/OL]//\allowbreak
+Proceedings of the 2013 IEEE Symposium on Security and Privacy (S\&P).
+\newblock 2013: 574-588.
+\newblock DOI: \doi{10.1109/SP.2013.45}.
+
+\bibitem[Williams-King {\bibetal}(2016)Williams-King, Gobieski, Williams-King,
+  Blake, Yuan, Colp, Zheng, Kemerlis, Yang, and Aiello]{williams2016shuffler}
+Williams-King~D, Gobieski~G, Williams-King~K, et~al.
+\newblock Shuffler: Fast and deployable continuous code re-randomization
+  [C]//\allowbreak
+Proceedings of the 12th USENIX Symposium on Operating Systems Design and
+  Implementation (OSDI).
+\newblock 2016: 367-382.
+
+\bibitem[Ahmed {\bibetal}(2020)Ahmed, Xiao, Snow, Tan, Monrose, and
+  Yao]{ahmed2020methodologies}
+Ahmed~S, Xiao~Y, Snow~K~Z, et~al.
+\newblock Methodologies for quantifying (re-)randomization security and timing
+  under {JIT-ROP} [C/OL]//\allowbreak
+Proceedings of the 2020 ACM SIGSAC Conference on Computer and Communications
+  Security (CCS).
+\newblock 2020: 1803-1820.
+\newblock DOI: \doi{10.1145/3372297.3417248}.
+
+\bibitem[Nikolaev {\bibetal}(2022)Nikolaev, Nadeem, Stone, and
+  Ravindran]{nikolaev2022adelie}
+Nikolaev~R, Nadeem~H, Stone~C, et~al.
+\newblock Adelie: Continuous address space layout re-randomization for {Linux}
+  drivers [C/OL]//\allowbreak
+Proceedings of the 27th ACM International Conference on Architectural Support
+  for Programming Languages and Operating Systems (ASPLOS).
+\newblock 2022: 483-498.
+\newblock DOI: \doi{10.1145/3503222.3507743}.
+
+\bibitem[Chang {\bibetal}(2024)Chang, Lin, Sun, Li, Wang, Hu, Zhao, Jiang, Sun,
+  and Wang]{chang2024chaos}
+Chang~Z, Lin~J, Sun~H, et~al.
+\newblock Chaos: Function granularity runtime address layout space
+  randomization for kernel module [C/OL]//\allowbreak
+Proceedings of the 15th ACM SIGOPS Asia-Pacific Workshop on Systems (APSys).
+\newblock 2024.
+\newblock DOI: \doi{10.1145/3678015.3680476}.
+
+\bibitem[Chen {\bibetal}(2016)Chen, Wang, Whalley, and Lu]{chen2016remix}
+Chen~Y, Wang~Z, Whalley~D, et~al.
+\newblock Remix: On-demand live randomization [C/OL]//\allowbreak
+Proceedings of the 6th ACM Conference on Data and Application Security and
+  Privacy (CODASPY).
+\newblock 2016: 50-61.
+\newblock DOI: \doi{10.1145/2857705.2857726}.
+
+\bibitem[Li {\bibetal}(2024{\natexlab{a}})Li, Chen, Zhang, and
+  Chung]{li2024dbox}
+Li~Y, Chen~P, Zhang~Y, et~al.
+\newblock Isolate and detect the untrusted driver with a virtual box
+  [C/OL]//\allowbreak
+Proceedings of the 2024 ACM SIGSAC Conference on Computer and Communications
+  Security (CCS).
+\newblock 2024{\natexlab{a}}.
+\newblock DOI: \doi{10.1145/3658644.3670283}.
+
+\bibitem[Backes {\bibetal}(2014{\natexlab{a}})Backes and
+  N{\"u}rnberger]{backes2014oxymoron}
+Backes~M, N{\"u}rnberger~S.
+\newblock Oxymoron: Making fine-grained memory randomization practical by
+  allowing code sharing [C]//\allowbreak
+Proceedings of the 23rd USENIX Security Symposium.
+\newblock 2014{\natexlab{a}}: 433-447.
+
+\bibitem[Jelesnianski {\bibetal}(2020)Jelesnianski, Yom, Min, and
+  Jang]{jelesnianski2020mardu}
+Jelesnianski~C, Yom~J, Min~C, et~al.
+\newblock {MARDU}: Efficient and scalable code re-randomization
+  [C/OL]//\allowbreak
+Proceedings of the 13th ACM International Systems and Storage Conference
+  (SYSTOR).
+\newblock 2020: 29-40.
+\newblock DOI: \doi{10.1145/3383669.3398280}.
+
+\bibitem[Chen {\bibetal}(2017{\natexlab{a}})Chen, Bos, and
+  Giuffrida]{chen2017codearmor}
+Chen~X, Bos~H, Giuffrida~C.
+\newblock {CodeArmor}: Virtualizing the code space to counter disclosure
+  attacks [C/OL]//\allowbreak
+Proceedings of the 2017 IEEE European Symposium on Security and Privacy
+  (EuroS\&P).
+\newblock 2017{\natexlab{a}}: 514-529.
+\newblock DOI: \doi{10.1109/EuroSP.2017.17}.
+
+\bibitem[Tang {\bibetal}(2015)Tang, Sethumadhavan, and
+  Stolfo]{tang2015heisenbyte}
+Tang~A, Sethumadhavan~S, Stolfo~S.
+\newblock Heisenbyte: Thwarting memory disclosure attacks using destructive
+  code reads [C/OL]//\allowbreak
+Proceedings of the 22nd ACM SIGSAC Conference on Computer and Communications
+  Security (CCS).
+\newblock 2015: 256-267.
+\newblock DOI: \doi{10.1145/2810103.2813685}.
+
+\bibitem[Werner {\bibetal}(2016)Werner, Baltas, Dallara, Joyce, Snow, Monrose,
+  and Polychronakis]{werner2016near}
+Werner~J, Baltas~G, Dallara~R, et~al.
+\newblock No-execute-after-read: Preventing code disclosure in commodity
+  software [C/OL]//\allowbreak
+Proceedings of the 11th ACM Asia Conference on Computer and Communications
+  Security (AsiaCCS).
+\newblock 2016: 35-46.
+\newblock DOI: \doi{10.1145/2897845.2897891}.
+
+\bibitem[Wang {\bibetal}(2019)Wang, Wu, Zhang, Tang, Yew, Xie, Lai, Kang,
+  Cheng, and Shi]{wang2019safehidden}
+Wang~Z, Wu~C, Zhang~Y, et~al.
+\newblock {SafeHidden}: An efficient and secure information hiding technique
+  using re-randomization [C]//\allowbreak
+Proceedings of the 28th USENIX Security Symposium.
+\newblock 2019: 1239-1256.
+
+\bibitem[Ravichandran {\bibetal}(2022)Ravichandran, Na, Liang, and
+  Yan]{ravichandran2022pacman}
+Ravichandran~J, Na~W~T, Liang~J, et~al.
+\newblock {PACMAN}: Attacking {ARM} pointer authentication with speculative
+  execution [C/OL]//\allowbreak
+Proceedings of the 49th Annual International Symposium on Computer Architecture
+  (ISCA).
+\newblock 2022: 685-698.
+\newblock DOI: \doi{10.1145/3470496.3527429}.
+
+\bibitem[Szekeres {\bibetal}(2013)Szekeres, Payer, Wei, and
+  Song]{szekeres2013sok}
+Szekeres~L, Payer~M, Wei~T, et~al.
+\newblock {SoK}: Eternal war in memory [C/OL]//\allowbreak
+Proceedings of the 2013 IEEE Symposium on Security and Privacy (S\&P).
+\newblock 2013: 48-62.
+\newblock DOI: \doi{10.1109/SP.2013.13}.
+
+\bibitem[{PaX Team}(2003)]{paxteam2003pax}
+{PaX Team}.
+\newblock {PaX}: Address space layout randomization and non-executable pages
+  [EB/OL].
+\newblock 2003.
+\newblock \url{https://pax.grsecurity.net/docs/}.
+
+\bibitem[Bletsch {\bibetal}(2011)Bletsch, Jiang, Freeh, and
+  Liang]{bletsch2011jop}
+Bletsch~T, Jiang~X, Freeh~V~W, et~al.
+\newblock Jump-oriented programming: A new class of code-reuse attack
+  [C/OL]//\allowbreak
+Proceedings of the 6th ACM Symposium on Information, Computer and
+  Communications Security (AsiaCCS).
+\newblock 2011: 30-40.
+\newblock DOI: \doi{10.1145/1966913.1966919}.
+
+\bibitem[Schuster {\bibetal}(2015)Schuster, Tendyck, Liebchen, Davi, Sadeghi,
+  and Holz]{schuster2015coop}
+Schuster~F, Tendyck~T, Liebchen~C, et~al.
+\newblock Counterfeit object-oriented programming: On the difficulty of
+  preventing code reuse attacks in {C++} applications [C/OL]//\allowbreak
+Proceedings of the 2015 IEEE Symposium on Security and Privacy (S\&P).
+\newblock 2015: 745-762.
+\newblock DOI: \doi{10.1109/SP.2015.51}.
+
+\bibitem[Shacham {\bibetal}(2004)Shacham, Page, Pfaff, Goh, Modadugu, and
+  Boneh]{shacham2004effectiveness}
+Shacham~H, Page~M, Pfaff~B, et~al.
+\newblock On the effectiveness of address-space randomization
+  [C/OL]//\allowbreak
+Proceedings of the 11th ACM Conference on Computer and Communications Security
+  (CCS).
+\newblock 2004: 298-307.
+\newblock DOI: \doi{10.1145/1030083.1030124}.
+
+\bibitem[Kil {\bibetal}(2006)Kil, Jun, Bookholt, Xu, and Ning]{kil2006aslp}
+Kil~C, Jun~J, Bookholt~C, et~al.
+\newblock Address space layout permutation ({ASLP}): Towards fine-grained
+  randomization of commodity software [C/OL]//\allowbreak
+Proceedings of the 22nd Annual Computer Security Applications Conference
+  (ACSAC).
+\newblock 2006: 339-348.
+\newblock DOI: \doi{10.1109/ACSAC.2006.9}.
+
+\bibitem[Giuffrida {\bibetal}(2012)Giuffrida, Kuijsten, and
+  Tanenbaum]{giuffrida2012enhanced}
+Giuffrida~C, Kuijsten~A, Tanenbaum~A~S.
+\newblock Enhanced operating system security through efficient and fine-grained
+  address space randomization [C]//\allowbreak
+Proceedings of the 21st USENIX Security Symposium.
+\newblock 2012: 475-490.
+
+\bibitem[Wartell {\bibetal}(2012)Wartell, Mohan, Hamlen, and
+  Lin]{wartell2012stirring}
+Wartell~R, Mohan~V, Hamlen~K~W, et~al.
+\newblock Binary stirring: Self-randomizing instruction addresses of legacy x86
+  binary code [C/OL]//\allowbreak
+Proceedings of the 2012 ACM Conference on Computer and Communications Security
+  (CCS).
+\newblock 2012: 157-168.
+\newblock DOI: \doi{10.1145/2382196.2382216}.
+
+\bibitem[Pappas {\bibetal}(2012)Pappas, Polychronakis, and
+  Keromytis]{pappas2012smashing}
+Pappas~V, Polychronakis~M, Keromytis~A~D.
+\newblock Smashing the gadgets: Hindering return-oriented programming using
+  in-place code randomization [C/OL]//\allowbreak
+Proceedings of the 2012 IEEE Symposium on Security and Privacy (S\&P).
+\newblock 2012: 601-615.
+\newblock DOI: \doi{10.1109/SP.2012.41}.
+
+\bibitem[Hiser {\bibetal}(2012)Hiser, Nguyen-Tuong, Co, Hall, and
+  Davidson]{hiser2012ilr}
+Hiser~J, Nguyen-Tuong~A, Co~M, et~al.
+\newblock {ILR}: Where'd my gadgets go? [C/OL]//\allowbreak
+Proceedings of the 2012 IEEE Symposium on Security and Privacy (S\&P).
+\newblock 2012: 571-585.
+\newblock DOI: \doi{10.1109/SP.2012.39}.
+
+\bibitem[Larsen {\bibetal}(2014)Larsen, Homescu, Brunthaler, and
+  Franz]{larsen2014sok}
+Larsen~P, Homescu~A, Brunthaler~S, et~al.
+\newblock {SoK}: Automated software diversity [C/OL]//\allowbreak
+Proceedings of the 2014 IEEE Symposium on Security and Privacy.
+\newblock 2014: 276-291.
+\newblock DOI: \doi{10.1109/SP.2014.25}.
+
+\bibitem[Conti {\bibetal}(2016)Conti, Crane, Frassetto, Homescu, Koppen,
+  Larsen, Liebchen, Perry, and Sadeghi]{conti2016selfrando}
+Conti~M, Crane~S, Frassetto~T, et~al.
+\newblock Selfrando: Securing the {Tor} browser against de-anonymization
+  exploits [J/OL].
+\newblock Proceedings on Privacy Enhancing Technologies, 2016, 2016\penalty0
+  (4): 454-469.
+\newblock DOI: \doi{10.1515/popets-2016-0050}.
+
+\bibitem[Koo {\bibetal}(2018)Koo, Chen, Lu, Kemerlis, and
+  Polychronakis]{koo2018compiler}
+Koo~H, Chen~Y, Lu~L, et~al.
+\newblock Compiler-assisted code randomization [C/OL]//\allowbreak
+Proceedings of the 2018 IEEE Symposium on Security and Privacy (S\&P).
+\newblock 2018: 461-477.
+\newblock DOI: \doi{10.1109/SP.2018.00029}.
+
+\bibitem[Bittau {\bibetal}(2014)Bittau, Belay, Mashtizadeh, Mazi{\`e}res, and
+  Boneh]{bittau2014blind}
+Bittau~A, Belay~A, Mashtizadeh~A, et~al.
+\newblock Hacking blind [C/OL]//\allowbreak
+Proceedings of the 2014 IEEE Symposium on Security and Privacy (S\&P).
+\newblock 2014: 227-242.
+\newblock DOI: \doi{10.1109/SP.2014.22}.
+
+\bibitem[Kollenda {\bibetal}(2017)Kollenda, G{\"o}kta{\c s}, Blazytko, Koppe,
+  Gawlik, Konoth, Giuffrida, Bos, and Holz]{kollenda2017crop}
+Kollenda~B, G{\"o}kta{\c s}~E, Blazytko~T, et~al.
+\newblock Towards automated discovery of crash-resistant primitives in binary
+  executables [C/OL]//\allowbreak
+Proceedings of the 47th Annual IEEE/IFIP International Conference on Dependable
+  Systems and Networks (DSN).
+\newblock 2017: 189-200.
+\newblock DOI: \doi{10.1109/DSN.2017.58}.
+
+\bibitem[Oikonomopoulos {\bibetal}(2016)Oikonomopoulos, Athanasopoulos, Bos,
+  and Giuffrida]{oikonomopoulos2016poking}
+Oikonomopoulos~A, Athanasopoulos~E, Bos~H, et~al.
+\newblock Poking holes in information hiding [C]//\allowbreak
+Proceedings of the 25th USENIX Security Symposium.
+\newblock 2016: 121-138.
+
+\bibitem[Gruss {\bibetal}(2016)Gruss, Maurice, Fogh, Lipp, and
+  Mangard]{gruss2016prefetch}
+Gruss~D, Maurice~C, Fogh~A, et~al.
+\newblock Prefetch side-channel attacks: Bypassing {SMAP} and kernel {ASLR}
+  [C/OL]//\allowbreak
+Proceedings of the 2016 ACM SIGSAC Conference on Computer and Communications
+  Security (CCS).
+\newblock 2016: 368-379.
+\newblock DOI: \doi{10.1145/2976749.2978356}.
+
+\bibitem[Koschel {\bibetal}(2020)Koschel, Giuffrida, Bos, and
+  Razavi]{koschel2020tagbleed}
+Koschel~J, Giuffrida~C, Bos~H, et~al.
+\newblock {TagBleed}: Breaking {KASLR} on the isolated kernel address space
+  using tagged {TLBs} [C/OL]//\allowbreak
+Proceedings of the 2020 IEEE European Symposium on Security and Privacy
+  (EuroS\&P).
+\newblock 2020: 309-321.
+\newblock DOI: \doi{10.1109/EuroSP48549.2020.00027}.
+
+\bibitem[Song {\bibetal}(2025)Song, Zhang, and Yan]{song2025oreo}
+Song~S, Zhang~J, Yan~M.
+\newblock Oreo: Protecting {ASLR} against microarchitectural attacks
+  [C]//\allowbreak
+Proceedings of the 2025 Network and Distributed System Security Symposium
+  (NDSS).
+\newblock 2025.
+
+\bibitem[Carlini {\bibetal}(2015)Carlini, Barresi, Payer, Wagner, and
+  Gross]{carlini2015bending}
+Carlini~N, Barresi~A, Payer~M, et~al.
+\newblock Control-flow bending: On the effectiveness of control-flow integrity
+  [C]//\allowbreak
+Proceedings of the 24th USENIX Security Symposium.
+\newblock 2015: 161-176.
+
+\bibitem[Hu {\bibetal}(2016)Hu, Shinde, Adrian, Chua, Saxena, and
+  Liang]{hu2016dop}
+Hu~H, Shinde~S, Adrian~S, et~al.
+\newblock Data-oriented programming: On the expressiveness of non-control data
+  attacks [C/OL]//\allowbreak
+Proceedings of the 2016 IEEE Symposium on Security and Privacy (S\&P).
+\newblock 2016: 969-986.
+\newblock DOI: \doi{10.1109/SP.2016.62}.
+
+\bibitem[Larsen {\bibetal}(2020)Larsen and Franz]{larsen2020adoption}
+Larsen~P, Franz~M.
+\newblock Adoption challenges of code randomization [C/OL]//\allowbreak
+Proceedings of the 7th ACM Workshop on Moving Target Defense (MTD).
+\newblock 2020: 45-46.
+\newblock DOI: \doi{10.1145/3411496.3421229}.
+
+\bibitem[Shen {\bibetal}(2019)Shen and Chen]{shen2019survey}
+Shen~Z, Chen~W.
+\newblock A survey of research on runtime rerandomization under memory
+  disclosure [J/OL].
+\newblock IEEE Access, 2019, 7: 105432-105440.
+\newblock DOI: \doi{10.1109/ACCESS.2019.2931707}.
+
+\bibitem[Stanley {\bibetal}(2013)Stanley, Xu, and
+  Spafford]{stanley2013improved}
+Stanley~D~M, Xu~D, Spafford~E~H.
+\newblock Improved kernel security through memory layout randomization
+  [C/OL]//\allowbreak
+Proceedings of the 32nd IEEE International Performance Computing and
+  Communications Conference (IPCCC).
+\newblock 2013: 1-10.
+\newblock DOI: \doi{10.1109/PCCC.2013.6742779}.
+
+\bibitem[{The Linux Kernel Organization}(2024)]{linux2024kernel}
+{The Linux Kernel Organization}.
+\newblock The {Linux} kernel, version 6.8 [EB/OL].
+\newblock 2024.
+\newblock \url{https://www.kernel.org/}.
+
+\bibitem[Gruss {\bibetal}(2017)Gruss, Lipp, Schwarz, Fellner, Maurice, and
+  Mangard]{gruss2017kaiser}
+Gruss~D, Lipp~M, Schwarz~M, et~al.
+\newblock {KASLR} is dead: Long live {KASLR} [C/OL]//\allowbreak
+Proceedings of the 9th International Symposium on Engineering Secure Software
+  and Systems (ESSoS).
+\newblock 2017: 161-176.
+\newblock DOI: \doi{10.1007/978-3-319-62105-0_11}.
+
+\bibitem[Canella {\bibetal}(2020)Canella, Schwarz, Haubenwallner, Schwarzl, and
+  Gruss]{canella2020kaslr}
+Canella~C, Schwarz~M, Haubenwallner~M, et~al.
+\newblock {KASLR}: Break it, fix it, repeat [C/OL]//\allowbreak
+Proceedings of the 15th ACM Asia Conference on Computer and Communications
+  Security (AsiaCCS).
+\newblock 2020: 481-493.
+\newblock DOI: \doi{10.1145/3320269.3384747}.
+
+\bibitem[G{\"o}kta{\c s} {\bibetal}(2018)G{\"o}kta{\c s}, Kollenda, Koppe,
+  Bosman, Portokalidis, Holz, Bos, and Giuffrida]{goktas2018pir}
+G{\"o}kta{\c s}~E, Kollenda~B, Koppe~P, et~al.
+\newblock Position-independent code reuse: On the effectiveness of {ASLR} in
+  the absence of information disclosure [C/OL]//\allowbreak
+Proceedings of the 2018 IEEE European Symposium on Security and Privacy
+  (EuroS\&P).
+\newblock 2018: 227-242.
+\newblock DOI: \doi{10.1109/EuroSP.2018.00024}.
+
+\bibitem[Bigelow {\bibetal}(2015)Bigelow, Hobson, Rudd, Streilein, and
+  Okhravi]{bigelow2015tasr}
+Bigelow~D, Hobson~T, Rudd~R, et~al.
+\newblock Timely rerandomization for mitigating memory disclosures
+  [C/OL]//\allowbreak
+Proceedings of the 22nd ACM SIGSAC Conference on Computer and Communications
+  Security (CCS).
+\newblock 2015: 268-279.
+\newblock DOI: \doi{10.1145/2810103.2813691}.
+
+\bibitem[Lu {\bibetal}(2016)Lu, N{\"u}rnberger, Backes, and
+  Lee]{lu2016runtimeaslr}
+Lu~K, N{\"u}rnberger~S, Backes~M, et~al.
+\newblock How to make {ASLR} win the clone wars: Runtime re-randomization
+  [C]//\allowbreak
+Proceedings of the 2016 Network and Distributed System Security Symposium
+  (NDSS).
+\newblock 2016.
+
+\bibitem[Wang {\bibetal}(2017)Wang, Wu, Li, Lai, Zhang, Hsu, and
+  Cheng]{wang2017reranz}
+Wang~Z, Wu~C, Li~J, et~al.
+\newblock {RERANZ}: A light-weight virtual machine to mitigate memory
+  disclosure attacks [C/OL]//\allowbreak
+Proceedings of the 13th ACM SIGPLAN/SIGOPS International Conference on Virtual
+  Execution Environments (VEE).
+\newblock 2017: 143-156.
+\newblock DOI: \doi{10.1145/3050748.3050752}.
+
+\bibitem[Davi {\bibetal}(2015)Davi, Liebchen, Sadeghi, Snow, and
+  Monrose]{davi2015isomeron}
+Davi~L, Liebchen~C, Sadeghi~A~R, et~al.
+\newblock Isomeron: Code randomization resilient to (just-in-time)
+  return-oriented programming [C]//\allowbreak
+Proceedings of the 2015 Network and Distributed System Security Symposium
+  (NDSS).
+\newblock 2015.
+
+\bibitem[Hawkins {\bibetal}(2017{\natexlab{a}})Hawkins, Nguyen-Tuong, Hiser,
+  Co, and Davidson]{hawkins2017mixr}
+Hawkins~W, Nguyen-Tuong~A, Hiser~J~D, et~al.
+\newblock Mixr: Flexible runtime rerandomization for binaries
+  [C/OL]//\allowbreak
+Proceedings of the 2017 Workshop on Moving Target Defense (MTD).
+\newblock 2017{\natexlab{a}}: 27-37.
+\newblock DOI: \doi{10.1145/3140549.3140552}.
+
+\bibitem[Hawkins {\bibetal}(2017{\natexlab{b}})Hawkins, Hiser, Co,
+  Nguyen-Tuong, and Davidson]{hawkins2017zipr}
+Hawkins~W~H, Hiser~J~D, Co~M, et~al.
+\newblock Zipr: Efficient static binary rewriting for security
+  [C/OL]//\allowbreak
+Proceedings of the 47th Annual IEEE/IFIP International Conference on Dependable
+  Systems and Networks (DSN).
+\newblock 2017{\natexlab{b}}: 559-566.
+\newblock DOI: \doi{10.1109/DSN.2017.27}.
+
+\bibitem[Williams-King {\bibetal}(2020)Williams-King, Kobayashi, Williams-King,
+  Patterson, Spano, Wu, Yang, and Kemerlis]{williamsking2020egalito}
+Williams-King~D, Kobayashi~H, Williams-King~K, et~al.
+\newblock Egalito: Layout-agnostic binary recompilation [C/OL]//\allowbreak
+Proceedings of the 25th International Conference on Architectural Support for
+  Programming Languages and Operating Systems (ASPLOS).
+\newblock 2020: 133-147.
+\newblock DOI: \doi{10.1145/3373376.3378470}.
+
+\bibitem[Nadeem(2020)]{nadeem2020kernelmodule}
+Nadeem~M~H.
+\newblock Linux kernel module continuous address space re-randomization [D].
+\newblock Virginia Polytechnic Institute and State University, 2020.
+
+\bibitem[Luo {\bibetal}(2025)Luo, Fu, Ming, Xie, and Peng]{luo2025ptrproxy}
+Luo~C, Fu~J, Ming~J, et~al.
+\newblock {PtrProxy}: Efficient code re-randomization on {AArch64} platform
+  [J].
+\newblock China Communications, 2025, 22\penalty0 (1).
+
+\bibitem[Morton {\bibetal}(2017)Morton, Koo, Li, Snow, Polychronakis, and
+  Monrose]{morton2017zombie}
+Morton~M, Koo~H, Li~F, et~al.
+\newblock Defeating zombie gadgets by re-randomizing code upon disclosure
+  [C/OL]//\allowbreak
+Proceedings of the 9th International Symposium on Engineering Secure Software
+  and Systems (ESSoS).
+\newblock 2017: 143-160.
+\newblock DOI: \doi{10.1007/978-3-319-62105-0_10}.
+
+\bibitem[Li {\bibetal}(2022)Li, Chung, Xing, Bao, and Lin]{li2022mprobe}
+Li~Y, Chung~Y~C, Xing~J, et~al.
+\newblock {MProbe}: Make the code probing meaningless [C/OL]//\allowbreak
+Proceedings of the 38th Annual Computer Security Applications Conference
+  (ACSAC).
+\newblock 2022.
+\newblock DOI: \doi{10.1145/3564625.3567967}.
+
+\bibitem[Li {\bibetal}(2024{\natexlab{b}})Li, Bao, and Chung]{li2024randomize}
+Li~Y, Bao~Y, Chung~Y~C.
+\newblock Randomize the running function when it is disclosed [J/OL].
+\newblock IEEE Transactions on Computers, 2024, 73\penalty0 (6): 1516-1530.
+\newblock DOI: \doi{10.1109/TC.2024.3377497}.
+
+\bibitem[Backes {\bibetal}(2014{\natexlab{b}})Backes, Holz, Kollenda, Koppe,
+  N{\"u}rnberger, and Pewny]{backes2014xnr}
+Backes~M, Holz~T, Kollenda~B, et~al.
+\newblock You can run but you can't read: Preventing disclosure exploits in
+  executable code [C/OL]//\allowbreak
+Proceedings of the 2014 ACM SIGSAC Conference on Computer and Communications
+  Security (CCS).
+\newblock 2014{\natexlab{b}}: 1342-1353.
+\newblock DOI: \doi{10.1145/2660267.2660378}.
+
+\bibitem[Gionta {\bibetal}(2015)Gionta, Enck, and Ning]{gionta2015hidem}
+Gionta~J, Enck~W, Ning~P.
+\newblock {HideM}: Protecting the contents of userspace memory in the face of
+  disclosure vulnerabilities [C/OL]//\allowbreak
+Proceedings of the 5th ACM Conference on Data and Application Security and
+  Privacy (CODASPY).
+\newblock 2015: 325-336.
+\newblock DOI: \doi{10.1145/2699026.2699107}.
+
+\bibitem[Braden {\bibetal}(2016)Braden, Davi, Liebchen, Sadeghi, Crane, Franz,
+  and Larsen]{braden2016leakage}
+Braden~K, Davi~L, Liebchen~C, et~al.
+\newblock Leakage-resilient layout randomization for mobile devices
+  [C/OL]//\allowbreak
+Proceedings of the 23rd Network and Distributed System Security Symposium
+  (NDSS).
+\newblock 2016.
+\newblock
+  \url{https://www.ndss-symposium.org/wp-content/uploads/2017/09/leakage-resilient-layout-randomization-mobile-devices.pdf}.
+
+\bibitem[Kwon {\bibetal}(2019)Kwon, Shin, Kim, Lee, Cho, and
+  Paek]{kwon2019uxom}
+Kwon~D, Shin~J, Kim~G, et~al.
+\newblock {uXOM}: Efficient {eXecute-Only} memory on {ARM} {Cortex-M}
+  [C/OL]//\allowbreak
+Proceedings of the 28th USENIX Security Symposium.
+\newblock 2019.
+\newblock
+  \url{https://www.usenix.org/conference/usenixsecurity19/presentation/kwon}.
+
+\bibitem[Shen {\bibetal}(2020)Shen, Dharsee, and Criswell]{shen2020picoxom}
+Shen~Z, Dharsee~K, Criswell~J.
+\newblock Fast execute-only memory for embedded systems [C/OL]//\allowbreak
+Proceedings of the IEEE Secure Development Conference (SecDev).
+\newblock 2020.
+\newblock \url{https://ieeexplore.ieee.org/document/9229982}.
+
+\bibitem[Chen {\bibetal}(2017{\natexlab{b}})Chen, Zhang, Wang, Qiao, Azab, Lu,
+  Vijayakumar, and Shen]{chen2017norax}
+Chen~Y, Zhang~D, Wang~R, et~al.
+\newblock {NORAX}: Enabling execute-only memory for {COTS} binaries on
+  {AArch64} [C/OL]//\allowbreak
+Proceedings of the 38th IEEE Symposium on Security and Privacy (S\&P).
+\newblock 2017{\natexlab{b}}.
+\newblock DOI: \doi{10.1109/SP.2017.30}.
+
+\bibitem[int(2023)]{intel2023sdm}
+{Intel} 64 and {IA-32} architectures software developer's manual [M].
+\newblock Intel Corporation, 2023.
+
+\bibitem[Crane {\bibetal}(2015)Crane, Liebchen, Homescu, Davi, Larsen, Sadeghi,
+  Brunthaler, and Franz]{crane2015readactor}
+Crane~S, Liebchen~C, Homescu~A, et~al.
+\newblock Readactor: Practical code randomization resilient to memory
+  disclosure [C/OL]//\allowbreak
+Proceedings of the 2015 IEEE Symposium on Security and Privacy (S\&P).
+\newblock 2015: 763-780.
+\newblock DOI: \doi{10.1109/SP.2015.52}.
+
+\bibitem[Pomonis {\bibetal}(2019)Pomonis, Petsios, Keromytis, Polychronakis,
+  and Kemerlis]{pomonis2019krx}
+Pomonis~M, Petsios~T, Keromytis~A~D, et~al.
+\newblock Kernel protection against just-in-time code reuse [D/OL].
+\newblock Columbia University, 2019.
+\newblock DOI: \doi{10.1145/3277592}.
+
+\bibitem[Tolvanen(2018)]{tolvanen2018androidcfi}
+Tolvanen~S.
+\newblock Control flow integrity in the {Android} kernel [Z].
+\newblock 2018.
+
+\bibitem[Burow {\bibetal}(2019)Burow, Zhang, and Payer]{burow2019shadow}
+Burow~N, Zhang~X, Payer~M.
+\newblock {SoK}: Shining light on shadow stacks [C/OL]//\allowbreak
+Proceedings of the 2019 IEEE Symposium on Security and Privacy.
+\newblock 2019: 985-999.
+\newblock DOI: \doi{10.1109/SP.2019.00076}.
+
+\bibitem[Kuznetsov {\bibetal}(2014)Kuznetsov, Szekeres, Payer, Candea, Sekar,
+  and Song]{kuznetsov2014cpi}
+Kuznetsov~V, Szekeres~L, Payer~M, et~al.
+\newblock Code-pointer integrity [C]//\allowbreak
+Proceedings of the 11th USENIX Symposium on Operating Systems Design and
+  Implementation (OSDI).
+\newblock 2014: 147-163.
+
+\bibitem[Liljestrand {\bibetal}(2021)Liljestrand, Nyman, Gunn, Ekberg, and
+  Asokan]{liljestrand2021pacstack}
+Liljestrand~H, Nyman~T, Gunn~L~J, et~al.
+\newblock {PACStack}: An authenticated call stack [C]//\allowbreak
+Proceedings of the 30th USENIX Security Symposium.
+\newblock 2021: 357-374.
+
+\bibitem[Ismail {\bibetal}(2022)Ismail, Quach, Jelesnianski, Jang, and
+  Min]{ismail2022pactight}
+Ismail~M, Quach~A, Jelesnianski~C, et~al.
+\newblock Tightly seal your sensitive pointers with {PACTight} [C]//\allowbreak
+Proceedings of the 31st USENIX Security Symposium.
+\newblock 2022: 3717-3734.
+
+\bibitem[{The LLVM Project}(2024)]{llvm2024newpm}
+{The LLVM Project}.
+\newblock Writing an {LLVM} pass and the new pass manager [Z].
+\newblock 2024.
+
+\bibitem[Yoo {\bibetal}(2022)Yoo, Park, Kim, Kim, and Kim]{yoo2022pal}
+Yoo~S, Park~J, Kim~S, et~al.
+\newblock In-kernel control-flow integrity on commodity {OSes} using {ARM}
+  pointer authentication [C/OL]//\allowbreak
+Proceedings of the 31st USENIX Security Symposium.
+\newblock 2022.
+\newblock
+  \url{https://www.usenix.org/conference/usenixsecurity22/presentation/yoo}.
+
+\bibitem[Jang {\bibetal}(2019)Jang and Kang]{jang2019revisiting}
+Jang~J, Kang~B~B.
+\newblock Revisiting the {ARM} debug facility for {OS} kernel security
+  [C/OL]//\allowbreak
+Proceedings of the 56th Annual Design Automation Conference (DAC).
+\newblock 2019.
+\newblock DOI: \doi{10.1145/3316781.3317897}.
+
+\bibitem[Gravani {\bibetal}(2021)Gravani, Hedayati, Criswell, and
+  Scott]{gravani2021iskios}
+Gravani~S, Hedayati~M, Criswell~J, et~al.
+\newblock Fast intra-kernel isolation and security with {IskiOS}
+  [C/OL]//\allowbreak
+Proceedings of the 24th International Symposium on Research in Attacks,
+  Intrusions and Defenses (RAID).
+\newblock 2021.
+\newblock DOI: \doi{10.1145/3471621.3471849}.
+
+\bibitem[Maar {\bibetal}(2024)Maar, Nasahl, and Mangard]{maar2024hekcfi}
+Maar~L, Nasahl~P, Mangard~S.
+\newblock Beyond the edges of kernel control-flow hijacking protection with
+  {HEK-CFI} [C/OL]//\allowbreak
+Proceedings of the 19th ACM Asia Conference on Computer and Communications
+  Security (ASIA CCS).
+\newblock 2024: 1214-1230.
+\newblock DOI: \doi{10.1145/3634737.3661135}.
+
+\bibitem[Ge {\bibetal}(2016)Ge, Talele, Payer, and Jaeger]{ge2016finegrained}
+Ge~X, Talele~N, Payer~M, et~al.
+\newblock Fine-grained control-flow integrity for kernel software
+  [C/OL]//\allowbreak
+Proceedings of the 2016 IEEE European Symposium on Security and Privacy
+  (EuroS\&P).
+\newblock 2016: 179-194.
+\newblock DOI: \doi{10.1109/EuroSP.2016.24}.
+
+\bibitem[Moreira {\bibetal}(2017)Moreira, Rigo, Polychronakis, and
+  Kemerlis]{moreira2017droptherop}
+Moreira~J, Rigo~S, Polychronakis~M, et~al.
+\newblock {DROP THE ROP}: Fine-grained control-flow integrity for the {Linux}
+  kernel [Z].
+\newblock 2017.
+
+\bibitem[Khandaker {\bibetal}(2019)Khandaker et~al.]{khandaker2019oscfi}
+Khandaker~M~R, et~al.
+\newblock Origin-sensitive control flow integrity [C/OL]//\allowbreak
+Proceedings of the 28th USENIX Security Symposium.
+\newblock 2019.
+\newblock
+  \url{https://www.usenix.org/conference/usenixsecurity19/presentation/khandaker}.
+
+\bibitem[Kasten {\bibetal}(2024)Kasten, Zieris, and Horsch]{kasten2024hpcfi}
+Kasten~F, Zieris~P, Horsch~J.
+\newblock Integrating static analyses for high-precision control-flow integrity
+  [C/OL]//\allowbreak
+Proceedings of the 27th International Symposium on Research in Attacks,
+  Intrusions and Defenses (RAID).
+\newblock 2024.
+\newblock DOI: \doi{10.1145/3678890.3678920}.
+
+\bibitem[Li {\bibetal}(2020)Li, Wang, Zhang, Chen, Yang, and Liu]{li2020cracks}
+Li~Y, Wang~M, Zhang~C, et~al.
+\newblock Finding cracks in shields: On the security of control flow integrity
+  mechanisms [C/OL]//\allowbreak
+Proceedings of the 2020 ACM SIGSAC Conference on Computer and Communications
+  Security (CCS).
+\newblock 2020.
+\newblock DOI: \doi{10.1145/3372297.3417867}.
+
+\bibitem[Kim {\bibetal}(2024)Kim, Park, Roh, Chung, Lee, Kim, and
+  Lee]{kim2024tiktag}
+Kim~J, Park~J, Roh~S, et~al.
+\newblock {TikTag}: Breaking {ARM}'s memory tagging extension with speculative
+  execution [C/OL]//\allowbreak
+arXiv preprint arXiv:2406.08719.
+\newblock 2024.
+\newblock DOI: \doi{10.48550/arXiv.2406.08719}.
+
+\end{thebibliography}

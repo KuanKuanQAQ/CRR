@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 340" width="720" height="340"
+     font-family="PingFang SC, Hiragino Sans GB, Noto Sans CJK SC, Microsoft YaHei, sans-serif">
+<!-- 图 3-9 与已有持续随机化工作的同条件对比（预测值） -->
+<defs>
+  <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#000"/></marker>
+  <marker id="ahs" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#000"/></marker>
+  <marker id="oah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0.6,0.6 L7,4 L0.6,7.4 z" fill="#fff" stroke="#000" stroke-width="1"/></marker>
+  <marker id="ahb" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#0072B2"/></marker>
+  <marker id="ahr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#D55E00"/></marker>
+  <marker id="ahg" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#555"/></marker>
+  <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#fff"/><line x1="0" y1="0" x2="0" y2="6" stroke="#000" stroke-width="1"/></pattern>
+  <pattern id="hatch2" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><rect width="5" height="5" fill="#fff"/><line x1="0" y1="0" x2="0" y2="5" stroke="#000" stroke-width="0.7"/></pattern>
+  <pattern id="dots" width="5" height="5" patternUnits="userSpaceOnUse"><rect width="5" height="5" fill="#fff"/><circle cx="2.5" cy="2.5" r="0.9" fill="#000"/></pattern>
+</defs>
+<style>
+  text  { fill:#000; }
+  .lbl  { font-size:11.5px; letter-spacing:.06em; }
+  .box  { fill:#fff; stroke:#000; stroke-width:1.2; }
+  .thick{ fill:#fff; stroke:#000; stroke-width:2; }
+  .plain{ fill:#fff; stroke:#000; stroke-width:0.8; }
+  .nr   { fill:#fff; stroke:#000; stroke-width:1.2; stroke-dasharray:6 3; }
+  .tr   { fill:#fff; stroke:#0072B2; stroke-width:2; }
+  .rd   { fill:#F0F0F0; stroke:#000; stroke-width:1.2; stroke-dasharray:1.5 2.5; }
+  .dt   { fill:#E3EEF7; stroke:#0072B2; stroke-width:2; }
+  .hw   { fill:#EDEDED; stroke:#555; stroke-width:1.2; }
+  .ours { fill:#E3EEF7; stroke:#0072B2; stroke-width:2; }
+  .dis  { fill:#fff; stroke:#000; stroke-width:0.8; stroke-dasharray:2 2; }
+  .concl{ fill:#E3EEF7; stroke:#0072B2; stroke-width:1.6; }
+  .ghost{ fill:#fff; stroke:#D55E00; stroke-width:1.2; stroke-dasharray:4 3; }
+  .trap { fill:url(#hatch); stroke:#000; stroke-width:1.2; }
+  .shade{ fill:url(#hatch2); stroke:#000; stroke-width:1; }
+  .dotf { fill:url(#dots); stroke:#000; stroke-width:1.2; }
+  .c5   { fill:#fff; stroke:#000; stroke-width:1.2; }
+  .bt   { font-size:12.5px; text-anchor:middle; }
+  .btl  { font-size:12.5px; }
+  .bs   { font-size:11px; text-anchor:middle; }
+  .bsl  { font-size:11px; }
+  .ttl  { font-size:13.5px; font-weight:bold; text-anchor:middle; }
+  .ttll { font-size:13.5px; font-weight:bold; }
+  .mono { font-family:"SF Mono",Menlo,Consolas,"Courier New",monospace; font-size:11.5px; }
+  .monos{ font-family:"SF Mono",Menlo,Consolas,"Courier New",monospace; font-size:10.5px; }
+  .mn   { fill:#000; font-weight:bold; }
+  .off  { fill:#555; }
+  .cap  { font-size:11px; fill:#333; }
+  .capc { font-size:11px; fill:#333; text-anchor:middle; }
+  .note { font-size:11.5px; }
+  .key  { font-size:11.5px; font-weight:bold; fill:#0072B2; }
+  .keyc { font-size:11.5px; font-weight:bold; text-anchor:middle; fill:#0072B2; }
+  .red  { font-size:11.5px; font-weight:bold; fill:#D55E00; }
+  .redc { font-size:11.5px; font-weight:bold; text-anchor:middle; fill:#D55E00; }
+  .good { font-size:11.5px; font-weight:bold; }
+  .goodc{ font-size:11.5px; font-weight:bold; text-anchor:middle; }
+  .gold { font-size:11.5px; font-weight:bold; }
+  .cf   { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#ah); }
+  .cfb  { fill:none; stroke:#0072B2; stroke-width:2; marker-end:url(#ahb); }
+  .cfg  { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#ah); }
+  .cfr  { fill:none; stroke:#D55E00; stroke-width:1.6; stroke-dasharray:7 3; marker-end:url(#ahr); }
+  .cfy  { fill:none; stroke:#0072B2; stroke-width:2; marker-end:url(#ahb); }
+  .cfm  { fill:none; stroke:#000; stroke-width:0.9; marker-end:url(#ahs); }
+  .cfo  { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#oah); }
+  .df   { fill:none; stroke:#555; stroke-width:1.1; stroke-dasharray:4 3; marker-end:url(#ahg); }
+  .dfb  { fill:none; stroke:#0072B2; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahb); }
+  .dfr  { fill:none; stroke:#D55E00; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahr); }
+  .dfy  { fill:none; stroke:#0072B2; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahb); }
+  .dep  { fill:none; stroke:#000; stroke-width:1.1; stroke-dasharray:6 4; marker-end:url(#ahs); }
+  .ln   { fill:none; stroke:#000; stroke-width:1.1; }
+  .lnr  { fill:none; stroke:#D55E00; stroke-width:1.6; }
+  .lng  { fill:none; stroke:#000; stroke-width:1.3; }
+  .dash { fill:none; stroke:#000; stroke-width:1; stroke-dasharray:5 4; }
+  .div  { stroke:#000; stroke-width:0.6; }
+  .axis { stroke:#000; stroke-width:1.1; fill:none; }
+  .grid { stroke:#999; stroke-width:0.5; stroke-dasharray:2 3; }
+</style>
+<rect width="720" height="340" fill="#fff"/>
+<text class="ttll" x="60" y="44">NVMe：fio randread-4k 吞吐降低</text>
+<path class="axis" d="M60,60 L60,250 L360,250"/>
+<line class="grid" x1="60" y1="215.455" x2="360" y2="215.455"/>
+<text class="cap" x="54" y="219.455" text-anchor="end">1%</text>
+<line class="grid" x1="60" y1="180.909" x2="360" y2="180.909"/>
+<text class="cap" x="54" y="184.909" text-anchor="end">2%</text>
+<line class="grid" x1="60" y1="146.364" x2="360" y2="146.364"/>
+<text class="cap" x="54" y="150.364" text-anchor="end">3%</text>
+<line class="grid" x1="60" y1="111.818" x2="360" y2="111.818"/>
+<text class="cap" x="54" y="115.818" text-anchor="end">4%</text>
+<line class="grid" x1="60" y1="77.2727" x2="360" y2="77.2727"/>
+<text class="cap" x="54" y="81.2727" text-anchor="end">5%</text>
+<rect x="80" y="142.909" width="16" height="107.091" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="98" y="104.909" width="16" height="145.091" fill="url(#hatch)" stroke="#000" stroke-width="1"/>
+<rect x="116" y="129.091" width="16" height="120.909" fill="url(#dots)" stroke="#000" stroke-width="1"/>
+<rect x="134" y="191.273" width="16" height="58.7273" fill="#0072B2" stroke="#000" stroke-width="1"/>
+<text class="capc" x="115" y="266">间隔 1 ms</text>
+<rect x="170" y="205.091" width="16" height="44.9091" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="188" y="177.455" width="16" height="72.5455" fill="url(#hatch)" stroke="#000" stroke-width="1"/>
+<rect x="206" y="198.182" width="16" height="51.8182" fill="url(#dots)" stroke="#000" stroke-width="1"/>
+<rect x="224" y="222.364" width="16" height="27.6364" fill="#0072B2" stroke="#000" stroke-width="1"/>
+<text class="capc" x="205" y="266">间隔 10 ms</text>
+<rect x="260" y="229.273" width="16" height="20.7273" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="278" y="215.455" width="16" height="34.5455" fill="url(#hatch)" stroke="#000" stroke-width="1"/>
+<rect x="296" y="225.818" width="16" height="24.1818" fill="url(#dots)" stroke="#000" stroke-width="1"/>
+<rect x="314" y="236.182" width="16" height="13.8182" fill="#0072B2" stroke="#000" stroke-width="1"/>
+<text class="capc" x="295" y="266">间隔 50 ms</text>
+<text class="ttll" x="400" y="44">E1000e：netperf TCP_RR 吞吐降低</text>
+<path class="axis" d="M400,60 L400,250 L700,250"/>
+<line class="grid" x1="400" y1="215.455" x2="700" y2="215.455"/>
+<text class="cap" x="394" y="219.455" text-anchor="end">1%</text>
+<line class="grid" x1="400" y1="180.909" x2="700" y2="180.909"/>
+<text class="cap" x="394" y="184.909" text-anchor="end">2%</text>
+<line class="grid" x1="400" y1="146.364" x2="700" y2="146.364"/>
+<text class="cap" x="394" y="150.364" text-anchor="end">3%</text>
+<line class="grid" x1="400" y1="111.818" x2="700" y2="111.818"/>
+<text class="cap" x="394" y="115.818" text-anchor="end">4%</text>
+<line class="grid" x1="400" y1="77.2727" x2="700" y2="77.2727"/>
+<text class="cap" x="394" y="81.2727" text-anchor="end">5%</text>
+<rect x="420" y="118.727" width="16" height="131.273" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="438" y="80.7273" width="16" height="169.273" fill="url(#hatch)" stroke="#000" stroke-width="1"/>
+<rect x="456" y="108.364" width="16" height="141.636" fill="url(#dots)" stroke="#000" stroke-width="1"/>
+<rect x="474" y="177.455" width="16" height="72.5455" fill="#0072B2" stroke="#000" stroke-width="1"/>
+<text class="capc" x="455" y="266">间隔 1 ms</text>
+<rect x="510" y="191.273" width="16" height="58.7273" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="528" y="167.091" width="16" height="82.9091" fill="url(#hatch)" stroke="#000" stroke-width="1"/>
+<rect x="546" y="184.364" width="16" height="65.6364" fill="url(#dots)" stroke="#000" stroke-width="1"/>
+<rect x="564" y="215.455" width="16" height="34.5455" fill="#0072B2" stroke="#000" stroke-width="1"/>
+<text class="capc" x="545" y="266">间隔 10 ms</text>
+<rect x="600" y="222.364" width="16" height="27.6364" fill="#fff" stroke="#000" stroke-width="1"/>
+<rect x="618" y="208.545" width="16" height="41.4545" fill="url(#hatch)" stroke="#000" stroke-width="1"/>
+<rect x="636" y="218.909" width="16" height="31.0909" fill="url(#dots)" stroke="#000" stroke-width="1"/>
+<rect x="654" y="232.727" width="16" height="17.2727" fill="#0072B2" stroke="#000" stroke-width="1"/>
+<text class="capc" x="635" y="266">间隔 50 ms</text>
+<rect x="60" y="288" width="22" height="13" fill="#fff" stroke="#000" stroke-width="1"/>
+<text class="cap" x="88" y="299">Adelie</text>
+<rect x="220" y="288" width="22" height="13" fill="url(#hatch)" stroke="#000" stroke-width="1"/>
+<text class="cap" x="248" y="299">Dbox</text>
+<rect x="380" y="288" width="22" height="13" fill="url(#dots)" stroke="#000" stroke-width="1"/>
+<text class="cap" x="408" y="299">Chaos</text>
+<rect x="540" y="288" width="22" height="13" fill="#0072B2" stroke="#000" stroke-width="1"/>
+<text class="cap" x="568" y="299">Ours</text>
+<text class="cap" x="60" y="326">纵轴为相对基线内核的吞吐降低，随机化相同驱动、相同间隔；CPU 占用升高见正文表</text>
+</svg>

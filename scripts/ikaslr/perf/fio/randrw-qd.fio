@@ -1,0 +1,15 @@
+; 扫队列深度：用 QD 环境变量覆盖，如 QD=1/4/16/64 各跑一次
+[global]
+ioengine=libaio
+direct=1
+runtime=20
+time_based=1
+group_reporting=1
+rw=randrw
+rwmixread=70
+bs=4k
+numjobs=1
+size=2G
+filename=/tmp/fio-test.dat
+[randrw]
+iodepth=${QD}

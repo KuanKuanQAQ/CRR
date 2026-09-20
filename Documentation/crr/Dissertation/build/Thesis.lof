@@ -1,0 +1,37 @@
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {1-1}{\ignorespaces \enspace 内存错误利用模型及不同防御策略的作用阶段}}{2}{figure.caption.17}%
+\contentsline {figure}{\numberline {1-2}{\ignorespaces \enspace 本文的研究思路与三章分工}}{10}{figure.caption.19}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {2-1}{\ignorespaces \enspace JIT-ROP 信息泄露攻击流程}}{18}{figure.caption.21}%
+\contentsline {figure}{\numberline {2-2}{\ignorespaces \enspace 只执行内存的三条实现路径}}{24}{figure.caption.23}%
+\contentsline {figure}{\numberline {2-3}{\ignorespaces \enspace 三类硬件 CFI 机制的等价类划分}}{26}{figure.caption.24}%
+\contentsline {figure}{\numberline {2-4}{\ignorespaces \enspace 四类攻击向量、三条安全不变式与三章工作的对应关系}}{30}{figure.caption.25}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {3-1}{\ignorespaces \enspace 本章机制的总体架构}}{35}{figure.caption.27}%
+\contentsline {figure}{\numberline {3-2}{\ignorespaces \enspace 一次跨区域调用的控制流}}{40}{figure.caption.29}%
+\contentsline {figure}{\numberline {3-3}{\ignorespaces \enspace 两个平台的绝对地址物化形式}}{43}{figure.caption.32}%
+\contentsline {figure}{\numberline {3-4}{\ignorespaces \enspace 返回地址的位置无关表示}}{44}{figure.caption.33}%
+\contentsline {figure}{\numberline {3-5}{\ignorespaces \enspace 执行流追踪与无副本随机化的时序}}{46}{figure.caption.34}%
+\contentsline {figure}{\numberline {3-6}{\ignorespaces \enspace 随机化抵达至开始的延迟累积分布}}{52}{figure.caption.39}%
+\contentsline {figure}{\numberline {3-7}{\ignorespaces \enspace 四种方法从随机化抵达到旧代码释放的时间线}}{54}{figure.caption.42}%
+\contentsline {figure}{\numberline {3-8}{\ignorespaces \enspace 与已有持续随机化工作的同条件对比}}{56}{figure.caption.45}%
+\contentsline {figure}{\numberline {3-9}{\ignorespaces \enspace 随机化范围与经过跳板的调用占比}}{57}{figure.caption.46}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {4-1}{\ignorespaces \enspace 本章机制的总体架构}}{64}{figure.caption.48}%
+\contentsline {figure}{\numberline {4-2}{\ignorespaces \enspace 跳转桩读取事件的处置与失效窗口}}{65}{figure.caption.49}%
+\contentsline {figure}{\numberline {4-3}{\ignorespaces \enspace 两级跳板与跳板激活}}{68}{figure.caption.51}%
+\contentsline {figure}{\numberline {4-4}{\ignorespaces \enspace 只执行保护施加的映射与跳转桩的改写路径}}{71}{figure.caption.52}%
+\contentsline {figure}{\numberline {4-5}{\ignorespaces \enspace 泄露地址利用竞态的成功率随读取至解引用时延的变化}}{75}{figure.caption.57}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {5-1}{\ignorespaces \enspace 指针认证的签名与认证过程}}{80}{figure.caption.59}%
+\contentsline {figure}{\numberline {5-2}{\ignorespaces \enspace 指针认证的上下文传播问题}}{81}{figure.caption.60}%
+\contentsline {figure}{\numberline {5-3}{\ignorespaces \enspace 本章机制的总体架构}}{82}{figure.caption.61}%
+\contentsline {figure}{\numberline {5-4}{\ignorespaces \enspace 高扇入函数的识别与绑定}}{83}{figure.caption.62}%
+\contentsline {figure}{\numberline {5-5}{\ignorespaces \enspace 跳板处的分区验证}}{85}{figure.caption.63}%
+\contentsline {figure}{\numberline {5-6}{\ignorespaces \enspace 每个间接调用点合法目标数的分布}}{90}{figure.caption.66}%
+\contentsline {figure}{\numberline {5-7}{\ignorespaces \enspace 高扇入函数识别数量随启动进程的变化}}{92}{figure.caption.69}%
+\contentsline {figure}{\numberline {5-8}{\ignorespaces \enspace Chaos 原文四组负载在三档随机化间隔下施加本章机制前后的吞吐下降}}{94}{figure.caption.72}%
+\contentsline {figure}{\numberline {5-9}{\ignorespaces \enspace 施加本章机制前后的 CPU 开销与单次随机化的迁移时间}}{95}{figure.caption.73}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }

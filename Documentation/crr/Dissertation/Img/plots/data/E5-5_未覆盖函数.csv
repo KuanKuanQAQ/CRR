@@ -1,0 +1,11 @@
+﻿函数（示例）,所属子系统,静态扇入度,启动期未执行的原因,傀儡任务如何覆盖,是否可覆盖
+dquot_alloc_space,fs/quota/,高,磁盘配额默认未启用,挂载一个开启 quota 的 tmpfs 并写入,可
+fsverity_verify_page,fs/verity/,中,无 fsverity 保护的文件被访问,创建并读取一个 fsverity 文件,可
+pm_suspend_prepare,kernel/power/,高,启动期不进入挂起流程,触发一次 s2idle 挂起并立即唤醒,可（有风险）
+cpuhp_invoke_callback,kernel/cpu.c,高,启动后不再热插拔 CPU,offline 再 online 一个非 boot CPU,可
+nfs_file_read,fs/nfs/,中,未挂载 NFS,挂载一个 loopback NFS 导出,可
+blk_mq_requeue_request,block/,高,正常路径不触发重排队,用 dm-flakey 注入 I/O 错误,可
+__netif_receive_skb_core（VLAN 分支）,net/core/,高,未配置 VLAN,创建 VLAN 接口并收发一帧,可
+kexec_load,kernel/kexec.c,低,需显式系统调用,调用一次 kexec_load（不实际重启）,可（有风险）
+ima_appraise_measurement,security/integrity/,中,IMA 策略未加载,加载一条最小 IMA 策略,可
+（合计示例 9 项，完整清单由静态候选集与运行时已识别集作差得出）,—,—,—,—,—

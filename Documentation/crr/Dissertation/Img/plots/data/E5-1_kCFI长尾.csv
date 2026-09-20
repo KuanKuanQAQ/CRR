@@ -1,0 +1,6 @@
+﻿排名,类型签名,等价类大小
+1,void (*)(void),141
+2,"unsigned long long (*)(unsigned long long, ...)",133
+3,int (*)(void),61
+4,int (*)(struct device*),57
+5,void (*)(struct sock*),55

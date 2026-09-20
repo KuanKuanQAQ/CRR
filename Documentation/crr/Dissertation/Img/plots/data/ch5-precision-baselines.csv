@@ -1,0 +1,7 @@
+# 已发表值
+mechanism,le5_pct,gt100_pct,max,kernel
+BTI,0,100,59,300,Linux 5.12
+Clang CFI,55,7,1,153,Android 4.14
+PAL，typesig,84.9,2.8,35,264,Linux 5.12
+PAL，+objtype,88.6,1.6,30,622,Linux 5.12
+PAL，+objbind+retbind,90.8,0.08,207,Linux 5.12

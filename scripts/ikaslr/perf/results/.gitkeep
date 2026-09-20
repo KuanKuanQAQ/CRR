@@ -1,0 +1,2 @@
+# 测试结果目录。05-run-suite.sh 会在此写 <arch>/<variant>/ 子目录。
+# 结果文件默认不入库（见本目录 .gitignore）。

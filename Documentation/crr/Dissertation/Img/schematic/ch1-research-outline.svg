@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 420" width="720" height="420"
+     font-family="PingFang SC, Hiragino Sans GB, Microsoft YaHei, sans-serif">
+<!-- 图 1-2 本文的研究思路与三章分工 -->
+<defs>
+  <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#000"/></marker>
+  <marker id="ahb" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#0072B2"/></marker>
+  <marker id="ahg" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#000"/></marker>
+  <marker id="ahr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#D55E00"/></marker>
+  <marker id="ahy" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#0072B2"/></marker>
+  <marker id="ahm" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#999"/></marker>
+  <marker id="sq" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="9" markerHeight="9" orient="0"><rect x="1" y="1" width="8" height="8" fill="#000"/></marker>
+  <marker id="ci" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="9" markerHeight="9" orient="0"><circle cx="5" cy="5" r="3.6" fill="#fff" stroke="#000" stroke-width="1.3"/></marker>
+  <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#fff"/><line x1="0" y1="0" x2="0" y2="6" stroke="#000" stroke-width="1"/></pattern>
+</defs>
+<style>
+  .lbl  { font-size:11.5px; fill:#000; letter-spacing:.06em; }
+  .box  { fill:#fff; stroke:#000; stroke-width:1.2; }
+  .plain{ fill:#fff; stroke:#000; stroke-width:0.8; }
+  .nr   { fill:#fff; stroke:#000; stroke-width:1.2; stroke-dasharray:6 3; }
+  .tr   { fill:#fff; stroke:#0072B2; stroke-width:2; }
+  .rd   { fill:#F0F0F0; stroke:#000; stroke-width:1.2; stroke-dasharray:1.5 2.5; }
+  .dt   { fill:#E3EEF7; stroke:#0072B2; stroke-width:2; }
+  .hw   { fill:#EDEDED; stroke:#555; stroke-width:1.2; }
+  .ours { fill:#E3EEF7; stroke:#0072B2; stroke-width:2; }
+  .dis  { fill:#fff; stroke:#555; stroke-width:0.8; stroke-dasharray:2 2; }
+  .bad  { font-size:11.5px; fill:#D55E00; font-weight:bold; }
+  .concl{ fill:#E3EEF7; stroke:#0072B2; stroke-width:1.6; }
+  .ghost{ fill:#fff; stroke:#D55E00; stroke-width:1.2; stroke-dasharray:4 3; }
+  .trap { fill:url(#hatch); stroke:#000; stroke-width:1.2; }
+  .c5   { fill:#E3EEF7; stroke:#0072B2; stroke-width:1.4; }
+  .bt   { font-size:12.5px; fill:#000; text-anchor:middle; }
+  .btl  { font-size:12.5px; fill:#000; }
+  .bs   { font-size:11px; fill:#000; text-anchor:middle; }
+  .bsl  { font-size:11px; fill:#000; }
+  .ttl  { font-size:13.5px; fill:#000; font-weight:bold; text-anchor:middle; }
+  .ttll { font-size:13.5px; fill:#000; font-weight:bold; }
+  .mono { font-family:"SF Mono",Menlo,Consolas,ui-monospace,monospace; font-size:11.5px; fill:#000; }
+  .monos{ font-family:"SF Mono",Menlo,Consolas,ui-monospace,monospace; font-size:10.5px; fill:#000; }
+  .mn   { fill:#000; font-weight:bold; }
+  .off  { fill:#555; }
+  .cap  { font-size:11px; fill:#333; }
+  .capc { font-size:11px; fill:#333; text-anchor:middle; }
+  .note { font-size:11.5px; fill:#000; }
+  .key  { font-size:11.5px; fill:#0072B2; font-weight:bold; }
+  .keyc { font-size:11.5px; fill:#0072B2; font-weight:bold; text-anchor:middle; }
+  .red  { font-size:11.5px; fill:#D55E00; font-weight:bold; }
+  .redc { font-size:11.5px; fill:#D55E00; font-weight:bold; text-anchor:middle; }
+  .good { font-size:11.5px; fill:#000; font-weight:bold; }
+  .goodc{ font-size:11.5px; fill:#000; font-weight:bold; text-anchor:middle; }
+  .gold { font-size:11.5px; fill:#000; font-weight:bold; }
+  .cf   { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#ah); }
+  .cfb  { fill:none; stroke:#0072B2; stroke-width:2; marker-end:url(#ahb); }
+  .cfg  { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#ahg); }
+  .cfr  { fill:none; stroke:#D55E00; stroke-width:1.6; stroke-dasharray:7 3; marker-end:url(#ahr); }
+  .cfy  { fill:none; stroke:#0072B2; stroke-width:2; marker-end:url(#ahy); }
+  .cfm  { fill:none; stroke:#999; stroke-width:1; marker-end:url(#ahm); }
+  .df   { fill:none; stroke:#555; stroke-width:1.1; stroke-dasharray:4 3; marker-end:url(#ahm); }
+  .dfb  { fill:none; stroke:#0072B2; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahb); }
+  .dfr  { fill:none; stroke:#D55E00; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahr); }
+  .dfy  { fill:none; stroke:#0072B2; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahy); }
+  .dep  { fill:none; stroke:#D55E00; stroke-width:1.1; stroke-dasharray:6 4; marker-end:url(#ahr); }
+  .ln   { fill:none; stroke:#000; stroke-width:1.1; }
+  .lnr  { fill:none; stroke:#D55E00; stroke-width:1.6; }
+  .lng  { fill:none; stroke:#000; stroke-width:1.3; }
+  .dash { fill:none; stroke:#000; stroke-width:1; stroke-dasharray:5 4; }
+  .div  { stroke:#000; stroke-width:0.6; }
+  .axis { stroke:#000; stroke-width:1.1; fill:none; }
+  .grid { stroke:#999; stroke-width:0.5; stroke-dasharray:2 3; }
+</style>
+<rect width="720" height="420" fill="#fff"/>
+<rect class="dash" x="26" y="66" width="106" height="322"/>
+<text class="bt" x="79" y="94">研究方向</text>
+<rect class="dash" x="150" y="66" width="140" height="322"/>
+<text class="bt" x="220" y="94">面临的三个问题</text>
+<rect class="dash" x="312" y="66" width="158" height="322"/>
+<text class="bt" x="391" y="94">关键挑战</text>
+<rect class="dash" x="494" y="66" width="200" height="322"/>
+<text class="bt" x="594" y="94">研究内容</text>
+<rect class="box" x="34" y="108" width="90" height="264"/>
+<text class="bt" x="79" y="234">内核</text>
+<text class="bt" x="79" y="256">持续随机化</text>
+<rect class="box" x="158" y="108" width="124" height="72"/>
+<text class="bs" x="220" y="140">如何随机化</text>
+<text class="bs" x="220" y="158">built-in 代码</text>
+<rect class="box" x="320" y="108" width="142" height="72" style="fill:#FAE4D6;stroke:#D55E00"/>
+<text class="bs" x="391" y="140">代码索引规模随调用点增长</text>
+<text class="bs" x="391" y="158">执行流无法安全暂停</text>
+<rect class="ours" x="502" y="108" width="184" height="72"/>
+<text class="bs" x="594" y="140">研究内容一：基于跳板函数的</text>
+<text class="bs" x="594" y="158">持续随机化</text>
+<path class="cf" d="M124,144 L154,144"/>
+<path class="cf" d="M282,144 L316,144"/>
+<path class="cf" d="M462,144 L498,144"/>
+<rect class="box" x="158" y="204" width="124" height="72"/>
+<text class="bs" x="220" y="236">随机化哪些函数</text>
+<text class="bs" x="220" y="254">何时随机化</text>
+<rect class="box" x="320" y="204" width="142" height="72" style="fill:#FAE4D6;stroke:#D55E00"/>
+<text class="bs" x="391" y="236">范围扩大则开销剧增</text>
+<text class="bs" x="391" y="254">跨区域调用随之增多</text>
+<rect class="ours" x="502" y="204" width="184" height="72"/>
+<text class="bs" x="594" y="236">研究内容二：基于代码索引泄露的</text>
+<text class="bs" x="594" y="254">触发式随机化</text>
+<path class="cf" d="M124,240 L154,240"/>
+<path class="cf" d="M282,240 L316,240"/>
+<path class="cf" d="M462,240 L498,240"/>
+<rect class="box" x="158" y="300" width="124" height="72"/>
+<text class="bs" x="220" y="332">范围之外的代码</text>
+<text class="bs" x="220" y="350">如何保护</text>
+<rect class="box" x="320" y="300" width="142" height="72" style="fill:#FAE4D6;stroke:#D55E00"/>
+<text class="bs" x="391" y="332">非随机化区域布局固定</text>
+<text class="bs" x="391" y="350">指针认证受上下文传播所限</text>
+<rect class="ours" x="502" y="300" width="184" height="72"/>
+<text class="bs" x="594" y="332">研究内容三：基于随机化辅助的</text>
+<text class="bs" x="594" y="350">ARM 指针认证</text>
+<path class="cf" d="M124,336 L154,336"/>
+<path class="cf" d="M282,336 L316,336"/>
+<path class="cf" d="M462,336 L498,336"/>
+<path class="dfb" d="M560.88,180 L560.88,200"/>
+<path class="dfb" d="M627.12,180 L627.12,200"/>
+<path class="dfb" d="M560.88,276 L560.88,296"/>
+<path class="dfb" d="M627.12,276 L627.12,296"/>
+<text class="capc" x="594" y="406">虚线箭头：后一项研究内容建立在前一项之上</text>
+</svg>

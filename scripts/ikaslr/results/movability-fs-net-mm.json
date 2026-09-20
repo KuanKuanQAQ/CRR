@@ -1,0 +1,13 @@
+{
+  "files": 175,
+  "total_funcs": 6371,
+  "per_table": {
+    "SMP 锁前缀": 247,
+    "BUG/WARN 表": 176,
+    "alternatives": 50,
+    "异常修正表": 12,
+    "静态键": 185
+  },
+  "blocked": 524,
+  "movable_pct": 91.7752315178151
+}

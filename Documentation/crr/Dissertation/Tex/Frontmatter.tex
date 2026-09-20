@@ -1,0 +1,48 @@
+%---------------------------------------------------------------------------%
+%->> Frontmatter
+%---------------------------------------------------------------------------%
+\maketitle% 生成中文封面
+\MAKETITLE% 生成英文封面
+\makedeclaration% 生成声明页
+%-
+%-> 中文摘要
+%-
+\intobmk\chapter*{摘\quad 要}% 显示在书签但不显示在目录
+\setcounter{page}{1}% 开始页码
+\pagenumbering{Roman}% 页码符号
+
+Linux 内核以 C 语言编写，内存安全漏洞持续被引入与发现，代码重用攻击因而长期是内核面临的主要威胁。持续随机化在运行期反复改变代码布局，使已泄露的地址迅速失效，是应对信息泄露类攻击的有效路线。然而现有的持续随机化工作或面向用户态进程，或以内核模块为保护对象，都依赖一条明确的模块边界来限定随机化范围；而内核中相当一部分代码在任何配置下都无法编译为模块，这部分 built-in 代码不具备这样的边界，其代码索引的更新规模、执行流的安全暂停、以及随机化范围之外代码的保护，都缺乏可用的现成解法。
+
+本文面向 Linux 内核 built-in 代码，提出并实现了一套持续随机化系统。该系统以跳板函数作为随机化区域的唯一出入口，在其之上组织三项关键技术，分别回答持续随机化的三个核心问题。
+
+第一项工作解决“如何随机化”。本文提出基于跳板函数的低开销持续随机化执行机制：在保持内核原有代码模型不变的前提下，由编译器插件按函数改写被选中函数内部的引用，使函数体可以整体搬移；跳板在承担地址间接的同时充当执行流的观测点，由进出计数精确刻画随机化区域内的活跃执行流，从而实现不保留旧副本的切换。实验表明，一次随机化需改写的代码索引由与调用点数量同阶降至与函数数量同阶，一次跨区域调用往返的常驻开销为 18.02 ns，其中执行流追踪占绝大部分。
+
+第二项工作解决“何时随机化”。本文把只执行内存由阻断机制改用为检测机制，以对代码探测行为的直接观测替代时钟或行为代理指标作为触发条件，并给出基于管理态保护键与基于硬件调试观察点的两条实现路径。实验表明，正常负载下的触发频率为每秒 0.02 至 0.44 次，从检测到随机化完成的延迟在基础负载下 99 分位不超过 110 μs；受控自测的竞态实验表明，泄露的地址在攻击者完成解引用之前即已失效，且每一次读取本身都会再触发一次随机化，使重复尝试无法累积。
+
+第三项工作解决随机化范围之外代码的保护。本文利用随机化区域内目标地址不可预测这一性质，提出以随机化打断指针认证上下文传播链的协同机制：以类型上下文恒定签名配合归属跟踪在运行时识别高扇入函数并将其移入随机化区域，并在跳板处施加分区验证。实验表明，91\% 的间接调用点合法目标数不超过 5，最大等价类为 57，而同平台上基于函数类型哈希的方案在同一口径下最大等价类为 141。
+
+综上，本文围绕 Linux 内核 built-in 代码的持续随机化，沿着“如何随机化、何时随机化、范围之外如何保护”的递进脉络，系统研究了随机化的执行机制、触发时机与非随机化区域的控制流约束，形成了从单次随机化的代价控制到全内核安全覆盖的一组方法与系统实现。本文的研究表明，built-in 代码长期落在持续随机化的保护范围之外，其原因不只在于工程量大，更在于这部分代码缺少一条可依托的模块边界，代码索引因而无处集中、执行流无处观测、随机化范围无处划定。把跳板确立为随机化区域的唯一出入口之后，三者获得了共同的着力点：索引集中到跳转桩，执行流在跳板处被计数，区域边界由跳板给出。在此之上，以对代码探测行为的直接观测替代固定周期作为触发条件，并以随机化打断指针认证的上下文传播链，可以在可接受的开销内把保护覆盖到 built-in 代码，为内核代码重用攻击的防御提供一条可部署、可复现、边界清晰的路线。
+
+\keywords{内核安全，地址空间布局随机化，持续随机化，只执行内存，控制流完整性，指针认证}% 中文关键词
+%-
+%-> 英文摘要
+%-
+\intobmk\chapter*{Abstract}% 显示在书签但不显示在目录
+
+The Linux kernel is written in C, memory-safety defects continue to be introduced and discovered, and code-reuse attacks therefore remain a principal threat to the kernel. Continuous re-randomization repeatedly changes the code layout at run time so that a leaked address quickly becomes stale, and is an effective answer to information-disclosure attacks. Existing work on continuous re-randomization, however, targets either user-space processes or kernel modules, and in both cases relies on an explicit module boundary to delimit the randomization scope. A substantial part of the kernel cannot be compiled as a module under any configuration; this built-in code has no such boundary, and for it the scale of code-pointer updates, the safe suspension of execution flows, and the protection of code outside the randomization scope all lack a usable off-the-shelf solution.
+
+This dissertation presents a continuous re-randomization system for built-in Linux kernel code. The system makes trampoline functions the sole entry and exit of the randomized region, and organizes three key techniques on top of them, each answering one of the three core problems of continuous re-randomization.
+
+The first technique addresses how to re-randomize. A low-overhead execution mechanism based on trampolines is proposed: keeping the kernel code model unchanged, a compiler plugin rewrites, per function, the references inside the selected functions so that a function body can be relocated as a whole; the trampoline serves at the same time as an observation point for execution flows, so that entry and exit counting characterizes exactly the flows currently executing inside the randomized region and a copy-free switch becomes possible. Measurements show that the number of code pointers to be rewritten per re-randomization drops from the order of the number of call sites to the order of the number of functions, and that the steady-state cost of one cross-region call round trip is 18.02 ns, of which execution-flow tracking accounts for the large majority.
+
+The second technique addresses when to re-randomize. Execute-only memory is repurposed from a blocking mechanism into a detection mechanism, so that the trigger condition becomes a direct observation of code-probing behaviour rather than a clock or a behavioural proxy; two implementation paths are given, one based on supervisor memory protection keys and one based on hardware debug watchpoints. Measurements show a trigger rate of 0.02 to 0.44 per second under normal workloads and a 99th-percentile detection-to-completion latency of at most 110 μs under baseline workloads; a controlled race experiment shows that a leaked address has already become stale before the attacker can dereference it, and that every read itself triggers a further re-randomization, so repeated attempts do not accumulate.
+
+The third technique addresses the protection of code outside the randomization scope. Exploiting the fact that target addresses inside the randomized region are unpredictable, a cooperative mechanism is proposed that uses randomization to break the context-propagation chain of pointer authentication: high-fan-in functions are identified at run time by constant type-context signing together with ownership tracking, are moved into the randomized region, and partitioned verification is applied at the trampolines. Measurements show that 91\% of indirect call sites have at most five legitimate targets and that the largest equivalence class is 57, whereas a scheme based on function type hashes yields a largest equivalence class of 141 on the same platform under the same criterion.
+
+In summary, this dissertation studies continuous re-randomization of built-in Linux kernel code along the progressive line of how to re-randomize, when to re-randomize, and how to protect what lies outside the scope, covering the execution mechanism of re-randomization, the choice of trigger moment, and the control-flow constraints on the non-randomized region, and yielding a set of methods and a system implementation that reach from the cost of a single re-randomization to security coverage of the whole kernel. The work shows that built-in code has remained outside the reach of continuous re-randomization not merely because of engineering effort, but more fundamentally because this code has no module boundary to build on: code pointers have nowhere to be collected, execution flows nowhere to be observed, and the randomization scope nowhere to be delimited. Once trampolines are established as the sole entry and exit of the randomized region, the three obtain a common footing: code pointers are collected into the jump stubs, execution flows are counted at the trampolines, and the region boundary is given by the trampolines themselves. On that basis, replacing a fixed period with direct observation of code-probing behaviour as the trigger condition, and using randomization to break the context-propagation chain of pointer authentication, brings protection to built-in code at an acceptable cost and offers a deployable, reproducible route with clearly stated boundaries for defending the kernel against code-reuse attacks.
+
+\KEYWORDS{Kernel Security, Address Space Layout Randomization, Continuous Re-randomization, Execute-Only Memory, Control-Flow Integrity, Pointer Authentication}% 英文关键词
+
+\pagestyle{enfrontmatterstyle}%
+\cleardoublepage\pagestyle{frontmatterstyle}%
+%---------------------------------------------------------------------------%

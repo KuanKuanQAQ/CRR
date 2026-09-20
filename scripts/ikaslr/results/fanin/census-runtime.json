@@ -1,0 +1,2332 @@
+{
+ "phases": [
+  {
+   "snap": "P0-boot.txt",
+   "header": "# used 3185 dropped 0 size 2097152 now 19577655639",
+   "pairs": 2374,
+   "ext_pairs": 0,
+   "call_sites": 1135,
+   "functions": 1905,
+   "high_fanin": 215,
+   "single_owner": 1690,
+   "max_class": 94,
+   "mean_class_nonzero": 2.496307237813885,
+   "call_sites_fully_exempt": 458,
+   "class_hist": [
+    [
+     "0",
+     0
+    ],
+    [
+     "1",
+     436
+    ],
+    [
+     "2",
+     115
+    ],
+    [
+     "3",
+     45
+    ],
+    [
+     "4-5",
+     31
+    ],
+    [
+     "6-10",
+     33
+    ],
+    [
+     "11-20",
+     10
+    ],
+    [
+     "21-50",
+     4
+    ],
+    [
+     "51-100",
+     3
+    ],
+    [
+     ">100",
+     0
+    ]
+   ],
+   "fanin_hist": [
+    [
+     "1",
+     1690
+    ],
+    [
+     "2",
+     156
+    ],
+    [
+     "3",
+     27
+    ],
+    [
+     "4-5",
+     17
+    ],
+    [
+     "6-10",
+     7
+    ],
+    [
+     "11-20",
+     5
+    ],
+    [
+     "21-50",
+     3
+    ],
+    [
+     "51-100",
+     0
+    ],
+    [
+     ">100",
+     0
+    ]
+   ],
+   "pa_baseline_max_component_funcs": 94,
+   "pa_baseline_max_component_callsites": 1,
+   "pa_baseline_components": 760,
+   "pa_baseline_max_callsites_in_component": 46,
+   "pa_baseline_callsites_sharing_context": 509,
+   "pa_baseline_hist_funcs": [
+    [
+     "1",
+     498
+    ],
+    [
+     "2",
+     117
+    ],
+    [
+     "3",
+     47
+    ],
+    [
+     "4-5",
+     42
+    ],
+    [
+     "6-10",
+     35
+    ],
+    [
+     "11-20",
+     12
+    ],
+    [
+     "21-50",
+     6
+    ],
+    [
+     "51-100",
+     3
+    ],
+    [
+     ">100",
+     0
+    ]
+   ],
+   "call_sites_with_class_gt1": 241
+  },
+  {
+   "snap": "P1-workload.txt",
+   "header": "# used 3480 dropped 0 size 2097152 now 31261217462",
+   "pairs": 2660,
+   "ext_pairs": 0,
+   "call_sites": 1262,
+   "functions": 2110,
+   "high_fanin": 264,
+   "single_owner": 1846,
+   "max_class": 94,
+   "mean_class_nonzero": 2.4979702300405955,
+   "call_sites_fully_exempt": 523,
+   "class_hist": [
+    [
+     "0",
+     0
+    ],
+    [
+     "1",
+     475
+    ],
+    [
+     "2",
+     127
+    ],
+    [
+     "3",
+     45
+    ],
+    [
+     "4-5",
+     37
+    ],
+    [
+     "6-10",
+     37
+    ],
+    [
+     "11-20",
+     10
+    ],
+    [
+     "21-50",
+     5
+    ],
+    [
+     "51-100",
+     3
+    ],
+    [
+     ">100",
+     0
+    ]
+   ],
+   "fanin_hist": [
+    [
+     "1",
+     1846
+    ],
+    [
+     "2",
+     193
+    ],
+    [
+     "3",
+     35
+    ],
+    [
+     "4-5",
+     20
+    ],
+    [
+     "6-10",
+     7
+    ],
+    [
+     "11-20",
+     6
+    ],
+    [
+     "21-50",
+     3
+    ],
+    [
+     "51-100",
+     0
+    ],
+    [
+     ">100",
+     0
+    ]
+   ],
+   "pa_baseline_max_component_funcs": 94,
+   "pa_baseline_max_component_callsites": 1,
+   "pa_baseline_components": 830,
+   "pa_baseline_max_callsites_in_component": 46,
+   "pa_baseline_callsites_sharing_context": 587,
+   "pa_baseline_hist_funcs": [
+    [
+     "1",
+     536
+    ],
+    [
+     "2",
+     134
+    ],
+    [
+     "3",
+     49
+    ],
+    [
+     "4-5",
+     45
+    ],
+    [
+     "6-10",
+     43
+    ],
+    [
+     "11-20",
+     12
+    ],
+    [
+     "21-50",
+     8
+    ],
+    [
+     "51-100",
+     3
+    ],
+    [
+     ">100",
+     0
+    ]
+   ],
+   "call_sites_with_class_gt1": 264
+  },
+  {
+   "snap": "P2-sysfs.txt",
+   "header": "# used 4813 dropped 0 size 2097152 now 121081177063",
+   "pairs": 3993,
+   "ext_pairs": 0,
+   "call_sites": 1334,
+   "functions": 3283,
+   "high_fanin": 396,
+   "single_owner": 2887,
+   "max_class": 392,
+   "mean_class_nonzero": 3.7012820512820515,
+   "call_sites_fully_exempt": 554,
+   "class_hist": [
+    [
+     "0",
+     0
+    ],
+    [
+     "1",
+     487
+    ],
+    [
+     "2",
+     127
+    ],
+    [
+     "3",
+     55
+    ],
+    [
+     "4-5",
+     40
+    ],
+    [
+     "6-10",
+     41
+    ],
+    [
+     "11-20",
+     12
+    ],
+    [
+     "21-50",
+     8
+    ],
+    [
+     "51-100",
+     8
+    ],
+    [
+     ">100",
+     2
+    ]
+   ],
+   "fanin_hist": [
+    [
+     "1",
+     2887
+    ],
+    [
+     "2",
+     320
+    ],
+    [
+     "3",
+     37
+    ],
+    [
+     "4-5",
+     23
+    ],
+    [
+     "6-10",
+     7
+    ],
+    [
+     "11-20",
+     5
+    ],
+    [
+     "21-50",
+     4
+    ],
+    [
+     "51-100",
+     0
+    ],
+    [
+     ">100",
+     0
+    ]
+   ],
+   "pa_baseline_max_component_funcs": 392,
+   "pa_baseline_max_component_callsites": 1,
+   "pa_baseline_components": 871,
+   "pa_baseline_max_callsites_in_component": 46,
+   "pa_baseline_callsites_sharing_context": 624,
+   "pa_baseline_hist_funcs": [
+    [
+     "1",
+     551
+    ],
+    [
+     "2",
+     135
+    ],
+    [
+     "3",
+     59
+    ],
+    [
+     "4-5",
+     48
+    ],
+    [
+     "6-10",
+     41
+    ],
+    [
+     "11-20",
+     15
+    ],
+    [
+     "21-50",
+     11
+    ],
+    [
+     "51-100",
+     8
+    ],
+    [
+     ">100",
+     3
+    ]
+   ],
+   "call_sites_with_class_gt1": 293
+  },
+  {
+   "snap": "P3-cold.txt",
+   "header": "# used 4931 dropped 0 size 2097152 now 126562552813",
+   "pairs": 4111,
+   "ext_pairs": 0,
+   "call_sites": 1361,
+   "functions": 3386,
+   "high_fanin": 405,
+   "single_owner": 2981,
+   "max_class": 392,
+   "mean_class_nonzero": 3.730913642052566,
+   "call_sites_fully_exempt": 562,
+   "class_hist": [
+    [
+     "0",
+     0
+    ],
+    [
+     "1",
+     502
+    ],
+    [
+     "2",
+     126
+    ],
+    [
+     "3",
+     57
+    ],
+    [
+     "4-5",
+     40
+    ],
+    [
+     "6-10",
+     44
+    ],
+    [
+     "11-20",
+     12
+    ],
+    [
+     "21-50",
+     7
+    ],
+    [
+     "51-100",
+     9
+    ],
+    [
+     ">100",
+     2
+    ]
+   ],
+   "fanin_hist": [
+    [
+     "1",
+     2981
+    ],
+    [
+     "2",
+     325
+    ],
+    [
+     "3",
+     39
+    ],
+    [
+     "4-5",
+     25
+    ],
+    [
+     "6-10",
+     7
+    ],
+    [
+     "11-20",
+     5
+    ],
+    [
+     "21-50",
+     4
+    ],
+    [
+     "51-100",
+     0
+    ],
+    [
+     ">100",
+     0
+    ]
+   ],
+   "pa_baseline_max_component_funcs": 392,
+   "pa_baseline_max_component_callsites": 1,
+   "pa_baseline_components": 890,
+   "pa_baseline_max_callsites_in_component": 46,
+   "pa_baseline_callsites_sharing_context": 636,
+   "pa_baseline_hist_funcs": [
+    [
+     "1",
+     562
+    ],
+    [
+     "2",
+     136
+    ],
+    [
+     "3",
+     63
+    ],
+    [
+     "4-5",
+     48
+    ],
+    [
+     "6-10",
+     44
+    ],
+    [
+     "11-20",
+     15
+    ],
+    [
+     "21-50",
+     10
+    ],
+    [
+     "51-100",
+     9
+    ],
+    [
+     ">100",
+     3
+    ]
+   ],
+   "call_sites_with_class_gt1": 297
+  },
+  {
+   "snap": "P4-stressng.txt",
+   "header": "# used 5973 dropped 0 size 2097152 now 1489680040746",
+   "pairs": 5153,
+   "ext_pairs": 0,
+   "call_sites": 1615,
+   "functions": 3878,
+   "high_fanin": 729,
+   "single_owner": 3149,
+   "max_class": 397,
+   "mean_class_nonzero": 3.4377729257641922,
+   "call_sites_fully_exempt": 699,
+   "class_hist": [
+    [
+     "0",
+     0
+    ],
+    [
+     "1",
+     580
+    ],
+    [
+     "2",
+     149
+    ],
+    [
+     "3",
+     61
+    ],
+    [
+     "4-5",
+     43
+    ],
+    [
+     "6-10",
+     46
+    ],
+    [
+     "11-20",
+     19
+    ],
+    [
+     "21-50",
+     10
+    ],
+    [
+     "51-100",
+     6
+    ],
+    [
+     ">100",
+     2
+    ]
+   ],
+   "fanin_hist": [
+    [
+     "1",
+     3149
+    ],
+    [
+     "2",
+     493
+    ],
+    [
+     "3",
+     178
+    ],
+    [
+     "4-5",
+     38
+    ],
+    [
+     "6-10",
+     7
+    ],
+    [
+     "11-20",
+     8
+    ],
+    [
+     "21-50",
+     5
+    ],
+    [
+     "51-100",
+     0
+    ],
+    [
+     ">100",
+     0
+    ]
+   ],
+   "pa_baseline_max_component_funcs": 397,
+   "pa_baseline_max_component_callsites": 1,
+   "pa_baseline_components": 1027,
+   "pa_baseline_max_callsites_in_component": 46,
+   "pa_baseline_callsites_sharing_context": 796,
+   "pa_baseline_hist_funcs": [
+    [
+     "1",
+     648
+    ],
+    [
+     "2",
+     159
+    ],
+    [
+     "3",
+     71
+    ],
+    [
+     "4-5",
+     56
+    ],
+    [
+     "6-10",
+     49
+    ],
+    [
+     "11-20",
+     19
+    ],
+    [
+     "21-50",
+     12
+    ],
+    [
+     "51-100",
+     10
+    ],
+    [
+     ">100",
+     3
+    ]
+   ],
+   "call_sites_with_class_gt1": 336
+  }
+ ],
+ "single_owner_in_first_but_hf_in_last": 90,
+ "hf_in_last_unseen_in_first": 424,
+ "late_conflicts_by_phase": [
+  [
+   "P0-boot.txt",
+   90
+  ],
+  [
+   "P1-workload.txt",
+   78
+  ],
+  [
+   "P2-sysfs.txt",
+   223
+  ],
+  [
+   "P3-cold.txt",
+   217
+  ]
+ ],
+ "top_classes": [
+  {
+   "call_site": "0xffffffff81b2a84a",
+   "in_func": "dev_attr_show",
+   "loc": "drivers/base/core.c:2364",
+   "owned": 397,
+   "targets": 397,
+   "sample": [
+    "active_count_show",
+    "active_show",
+    "active_time_ms_show",
+    "addr_assign_type_show",
+    "addr_len_show",
+    "address_show",
+    "adr_show",
+    "any_show"
+   ]
+  },
+  {
+   "call_site": "0xffffffff813f0e7b",
+   "in_func": "proc_sys_call_handler",
+   "loc": "fs/proc/proc_sysctl.c:595",
+   "owned": 118,
+   "targets": 118,
+   "sample": [
+    "addrconf_sysctl_addr_gen_mode",
+    "addrconf_sysctl_disable",
+    "addrconf_sysctl_disable_policy",
+    "addrconf_sysctl_forward",
+    "addrconf_sysctl_ignore_routes_with_linkdown",
+    "addrconf_sysctl_mtu",
+    "addrconf_sysctl_proxy_ndp",
+    "addrconf_sysctl_stable_secret"
+   ]
+  },
+  {
+   "call_site": "0xffffffff81ed2d78",
+   "in_func": "ops_init",
+   "loc": "net/core/net_namespace.c:136",
+   "owned": 94,
+   "targets": 94,
+   "sample": [
+    "addrconf_init_net",
+    "arp_net_init",
+    "audit_net_init",
+    "ctnetlink_net_init",
+    "dev_mc_net_init",
+    "dev_proc_net_init",
+    "devinet_init_net",
+    "diag_net_init"
+   ]
+  },
+  {
+   "call_site": "0xffffffff81ed3182",
+   "in_func": "cleanup_net",
+   "loc": "net/core/net_namespace.c:170",
+   "owned": 86,
+   "targets": 86,
+   "sample": [
+    "addrconf_exit_net",
+    "arp_net_exit",
+    "audit_net_exit",
+    "cfg80211_pernet_exit",
+    "defrag4_net_exit",
+    "defrag6_net_exit",
+    "dev_mc_net_exit",
+    "dev_proc_net_exit"
+   ]
+  },
+  {
+   "call_site": "0xffffffff810d791f",
+   "in_func": "process_one_work",
+   "loc": "kernel/workqueue.c:2633",
+   "owned": 82,
+   "targets": 82,
+   "sample": [
+    "addrconf_dad_work",
+    "addrconf_verify_work",
+    "async_run_entry_fn",
+    "ata_sff_pio_task",
+    "autoload_drivers",
+    "blk_mq_requeue_work",
+    "blk_mq_run_work_fn",
+    "blk_mq_timeout_work"
+   ]
+  },
+  {
+   "call_site": "0xffffffff810abef9",
+   "in_func": "cpuhp_invoke_callback",
+   "loc": "kernel/cpu.c:195",
+   "owned": 80,
+   "targets": 80,
+   "sample": [
+    "acpi_soft_cpu_dead",
+    "acpi_soft_cpu_online",
+    "alloc_swap_slot_cache",
+    "blk_softirq_cpu_dead",
+    "buffer_exit_cpu_dead",
+    "cache_ap_offline",
+    "cache_ap_online",
+    "cacheinfo_cpu_online"
+   ]
+  },
+  {
+   "call_site": "0xffffffff813227b2",
+   "in_func": "do_dentry_open",
+   "loc": "fs/open.c:953",
+   "owned": 61,
+   "targets": 61,
+   "sample": [
+    "auxv_open",
+    "blkdev_open",
+    "chrdev_open",
+    "comm_open",
+    "configfs_dir_open",
+    "dcache_dir_open",
+    "dyn_event_open",
+    "environ_open"
+   ]
+  },
+  {
+   "call_site": "0xffffffff8132549a",
+   "in_func": "vfs_read",
+   "loc": "fs/read_write.c:486",
+   "owned": 60,
+   "targets": 61,
+   "sample": [
+    "auxv_read",
+    "bm_status_read",
+    "buffer_percent_read",
+    "buffer_subbuf_size_read",
+    "devkmsg_read",
+    "environ_read",
+    "event_enable_read",
+    "event_filter_read"
+   ]
+  },
+  {
+   "call_site": "0xffffffff8132bcad",
+   "in_func": "__fput",
+   "loc": "fs/file_table.c:376",
+   "owned": 44,
+   "targets": 47,
+   "sample": [
+    "blkdev_release",
+    "bsg_release",
+    "configfs_dir_close",
+    "dcache_dir_close",
+    "devkmsg_release",
+    "ep_eventpoll_release",
+    "evdev_release",
+    "event_trigger_release"
+   ]
+  },
+  {
+   "call_site": "0xffffffff822f7d40",
+   "in_func": "kobj_attr_show",
+   "loc": "lib/kobject.c:828",
+   "owned": 41,
+   "targets": 41,
+   "sample": [
+    "actions_show",
+    "address_bits_show",
+    "chip_name_show",
+    "counter_show",
+    "cpu_byteorder_show",
+    "cpu_show",
+    "crash_elfcorehdr_size_show",
+    "delegate_show"
+   ]
+  },
+  {
+   "call_site": "0xffffffff81601ac7",
+   "in_func": "queue_attr_show",
+   "loc": "block/blk-sysfs.c:722",
+   "owned": 38,
+   "targets": 38,
+   "sample": [
+    "elv_iosched_show",
+    "queue_chunk_sectors_show",
+    "queue_dax_show",
+    "queue_discard_granularity_show",
+    "queue_discard_max_hw_show",
+    "queue_discard_max_show",
+    "queue_discard_zeroes_data_show",
+    "queue_dma_alignment_show"
+   ]
+  },
+  {
+   "call_site": "0xffffffff813fde2b",
+   "in_func": "internal_create_group",
+   "loc": "fs/sysfs/group.c:54",
+   "owned": 31,
+   "targets": 31,
+   "sample": [
+    "acpi_attr_is_visible",
+    "aspm_ctrl_attrs_are_visible",
+    "atkbd_attr_is_visible",
+    "blk_mq_queue_attr_visible",
+    "cache_default_attrs_is_visible",
+    "default_is_visible",
+    "disk_visible",
+    "exra_is_visible"
+   ]
+  },
+  {
+   "call_site": "0xffffffff815b1f67",
+   "in_func": "hashtab_map",
+   "loc": "security/selinux/ss/hashtab.c:97",
+   "owned": 25,
+   "targets": 25,
+   "sample": [
+    "cat_index",
+    "cat_write",
+    "class_index",
+    "class_write",
+    "common_index",
+    "common_write",
+    "cond_index_bool",
+    "cond_write_bool"
+   ]
+  },
+  {
+   "call_site": "0xffffffff813fd12d",
+   "in_func": "sysfs_kf_bin_read",
+   "loc": "fs/sysfs/file.c:97",
+   "owned": 25,
+   "targets": 25,
+   "sample": [
+    "acpi_table_show",
+    "bin_attr_nvmem_read",
+    "boot_params_data_read",
+    "cluster_cpus_list_read",
+    "cluster_cpus_read",
+    "core_cpus_list_read",
+    "core_cpus_read",
+    "core_siblings_list_read"
+   ]
+  },
+  {
+   "call_site": "0xffffffff813dee8e",
+   "in_func": "proc_reg_open",
+   "loc": "fs/proc/inode.c:526",
+   "owned": 24,
+   "targets": 26,
+   "sample": [
+    "acpi_system_wakeup_device_open_fs",
+    "cache_open_procfs",
+    "content_open_procfs",
+    "default_affinity_open",
+    "input_proc_devices_open",
+    "input_proc_handlers_open",
+    "irq_affinity_list_proc_open",
+    "irq_affinity_proc_open"
+   ]
+  }
+ ],
+ "top_high_fanin": [
+  {
+   "func": "io_serial_out",
+   "fanin": 46,
+   "sample_callers": [
+    "__stop_tx",
+    "default_serial_dl_write",
+    "serial8250_config_port",
+    "serial8250_console_putchar",
+    "serial8250_console_write",
+    "serial8250_do_set_termios"
+   ]
+  },
+  {
+   "func": "filldir64",
+   "fanin": 38,
+   "sample_callers": [
+    "configfs_readdir",
+    "dcache_readdir",
+    "empty_dir_readdir",
+    "eventfs_iterate",
+    "ext4_readdir",
+    "kernfs_fop_readdir"
+   ]
+  },
+  {
+   "func": "io_serial_in",
+   "fanin": 31,
+   "sample_callers": [
+    "serial8250_config_port",
+    "serial8250_console_write",
+    "serial8250_default_handle_irq",
+    "serial8250_do_shutdown",
+    "serial8250_do_startup",
+    "serial8250_handle_irq"
+   ]
+  },
+  {
+   "func": "vp_get",
+   "fanin": 23,
+   "sample_callers": [
+    "cache_type_show",
+    "init_vq",
+    "p9_virtio_probe",
+    "virtblk_probe",
+    "virtblk_update_cache_mode",
+    "virtblk_update_capacity"
+   ]
+  },
+  {
+   "func": "sr_packet",
+   "fanin": 23,
+   "sample_callers": [
+    "cdrom_get_last_written",
+    "cdrom_get_media_event",
+    "mmc_ioctl_cdrom_next_writable",
+    "mmc_ioctl_cdrom_pause_resume",
+    "mmc_ioctl_cdrom_play_blk",
+    "mmc_ioctl_cdrom_play_msf"
+   ]
+  },
+  {
+   "func": "ep_ptable_queue_proc",
+   "fanin": 17,
+   "sample_callers": [
+    "__ep_eventpoll_poll",
+    "datagram_poll",
+    "devkmsg_poll",
+    "eventfd_poll",
+    "inotify_poll",
+    "mounts_poll"
+   ]
+  },
+  {
+   "func": "ata_sff_check_status",
+   "fanin": 16,
+   "sample_callers": [
+    "__ata_sff_port_intr",
+    "ata_bmdma_qc_issue",
+    "ata_hsm_qc_complete",
+    "ata_sff_check_ready",
+    "ata_sff_dev_classify",
+    "ata_sff_drain_fifo"
+   ]
+  },
+  {
+   "func": "__pollwait",
+   "fanin": 15,
+   "sample_callers": [
+    "datagram_poll",
+    "inotify_poll",
+    "kernfs_fop_poll",
+    "n_tty_poll",
+    "pipe_poll",
+    "ring_buffer_poll_wait"
+   ]
+  },
+  {
+   "func": "filldir",
+   "fanin": 14,
+   "sample_callers": [
+    "ext4_readdir",
+    "kernfs_fop_readdir",
+    "offset_readdir",
+    "proc_fill_cache",
+    "proc_pid_readdir",
+    "proc_readdir_de"
+   ]
+  },
+  {
+   "func": "kvm_clock_get_cycles",
+   "fanin": 13,
+   "sample_callers": [
+    "clocksource_watchdog",
+    "ktime_get",
+    "ktime_get_mono_fast_ns",
+    "ktime_get_raw_ts64",
+    "ktime_get_real_ts64",
+    "ktime_get_ts64"
+   ]
+  },
+  {
+   "func": "ata_sff_dev_select",
+   "fanin": 12,
+   "sample_callers": [
+    "ata_bmdma_qc_issue",
+    "ata_devchk",
+    "ata_sff_dev_classify",
+    "ata_sff_postreset",
+    "ata_sff_qc_issue",
+    "ata_sff_softreset"
+   ]
+  },
+  {
+   "func": "sock_def_readable",
+   "fanin": 12,
+   "sample_callers": [
+    "__netlink_sendskb",
+    "__sock_queue_rcv_skb",
+    "netlink_broadcast_filtered",
+    "netlink_dump",
+    "netlink_sendskb",
+    "packet_rcv"
+   ]
+  },
+  {
+   "func": "ktime_get",
+   "fanin": 11,
+   "sample_callers": [
+    "__hrtimer_get_remaining",
+    "common_hrtimer_arm",
+    "common_hrtimer_rearm",
+    "dequeue_signal",
+    "do_nanosleep",
+    "do_timerfd_gettime"
+   ]
+  },
+  {
+   "func": "vp_get_status",
+   "fanin": 9,
+   "sample_callers": [
+    "p9_virtio_probe",
+    "register_virtio_device",
+    "status_show",
+    "virtblk_probe",
+    "virtio_dev_probe",
+    "virtio_features_ok"
+   ]
+  },
+  {
+   "func": "sock_def_wakeup",
+   "fanin": 8,
+   "sample_callers": [
+    "inet_shutdown",
+    "tcp_done",
+    "tcp_fin",
+    "tcp_rcv_state_process",
+    "unix_release_sock",
+    "unix_shutdown"
+   ]
+  }
+ ],
+ "pa_baseline_top_components": [
+  {
+   "funcs": 397,
+   "call_sites": 1,
+   "example": "sdev_show_device_blocked"
+  },
+  {
+   "funcs": 141,
+   "call_sites": 3,
+   "example": "sg_proc_seq_show_debug"
+  },
+  {
+   "funcs": 118,
+   "call_sites": 1,
+   "example": "hugetlb_sysctl_handler"
+  },
+  {
+   "funcs": 94,
+   "call_sites": 1,
+   "example": "loopback_net_init"
+  },
+  {
+   "funcs": 89,
+   "call_sites": 3,
+   "example": "slab_start"
+  },
+  {
+   "funcs": 86,
+   "call_sites": 1,
+   "example": "dev_proc_net_exit"
+  },
+  {
+   "funcs": 83,
+   "call_sites": 4,
+   "example": "netfs_requests_seq_stop"
+  },
+  {
+   "funcs": 82,
+   "call_sites": 1,
+   "example": "serio_handle_event"
+  }
+ ],
+ "pa_baseline_top_components_by_callsites": [
+  {
+   "funcs": 1,
+   "call_sites": 46,
+   "example": "io_serial_out"
+  },
+  {
+   "funcs": 2,
+   "call_sites": 38,
+   "example": "filldir64"
+  },
+  {
+   "funcs": 1,
+   "call_sites": 31,
+   "example": "io_serial_in"
+  },
+  {
+   "funcs": 2,
+   "call_sites": 24,
+   "example": "ep_ptable_queue_proc"
+  },
+  {
+   "funcs": 1,
+   "call_sites": 23,
+   "example": "sr_packet"
+  },
+  {
+   "funcs": 1,
+   "call_sites": 23,
+   "example": "vp_get"
+  },
+  {
+   "funcs": 1,
+   "call_sites": 16,
+   "example": "ata_sff_check_status"
+  },
+  {
+   "funcs": 2,
+   "call_sites": 14,
+   "example": "jiffies_read"
+  }
+ ],
+ "hf_convergence_ns": [
+  0,
+  0,
+  0,
+  0,
+  0,
+  0,
+  129354503,
+  137647798,
+  138054737,
+  141374831,
+  141595954,
+  141993240,
+  142024269,
+  142465726,
+  145540038,
+  151676667,
+  186840777,
+  193717881,
+  194288841,
+  196664089,
+  200035598,
+  202659799,
+  203731873,
+  210676747,
+  216219666,
+  220333047,
+  220714117,
+  221036529,
+  227254771,
+  227262373,
+  227709083,
+  278673782,
+  286377887,
+  286381493,
+  286383363,
+  288283030,
+  301318353,
+  301658673,
+  302869876,
+  315751431,
+  325628793,
+  636692662,
+  639218573,
+  659527290,
+  665623793,
+  665632189,
+  665706500,
+  667196012,
+  667356059,
+  668684222,
+  668829441,
+  669772493,
+  669784414,
+  669784565,
+  669786299,
+  673079447,
+  673093756,
+  673417807,
+  673749575,
+  673828137,
+  673828352,
+  673828689,
+  673828980,
+  673829240,
+  673834961,
+  673835208,
+  673835608,
+  673836066,
+  673836401,
+  673836675,
+  673837007,
+  673837278,
+  673837538,
+  673837872,
+  684232795,
+  707121311,
+  713340088,
+  713340644,
+  713341124,
+  713341668,
+  713342060,
+  713342475,
+  745435815,
+  767984882,
+  768062029,
+  827637343,
+  828089539,
+  828142828,
+  830755575,
+  832141147,
+  832551769,
+  837101599,
+  850910096,
+  850995872,
+  861125026,
+  1318656121,
+  1330597913,
+  1347758553,
+  1347762223,
+  1348217060,
+  1443139812,
+  1445686503,
+  1466090151,
+  1466624100,
+  1466676522,
+  1466680395,
+  1466713828,
+  1466937391,
+  1466999265,
+  1527552708,
+  1527555268,
+  1528121362,
+  1530358277,
+  1547764138,
+  1547934208,
+  1547984643,
+  1547991461,
+  1548246755,
+  1548365390,
+  1548367588,
+  1550865477,
+  1551094497,
+  1552112358,
+  1561397484,
+  1561484187,
+  1566300496,
+  1566321624,
+  1569148527,
+  1569149066,
+  1569363253,
+  1569386002,
+  1569489138,
+  1569500301,
+  1569780273,
+  1579071564,
+  1580670561,
+  1580848558,
+  1582822988,
+  1599425826,
+  1601071069,
+  1601073328,
+  1601174131,
+  1601174653,
+  1620356559,
+  1620392450,
+  1620403764,
+  1620404056,
+  1620439933,
+  1620712153,
+  1620713716,
+  1620717517,
+  1621116423,
+  1660402706,
+  1670046411,
+  1671070670,
+  1685826790,
+  1685850772,
+  1711000363,
+  1719446548,
+  1735077154,
+  1750057361,
+  1750211419,
+  1759495947,
+  1796794761,
+  1856366057,
+  1857725685,
+  1866938945,
+  1879115949,
+  1886589167,
+  1901409218,
+  1903324087,
+  1906375010,
+  1907761303,
+  1927992778,
+  1930768693,
+  1933933719,
+  1933988928,
+  1935197437,
+  1941626607,
+  1962889082,
+  1987860921,
+  1992510927,
+  1996552721,
+  1997169668,
+  1998509030,
+  2028996218,
+  2034252810,
+  2047824349,
+  2048027963,
+  2048181013,
+  2051686812,
+  2051688930,
+  2082435512,
+  2105964119,
+  2122221387,
+  2136114434,
+  2141503804,
+  2141540691,
+  2144646303,
+  2147498629,
+  2176011217,
+  2183234561,
+  2236770988,
+  2304898626,
+  2304901430,
+  2340453648,
+  2400925768,
+  2403854882,
+  2440412995,
+  2468961282,
+  3466120697,
+  3985863093,
+  4510364395,
+  4605887691,
+  19573628725,
+  19685937145,
+  19686304941,
+  19689470441,
+  19707768094,
+  19712244630,
+  19728093136,
+  19728991139,
+  19760492473,
+  19760973668,
+  19760974041,
+  19760977994,
+  19760981530,
+  21845873259,
+  21943919915,
+  21943935399,
+  22007623779,
+  24056192151,
+  24288779631,
+  24292857677,
+  24294857378,
+  24298156258,
+  24298340071,
+  24298345818,
+  24298346803,
+  24298369098,
+  24304654983,
+  24304661373,
+  24304708185,
+  24304785933,
+  24304875171,
+  29660522542,
+  29660549841,
+  29660557328,
+  29660566706,
+  29660570077,
+  29660582217,
+  29660605273,
+  29660614154,
+  29660684710,
+  29660689254,
+  29660692994,
+  29808033594,
+  29813449261,
+  29813744588,
+  29931202570,
+  29949895281,
+  29956442767,
+  29966790348,
+  30241045481,
+  31366384942,
+  31366884795,
+  31366996995,
+  31367090368,
+  31367139509,
+  31373754373,
+  31447297915,
+  31483127717,
+  31737958701,
+  31737969886,
+  31789545206,
+  31794771689,
+  31794804161,
+  39365100555,
+  68932671350,
+  71672456181,
+  71672681600,
+  71704361854,
+  71704643881,
+  93249837490,
+  105194716603,
+  105194791475,
+  105195079720,
+  105195183084,
+  109973733321,
+  109973760945,
+  112328488993,
+  112894865169,
+  112956009041,
+  114208210821,
+  114289241431,
+  114886165013,
+  119759349488,
+  120085734348,
+  120257938552,
+  120257965112,
+  120263086970,
+  120263163190,
+  120273378119,
+  120293924272,
+  120314296239,
+  120350581579,
+  120352627599,
+  120357640384,
+  120357765652,
+  120362879549,
+  120368049988,
+  120368080648,
+  120383448912,
+  120383505948,
+  120388638496,
+  120388686473,
+  120398783648,
+  120410913510,
+  120411122968,
+  120421124396,
+  120421161559,
+  120426146919,
+  120431236496,
+  120436202970,
+  120436245528,
+  120441186532,
+  120441221392,
+  120451685124,
+  120451709263,
+  120461924010,
+  120462181830,
+  120482783959,
+  120482893623,
+  120487906548,
+  120487926608,
+  120492933692,
+  120498103630,
+  120503237737,
+  120523629252,
+  120523647392,
+  120544320750,
+  120549476657,
+  120554655983,
+  120554680930,
+  120564914204,
+  120565088259,
+  120580267939,
+  120580325479,
+  120585450639,
+  120595533336,
+  120595570484,
+  120600648779,
+  120616201692,
+  120616202128,
+  120616222284,
+  120621290523,
+  120621290899,
+  120691890536,
+  120697417376,
+  120720441228,
+  120835738288,
+  120850780703,
+  120850794276,
+  120856037763,
+  120856558076,
+  120861532684,
+  120861790808,
+  120866648539,
+  120866697737,
+  120866888290,
+  120866890532,
+  120871971510,
+  120872103977,
+  120892251737,
+  120892626883,
+  120897699372,
+  120897810919,
+  120908088852,
+  120914519395,
+  120914535463,
+  120919692819,
+  120919994884,
+  120969072008,
+  120974163590,
+  120984166139,
+  120984188508,
+  121010531203,
+  121015590864,
+  121015683159,
+  121020755372,
+  121042084688,
+  121047332592,
+  121063759479,
+  121070734879,
+  121070792324,
+  121076048512,
+  121210744350,
+  121211087584,
+  121211443568,
+  121216108295,
+  126452695720,
+  126452721102,
+  126484713887,
+  126484714697,
+  126484779714,
+  126839626167,
+  127147157129,
+  127147253655,
+  129257636267,
+  131216029757,
+  134330424097,
+  134330582332,
+  134359778476,
+  135129637942,
+  201196538892,
+  246273352298,
+  291565046464,
+  291589146666,
+  402884897768,
+  418920601730,
+  455266263579,
+  455266263786,
+  461481320522,
+  461485069000,
+  489410461604,
+  520606656860,
+  526690101219,
+  526690325461,
+  526690333639,
+  526690427617,
+  526695662059,
+  526695666830,
+  526755293188,
+  526755383663,
+  557286610497,
+  560292135581,
+  562337723764,
+  614091825142,
+  632184095282,
+  632321707039,
+  638178231537,
+  641180564605,
+  671451981050,
+  678414349237,
+  678414360225,
+  678415094342,
+  678430250175,
+  678430289042,
+  678436735454,
+  678437336358,
+  678440524399,
+  678440577394,
+  678597365817,
+  678597898069,
+  678597945087,
+  678597968560,
+  678598211770,
+  678598314457,
+  678598331589,
+  678598636402,
+  678600634022,
+  678601674382,
+  678601689136,
+  678609103601,
+  678609182736,
+  678653862087,
+  678653872908,
+  678689220597,
+  678689477546,
+  678708681556,
+  678708696067,
+  678718475287,
+  678725095771,
+  678741631369,
+  678743111440,
+  678746269006,
+  678748120542,
+  678748310570,
+  678748316317,
+  678748324973,
+  678748572078,
+  678748786000,
+  678748889123,
+  678749331201,
+  678749354396,
+  678749363157,
+  678752383277,
+  678752546018,
+  678752649810,
+  678753601304,
+  678753671570,
+  678753696031,
+  678753829673,
+  678753842386,
+  678753950931,
+  678753976608,
+  678753987018,
+  678754002347,
+  678754129604,
+  678754134948,
+  678754140437,
+  678754255235,
+  678754260711,
+  678754266273,
+  678754517988,
+  678756572794,
+  678782975869,
+  678782985211,
+  678801121802,
+  678801204448,
+  678801253825,
+  678801317537,
+  678801391570,
+  678801456227,
+  678801537157,
+  678801605871,
+  679210187017,
+  679210199426,
+  679211878291,
+  679212337873,
+  679240438235,
+  679250264883,
+  679250315070,
+  679252177418,
+  679252190633,
+  679252201279,
+  679252906729,
+  679256243015,
+  679256251693,
+  679257058506,
+  679257075160,
+  679257905977,
+  679261801671,
+  679261907366,
+  679266039432,
+  679286360230,
+  679287284361,
+  679287293218,
+  679289960609,
+  679289984031,
+  679290068629,
+  679290090114,
+  679290206747,
+  679292640003,
+  679292761754,
+  679292793111,
+  679292863232,
+  679292959123,
+  679292970193,
+  679292985350,
+  679292994099,
+  679293084469,
+  679293150925,
+  679293278972,
+  679293355751,
+  679298944731,
+  679299061076,
+  679299072580,
+  679336902082,
+  679339391516,
+  679342911246,
+  679342919842,
+  679407468772,
+  679407473448,
+  679407716209,
+  679408125584,
+  679413728531,
+  679413748295,
+  679500737704,
+  679500770609,
+  679500794443,
+  679500806326,
+  679502323859,
+  679502342337,
+  679502357390,
+  679504146526,
+  679504286289,
+  679504374168,
+  679504806373,
+  679517506023,
+  679517509495,
+  679655053973,
+  680564164390,
+  680564195147,
+  680584026385,
+  680607402229,
+  680608899949,
+  680608914904,
+  680610721047,
+  680610982469,
+  680611189202,
+  680611277507,
+  680611357469,
+  680615273935,
+  680615388831,
+  680615392630,
+  680615398747,
+  680615699437,
+  680615706384,
+  680617437558,
+  680617710629,
+  680617732801,
+  680617911769,
+  680617946910,
+  680618007630,
+  680618010624,
+  680621132857,
+  680621156108,
+  680621233884,
+  680621343360,
+  680621346650,
+  680621361363,
+  680621473564,
+  680621492136,
+  680621498194,
+  680622450492,
+  680622462284,
+  680623637846,
+  680626507564,
+  680626521027,
+  680626660681,
+  680626663770,
+  680626783142,
+  680626792139,
+  680626919995,
+  680626936134,
+  680626944700,
+  680628879894,
+  680628907275,
+  680632082825,
+  680632675250,
+  680633654689,
+  680633665700,
+  680633848945,
+  680634733167,
+  680634765055,
+  680637790670,
+  680637821001,
+  680637965564,
+  680638116132,
+  680638481879,
+  680638686661,
+  680638692437,
+  680638790515,
+  680640655991,
+  680644090126,
+  680644191067,
+  680644193880,
+  680644196731,
+  680644295318,
+  680644398664,
+  680644417499,
+  680644423090,
+  680644536866,
+  680645566501,
+  680645622808,
+  680646546241,
+  680646562258,
+  680646750651,
+  680646758481,
+  680646819389,
+  680646824815,
+  680646896851,
+  680646913295,
+  680646924269,
+  680647044445,
+  680647052754,
+  680647056781,
+  680647362801,
+  680647487062,
+  680648050001,
+  680648062943,
+  680648551539,
+  680648559762,
+  680649229740,
+  680653930924,
+  680653931193,
+  680653937452,
+  680655405122,
+  680657703360,
+  680657743779,
+  680657816669,
+  680657819862,
+  680657874149,
+  680657941866,
+  680657993503,
+  693745645691,
+  705889943426,
+  708891510432,
+  711891221882,
+  721210171724,
+  751075207017,
+  751214234701,
+  766172481400,
+  869135519836,
+  963886363767,
+  963886396132,
+  963886408841,
+  963962403833,
+  964039117415,
+  964124512185,
+  964327805945,
+  964399045797,
+  964846089281,
+  965326095392,
+  965326130661,
+  993133654897,
+  1040498055350,
+  1071523496796,
+  1071523526295,
+  1071538071116,
+  1095763080446,
+  1194393844114,
+  1194393851327,
+  1224477820158,
+  1311565474841,
+  1311566589444,
+  1314567119821,
+  1348279544813,
+  1348279588325,
+  1348279622974,
+  1348279679174,
+  1348279767036,
+  1348280054060,
+  1446509234681,
+  1446519102253,
+  1451136080605,
+  1473929778052,
+  1473929786510
+ ],
+ "static": {
+  "type": {
+   "call_sites": 19423,
+   "address_taken": 30465,
+   "reachable": 25620,
+   "high_fanin": 18607,
+   "single_owner": 7013,
+   "max_class": 1004,
+   "max_targets_per_cs": 1004,
+   "pa_max_component_funcs": 1004,
+   "pa_max_component_callsites": 1,
+   "pa_max_component_callsites_any": 2513,
+   "class_hist": [
+    [
+     "0",
+     0
+    ],
+    [
+     "1",
+     528
+    ],
+    [
+     "2",
+     223
+    ],
+    [
+     "3",
+     510
+    ],
+    [
+     "4-5",
+     91
+    ],
+    [
+     "6-10",
+     91
+    ],
+    [
+     "11-20",
+     36
+    ],
+    [
+     "21-50",
+     15
+    ],
+    [
+     "51-100",
+     5
+    ],
+    [
+     ">100",
+     8
+    ]
+   ],
+   "top_classes": [
+    {
+     "loc": "drivers/base/core.c:2364",
+     "caller": "dev_attr_show",
+     "type": "i64 (%struct.device*, %struct.device_attribute*, i8*)",
+     "field": null,
+     "owned": 1004
+    },
+    {
+     "loc": "drivers/base/core.c:2380",
+     "caller": "dev_attr_store",
+     "type": "i64 (%struct.device*, %struct.device_attribute*, i8*, i64)",
+     "field": null,
+     "owned": 247
+    },
+    {
+     "loc": "lib/kobject.c:828",
+     "caller": "kobj_attr_show",
+     "type": "i64 (%struct.kobject*, %struct.kobj_attribute*, i8*)",
+     "field": null,
+     "owned": 158
+    },
+    {
+     "loc": "net/netlink/genetlink.c:1113",
+     "caller": "genl_rcv_msg",
+     "type": "i32 (%struct.sk_buff*, %struct.genl_info*)",
+     "field": "struct.anon@8",
+     "owned": 155
+    },
+    {
+     "loc": "kernel/bpf/core.c:1986",
+     "caller": "___bpf_prog_run",
+     "type": "i64 (i64, i64, i64, i64, i64)",
+     "field": null,
+     "owned": 138
+    },
+    {
+     "loc": "fs/proc/proc_sysctl.c:595",
+     "caller": "proc_sys_call_handler",
+     "type": "i32 (%struct.ctl_table*, i32, i8*, i64*, i64*)",
+     "field": "struct.ctl_table@32",
+     "owned": 121
+    },
+    {
+     "loc": "drivers/gpu/drm/drm_ioctl.c:744",
+     "caller": "drm_ioctl_kernel",
+     "type": "i32 (%struct.drm_device*, i8*, %struct.drm_file*)",
+     "field": null,
+     "owned": 117
+    },
+    {
+     "loc": "kernel/time/timer.c:1700",
+     "caller": "call_timer_fn",
+     "type": "void (%struct.timer_list*)",
+     "field": null,
+     "owned": 110
+    },
+    {
+     "loc": "net/sunrpc/auth.c:743",
+     "caller": "rpcauth_wrap_req_encode",
+     "type": "void (%struct.rpc_rqst*, %struct.xdr_stream*, i8*)",
+     "field": "struct.rpc_procinfo@8",
+     "owned": 90
+    },
+    {
+     "loc": "fs/sysfs/group.c:54",
+     "caller": "internal_create_group",
+     "type": "i16 (%struct.kobject*, %struct.attribute*, i32)",
+     "field": "struct.attribute_group@8",
+     "owned": 88
+    },
+    {
+     "loc": "net/sunrpc/auth.c:798",
+     "caller": "rpcauth_unwrap_resp_decode",
+     "type": "i32 (%struct.rpc_rqst*, %struct.xdr_stream*, i8*)",
+     "field": "struct.rpc_procinfo@16",
+     "owned": 79
+    },
+    {
+     "loc": "drivers/firmware/dmi_scan.c:900",
+     "caller": "dmi_check_system",
+     "type": "i32 (%struct.dmi_system_id*)",
+     "field": "struct.dmi_system_id@0",
+     "owned": 73
+    },
+    {
+     "loc": "lib/kobject.c:840",
+     "caller": "kobj_attr_store",
+     "type": "i64 (%struct.kobject*, %struct.kobj_attribute*, i8*, i64)",
+     "field": null,
+     "owned": 56
+    },
+    {
+     "loc": "lib/kobject.c:689",
+     "caller": "kobject_put",
+     "type": "void (%struct.kobject*)",
+     "field": "struct.kobj_type@0",
+     "owned": 50
+    },
+    {
+     "loc": "io_uring/io_uring.c:2253",
+     "caller": "io_submit_sqe",
+     "type": "i32 (%struct.io_kiocb*, %struct.io_uring_sqe*)",
+     "field": "struct.io_issue_def@16",
+     "owned": 48
+    }
+   ]
+  },
+  "field": {
+   "call_sites": 19423,
+   "address_taken": 30465,
+   "reachable": 22062,
+   "high_fanin": 14862,
+   "single_owner": 7200,
+   "max_class": 1004,
+   "max_targets_per_cs": 1004,
+   "pa_max_component_funcs": 3355,
+   "pa_max_component_callsites": 1066,
+   "pa_max_component_callsites_any": 2513,
+   "class_hist": [
+    [
+     "0",
+     0
+    ],
+    [
+     "1",
+     708
+    ],
+    [
+     "2",
+     321
+    ],
+    [
+     "3",
+     164
+    ],
+    [
+     "4-5",
+     125
+    ],
+    [
+     "6-10",
+     128
+    ],
+    [
+     "11-20",
+     51
+    ],
+    [
+     "21-50",
+     21
+    ],
+    [
+     "51-100",
+     4
+    ],
+    [
+     ">100",
+     8
+    ]
+   ],
+   "top_classes": [
+    {
+     "loc": "drivers/base/core.c:2364",
+     "caller": "dev_attr_show",
+     "type": "i64 (%struct.device*, %struct.device_attribute*, i8*)",
+     "field": null,
+     "owned": 1004
+    },
+    {
+     "loc": "drivers/base/core.c:2380",
+     "caller": "dev_attr_store",
+     "type": "i64 (%struct.device*, %struct.device_attribute*, i8*, i64)",
+     "field": null,
+     "owned": 247
+    },
+    {
+     "loc": "kernel/workqueue.c:3694",
+     "caller": "execute_in_process_context",
+     "type": "void (%struct.work_struct*)",
+     "field": null,
+     "owned": 222
+    },
+    {
+     "loc": "lib/kobject.c:828",
+     "caller": "kobj_attr_show",
+     "type": "i64 (%struct.kobject*, %struct.kobj_attribute*, i8*)",
+     "field": null,
+     "owned": 158
+    },
+    {
+     "loc": "kernel/bpf/core.c:1986",
+     "caller": "___bpf_prog_run",
+     "type": "i64 (i64, i64, i64, i64, i64)",
+     "field": null,
+     "owned": 138
+    },
+    {
+     "loc": "fs/proc/proc_sysctl.c:595",
+     "caller": "proc_sys_call_handler",
+     "type": "i32 (%struct.ctl_table*, i32, i8*, i64*, i64*)",
+     "field": "struct.ctl_table@32",
+     "owned": 121
+    },
+    {
+     "loc": "drivers/gpu/drm/drm_ioctl.c:744",
+     "caller": "drm_ioctl_kernel",
+     "type": "i32 (%struct.drm_device*, i8*, %struct.drm_file*)",
+     "field": null,
+     "owned": 117
+    },
+    {
+     "loc": "kernel/time/timer.c:1700",
+     "caller": "call_timer_fn",
+     "type": "void (%struct.timer_list*)",
+     "field": null,
+     "owned": 110
+    },
+    {
+     "loc": "net/sunrpc/auth.c:743",
+     "caller": "rpcauth_wrap_req_encode",
+     "type": "void (%struct.rpc_rqst*, %struct.xdr_stream*, i8*)",
+     "field": "struct.rpc_procinfo@8",
+     "owned": 90
+    },
+    {
+     "loc": "fs/sysfs/group.c:54",
+     "caller": "internal_create_group",
+     "type": "i16 (%struct.kobject*, %struct.attribute*, i32)",
+     "field": "struct.attribute_group@8",
+     "owned": 88
+    },
+    {
+     "loc": "net/sunrpc/auth.c:798",
+     "caller": "rpcauth_unwrap_resp_decode",
+     "type": "i32 (%struct.rpc_rqst*, %struct.xdr_stream*, i8*)",
+     "field": "struct.rpc_procinfo@16",
+     "owned": 79
+    },
+    {
+     "loc": "drivers/firmware/dmi_scan.c:900",
+     "caller": "dmi_check_system",
+     "type": "i32 (%struct.dmi_system_id*)",
+     "field": "struct.dmi_system_id@0",
+     "owned": 73
+    },
+    {
+     "loc": "lib/kobject.c:689",
+     "caller": "kobject_put",
+     "type": "void (%struct.kobject*)",
+     "field": "struct.kobj_type@0",
+     "owned": 49
+    },
+    {
+     "loc": "io_uring/io_uring.c:2253",
+     "caller": "io_submit_sqe",
+     "type": "i32 (%struct.io_kiocb*, %struct.io_uring_sqe*)",
+     "field": "struct.io_issue_def@16",
+     "owned": 48
+    },
+    {
+     "loc": "kernel/cgroup/cgroup.c:4153",
+     "caller": "cgroup_seqfile_show",
+     "type": "i32 (%struct.seq_file*, i8*)",
+     "field": "struct.cftype@152",
+     "owned": 46
+    }
+   ]
+  }
+ },
+ "static_kcfi_like": {
+  "groups": 5337,
+  "max_group": 1004,
+  "top": [
+   [
+    1004,
+    "i64 (%struct.device*, %struct.device_attribute*, i8*)"
+   ],
+   [
+    986,
+    "i32 (%struct.trace_iterator*, i32, %struct.trace_event*)"
+   ],
+   [
+    820,
+    "i32 ()"
+   ],
+   [
+    786,
+    "i64 (%struct.pt_regs*)"
+   ],
+   [
+    683,
+    "void ()"
+   ],
+   [
+    438,
+    "i32 (%struct.inode*, %struct.file*)"
+   ],
+   [
+    401,
+    "i32 (i8*)"
+   ],
+   [
+    387,
+    "void (%struct.work_struct*)"
+   ]
+  ]
+ },
+ "static_vs_dynamic_edges": {
+  "type_covered": 5104,
+  "field_covered": 4891,
+  "field_missed": 256,
+  "type_missed": 43,
+  "cs_unmatched": 6
+ }
+}

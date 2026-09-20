@@ -1,0 +1,11 @@
+﻿函数,直接转移,取地址,数据指针
+seq_puts,480,10,1
+__brelse,414,1,1
+__folio_put,343,16,1
+kvfree,289,9,1
+skb_put,289,1,1
+net_ratelimit,243,1,1
+rtnl_unlock,235,4,1
+seq_putc,211,4,1
+dput,213,10,1
+rtnl_is_locked,206,14,1

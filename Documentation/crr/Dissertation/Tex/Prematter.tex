@@ -1,0 +1,42 @@
+\intobmk\chapter*{符号与缩略语说明}% 显示在书签但不显示在目录
+
+\section*{缩略语}
+\nomenclatureitem{\textbf{缩写}}{\textbf{全称与含义}}
+\nomenclatureitem{ASLR}{Address Space Layout Randomization，地址空间布局随机化}
+\nomenclatureitem{KASLR}{Kernel ASLR，内核地址空间布局随机化}
+\nomenclatureitem{ROP}{Return-Oriented Programming，返回导向编程}
+\nomenclatureitem{JOP}{Jump-Oriented Programming，跳转导向编程}
+\nomenclatureitem{COOP}{Counterfeit Object-Oriented Programming，伪造对象编程}
+\nomenclatureitem{JIT-ROP}{Just-In-Time ROP，即时代码重用攻击}
+\nomenclatureitem{DOP}{Data-Oriented Programming，数据导向编程}
+\nomenclatureitem{DEP}{Data Execution Prevention，数据执行阻止}
+\nomenclatureitem{CFI}{Control-Flow Integrity，控制流完整性}
+\nomenclatureitem{XOM}{Execute-Only Memory，只执行内存}
+\nomenclatureitem{PIC}{Position-Independent Code，位置无关代码}
+\nomenclatureitem{PIE}{Position-Independent Executable，位置无关可执行文件}
+\nomenclatureitem{GOT}{Global Offset Table，全局偏移表}
+\nomenclatureitem{PLT}{Procedure Linkage Table，过程链接表}
+\nomenclatureitem{PKS}{Protection Keys for Supervisor，Intel 管理态内存保护键}
+\nomenclatureitem{PA / PAC}{Pointer Authentication (Code)，ARM 指针认证（认证码）}
+\nomenclatureitem{BTI}{Branch Target Identification，ARM 分支目标识别}
+\nomenclatureitem{IBT}{Indirect Branch Tracking，Intel 间接分支跟踪}
+\nomenclatureitem{CET}{Control-flow Enforcement Technology，Intel 控制流强制技术}
+\nomenclatureitem{SMEP}{Supervisor Mode Execution Prevention，管理模式执行阻止}
+\nomenclatureitem{SMAP}{Supervisor Mode Access Prevention，管理模式访问阻止}
+\nomenclatureitem{PXN}{Privileged eXecute Never，ARM 特权级不可执行}
+\nomenclatureitem{TLB}{Translation Lookaside Buffer，地址翻译缓存}
+\nomenclatureitem{IPI}{Inter-Processor Interrupt，处理器间中断}
+\nomenclatureitem{RCU}{Read-Copy-Update，读拷贝更新}
+\nomenclatureitem{ORC}{Oops Rewind Capability，内核栈展开表格式}
+\nomenclatureitem{CVE}{Common Vulnerabilities and Exposures，公共漏洞披露编号}
+\nomenclatureitem{LLVM}{一套模块化的编译器基础设施}
+\nomenclatureitem{IR}{Intermediate Representation，中间表示}
+
+\section*{本文使用的记号}
+\nomenclatureitem{\textbf{记号}}{\textbf{含义}}
+\nomenclatureitem{\lstinline|fixed_in|}{入站跳板：由非随机化区域进入随机化区域的唯一入口}
+\nomenclatureitem{\lstinline|fixed_out|}{出站跳板：由随机化区域离开的唯一出口}
+\nomenclatureitem{\lstinline|target_addr|}{跳板中保存函数体当前地址的槽，随机化时唯一需要改写的位置}
+\nomenclatureitem{I1 / I2 / I3}{第 2.7 节定义的三条安全不变式：机密性、时效性、完整性}
+\nomenclatureitem{V1 -- V4}{第 2.6.2 节定义的四类攻击向量}
+\nomenclatureitem{D1 -- D3}{各章第 3 节给出的设计需求}

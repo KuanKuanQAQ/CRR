@@ -1,0 +1,578 @@
+\relax 
+\bibstyle{Biblio/gbt7714-numerical}
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand*\HyPL@Entry[1]{}
+\HyPL@Entry{0<</S/r>>}
+\HyPL@Entry{6<</S/R>>}
+\citation{peng2025asterinas}
+\citation{cho2023bokasan}
+\citation{wu2018fuze,chen2020koobe,zeng2022playing,lee2023pspray,liang2024kleak}
+\citation{shacham2007geometry}
+\citation{kernel2021fgkaslr}
+\HyPL@Entry{18<</S/D>>}
+\@writefile{toc}{\contentsline {chapter}{\numberline {第1章\hspace  {.3em}}绪论}{1}{chapter.1}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\@writefile{loappfig}{\addvspace {10\p@ }}
+\@writefile{loapptab}{\addvspace {10\p@ }}
+\newlabel{chap:1}{{1}{1}{绪论}{chapter.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {1.1}从内核内存安全缺陷到持续随机化}{1}{section.1.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1-1}{\ignorespaces \enspace  Linux 内核 CVE 的缺陷类型分布}}{2}{table.caption.16}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{tab:1-1}{{1-1}{2}{\enspace Linux 内核 CVE 的缺陷类型分布}{table.caption.16}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1-1}{\ignorespaces \enspace  内存错误利用模型及不同防御策略的作用阶段}}{2}{figure.caption.17}\protected@file@percent }
+\newlabel{fig:1-1}{{1-1}{2}{\enspace 内存错误利用模型及不同防御策略的作用阶段}{figure.caption.17}{}}
+\citation{abadi2005cfi}
+\citation{shanbhogue2019cet,arm2023armv8,clang2022kcfi}
+\citation{gaidis2023fineibt,burow2017cfi}
+\citation{liljestrand2019pac}
+\citation{vahldiek2019erim,hedayati2019hodor,dautenhahn2015nested,huang2022ksplit,guo2025bulkhead,lefeuvre2025sok}
+\citation{hund2013practical}
+\citation{jang2016drk}
+\citation{evtyushkin2016jump}
+\citation{liu2023entrybleed,lipp2022amd}
+\citation{maar2025kernelsnitch}
+\citation{canella2019transient}
+\citation{gens2017lazarus}
+\citation{snow2013just}
+\citation{williams2016shuffler}
+\citation{ahmed2020methodologies}
+\citation{nikolaev2022adelie}
+\citation{chang2024chaos}
+\citation{chen2016remix}
+\citation{li2024dbox}
+\citation{nikolaev2022adelie}
+\@writefile{toc}{\contentsline {section}{\numberline {1.2}研究问题与面临的挑战}{4}{section.1.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1-2}{\ignorespaces \enspace  Linux 内核 CVE 所涉代码的可模块化性}}{5}{table.caption.18}\protected@file@percent }
+\newlabel{tab:1-2}{{1-2}{5}{\enspace Linux 内核 CVE 所涉代码的可模块化性}{table.caption.18}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.2.1}共性挑战：built-in 代码缺乏明确的随机化边界}{6}{subsection.1.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.2.2}挑战一：代码索引更新与执行流协调}{7}{subsection.1.2.2}\protected@file@percent }
+\citation{liljestrand2019pac}
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.2.3}挑战二：随机化的触发时机与作用对象}{8}{subsection.1.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.2.4}挑战三：非随机化区域中指针认证上下文的传播}{8}{subsection.1.2.4}\protected@file@percent }
+\citation{backes2014oxymoron}
+\citation{jelesnianski2020mardu}
+\citation{chen2017codearmor}
+\@writefile{toc}{\contentsline {section}{\numberline {1.3}研究内容与主要贡献}{9}{section.1.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.3.1}研究内容一：基于跳板函数的低开销持续随机化}{9}{subsection.1.3.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1-2}{\ignorespaces \enspace  本文的研究思路与三章分工}}{10}{figure.caption.19}\protected@file@percent }
+\newlabel{fig:1-2}{{1-2}{10}{\enspace 本文的研究思路与三章分工}{figure.caption.19}{}}
+\citation{tang2015heisenbyte}
+\citation{werner2016near}
+\citation{wang2019safehidden}
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.3.2}研究内容二：基于代码索引泄露的触发式随机化}{11}{subsection.1.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.3.3}研究内容三：基于随机化辅助的 ARM 指针认证机制}{11}{subsection.1.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.3.4}三项工作的关系}{12}{subsection.1.3.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1.4}本文的安全性论证方式}{12}{section.1.4}\protected@file@percent }
+\citation{ravichandran2022pacman}
+\@writefile{toc}{\contentsline {section}{\numberline {1.5}论文组织结构}{13}{section.1.5}\protected@file@percent }
+\citation{szekeres2013sok}
+\citation{paxteam2003pax}
+\citation{shacham2007geometry}
+\citation{bletsch2011jop}
+\citation{schuster2015coop}
+\citation{snow2013just}
+\@writefile{toc}{\contentsline {chapter}{\numberline {第2章\hspace  {.3em}}相关研究综述与威胁模型}{15}{chapter.2}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\@writefile{loappfig}{\addvspace {10\p@ }}
+\@writefile{loapptab}{\addvspace {10\p@ }}
+\newlabel{chap:2}{{2}{15}{相关研究综述与威胁模型}{chapter.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.1}内存安全漏洞攻防方法的演进}{15}{section.2.1}\protected@file@percent }
+\citation{paxteam2003pax,shacham2004effectiveness}
+\citation{backes2014oxymoron}
+\citation{kil2006aslp,giuffrida2012enhanced}
+\citation{wartell2012stirring}
+\citation{pappas2012smashing,hiser2012ilr}
+\citation{larsen2014sok}
+\citation{conti2016selfrando}
+\citation{koo2018compiler}
+\@writefile{lot}{\contentsline {table}{\numberline {2-1}{\ignorespaces \enspace  Linux 内核镜像中可利用 gadget 的分布}}{16}{table.caption.20}\protected@file@percent }
+\newlabel{tab:2-1}{{2-1}{16}{\enspace Linux 内核镜像中可利用 gadget 的分布}{table.caption.20}{}}
+\citation{snow2013just}
+\citation{bittau2014blind}
+\citation{kollenda2017crop}
+\citation{oikonomopoulos2016poking}
+\citation{gruss2016prefetch}
+\citation{hund2013practical}
+\citation{jang2016drk}
+\citation{evtyushkin2016jump}
+\citation{liu2023entrybleed,lipp2022amd}
+\citation{maar2025kernelsnitch}
+\citation{canella2019transient}
+\citation{gens2017lazarus}
+\citation{koschel2020tagbleed}
+\citation{song2025oreo}
+\citation{abadi2005cfi}
+\citation{carlini2015bending}
+\citation{hu2016dop}
+\citation{larsen2020adoption}
+\citation{shen2019survey}
+\@writefile{lof}{\contentsline {figure}{\numberline {2-1}{\ignorespaces \enspace  JIT-ROP 信息泄露攻击流程}}{18}{figure.caption.21}\protected@file@percent }
+\newlabel{fig:2-1}{{2-1}{18}{\enspace JIT-ROP 信息泄露攻击流程}{figure.caption.21}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.2}内核地址空间布局随机化相关工作}{18}{section.2.2}\protected@file@percent }
+\citation{stanley2013improved}
+\citation{linux2024kernel}
+\citation{gruss2017kaiser,canella2020kaslr}
+\citation{goktas2018pir}
+\citation{bigelow2015tasr}
+\citation{williams2016shuffler}
+\citation{chen2016remix}
+\citation{lu2016runtimeaslr}
+\citation{chen2017codearmor}
+\citation{wang2017reranz}
+\citation{jelesnianski2020mardu}
+\citation{davi2015isomeron}
+\citation{hawkins2017mixr}
+\citation{hawkins2017zipr}
+\citation{williamsking2020egalito}
+\citation{ahmed2020methodologies}
+\citation{nikolaev2022adelie,nadeem2020kernelmodule}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2.1}一次性随机化}{19}{subsection.2.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2.2}持续随机化}{19}{subsection.2.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2.3}部分随机化与触发式随机化}{19}{subsection.2.2.3}\protected@file@percent }
+\citation{luo2025ptrproxy}
+\citation{wang2019safehidden}
+\citation{nikolaev2022adelie}
+\citation{li2024dbox}
+\@writefile{lot}{\contentsline {table}{\numberline {2-2}{\ignorespaces \enspace  持续随机化代表性工作的横向对比}}{20}{table.caption.22}\protected@file@percent }
+\newlabel{tab:2-3}{{2-2}{20}{\enspace 持续随机化代表性工作的横向对比}{table.caption.22}{}}
+\citation{bigelow2015tasr}
+\citation{giuffrida2012enhanced}
+\citation{lu2016runtimeaslr}
+\citation{backes2014oxymoron}
+\citation{williams2016shuffler}
+\citation{chen2017codearmor}
+\citation{jelesnianski2020mardu}
+\citation{wang2017reranz}
+\@writefile{toc}{\contentsline {section}{\numberline {2.3}持续随机化的三个核心问题}{21}{section.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.1}代码索引更新}{21}{subsection.2.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.2}执行流的安全暂停}{22}{subsection.2.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.3}随机化的触发策略}{22}{subsection.2.3.3}\protected@file@percent }
+\citation{morton2017zombie}
+\citation{li2022mprobe}
+\citation{li2024randomize}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3.4}非随机化区域的处理}{23}{subsection.2.3.4}\protected@file@percent }
+\citation{backes2014xnr}
+\citation{gionta2015hidem}
+\citation{braden2016leakage}
+\citation{kwon2019uxom}
+\citation{shen2020picoxom}
+\citation{chen2017norax}
+\citation{intel2023sdm}
+\citation{crane2015readactor}
+\@writefile{toc}{\contentsline {section}{\numberline {2.4}只执行内存技术}{24}{section.2.4}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2-2}{\ignorespaces \enspace  只执行内存的三条实现路径}}{24}{figure.caption.23}\protected@file@percent }
+\newlabel{fig:2-2}{{2-2}{24}{\enspace 只执行内存的三条实现路径}{figure.caption.23}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.1}实现路径}{24}{subsection.2.4.1}\protected@file@percent }
+\citation{tang2015heisenbyte}
+\citation{werner2016near}
+\citation{pomonis2019krx}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4.2}内核场景下的两个困难}{25}{subsection.2.4.2}\protected@file@percent }
+\citation{shanbhogue2019cet,arm2023armv8}
+\citation{gaidis2023fineibt}
+\citation{gaidis2023fineibt}
+\citation{tolvanen2018androidcfi}
+\citation{burow2019shadow}
+\citation{kuznetsov2014cpi}
+\@writefile{toc}{\contentsline {section}{\numberline {2.5}硬件辅助的控制流完整性}{26}{section.2.5}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2-3}{\ignorespaces \enspace  三类硬件 CFI 机制的等价类划分}}{26}{figure.caption.24}\protected@file@percent }
+\newlabel{fig:2-3}{{2-3}{26}{\enspace 三类硬件 CFI 机制的等价类划分}{figure.caption.24}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.1}落地点标记类}{26}{subsection.2.5.1}\protected@file@percent }
+\citation{liljestrand2019pac}
+\citation{liljestrand2019pac}
+\citation{liljestrand2021pacstack}
+\citation{ismail2022pactight}
+\citation{ravichandran2022pacman}
+\citation{clang2022kcfi}
+\citation{burow2017cfi}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.2}签名验证类}{27}{subsection.2.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.3}类型哈希类}{27}{subsection.2.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5.4}小结}{28}{subsection.2.5.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.6}本文的威胁模型}{28}{section.2.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.1}攻击者能力}{28}{subsection.2.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.2}四类攻击向量}{28}{subsection.2.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.3}信任基础}{29}{subsection.2.6.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {2-4}{\ignorespaces \enspace  四类攻击向量、三条安全不变式与三章工作的对应关系}}{30}{figure.caption.25}\protected@file@percent }
+\newlabel{fig:2-4}{{2-4}{30}{\enspace 四类攻击向量、三条安全不变式与三章工作的对应关系}{figure.caption.25}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.6.4}明确的排除项}{30}{subsection.2.6.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2.7}安全不变式}{31}{section.2.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.7.1}不变式的定义}{31}{subsection.2.7.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.7.2}不变式与章节、证据层级的对应}{31}{subsection.2.7.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2-3}{\ignorespaces \enspace  安全不变式的维持与论证方式}}{32}{table.caption.26}\protected@file@percent }
+\newlabel{tab:2-5}{{2-3}{32}{\enspace 安全不变式的维持与论证方式}{table.caption.26}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {2.8}本章小结}{32}{section.2.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {第3章\hspace  {.3em}}基于跳板函数的低开销持续随机化方法}{33}{chapter.3}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\@writefile{loappfig}{\addvspace {10\p@ }}
+\@writefile{loapptab}{\addvspace {10\p@ }}
+\newlabel{chap:3}{{3}{33}{基于跳板函数的低开销持续随机化方法}{chapter.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.1}引言}{33}{section.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.2}研究背景与动机}{33}{section.3.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.1}Built-in 代码的代码索引更新}{33}{subsection.3.2.1}\protected@file@percent }
+\citation{nikolaev2022adelie}
+\citation{williams2016shuffler}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.2}Built-in 代码的执行流暂停}{34}{subsection.3.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2.3}研究动机与挑战}{34}{subsection.3.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.3}系统设计}{35}{section.3.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3.1}总体架构}{35}{subsection.3.3.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3-1}{\ignorespaces \enspace  本章机制的总体架构}}{35}{figure.caption.27}\protected@file@percent }
+\newlabel{fig:3-1}{{3-1}{35}{\enspace 本章机制的总体架构}{figure.caption.27}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3-1}{\ignorespaces \enspace  本章使用的随机化范围}}{36}{table.caption.28}\protected@file@percent }
+\newlabel{tab:3-1}{{3-1}{36}{\enspace 本章使用的随机化范围}{table.caption.28}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3.2}跳板函数的设计}{36}{subsection.3.3.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3-2}{\ignorespaces \enspace  图~\ref {fig:3-2} 中每一步之后的执行流状态}}{39}{table.caption.30}\protected@file@percent }
+\newlabel{tab:3-2}{{3-2}{39}{\enspace 图~\ref {fig:3-2} 中每一步之后的执行流状态}{table.caption.30}{}}
+\citation{kuznetsov2014cpi}
+\@writefile{lof}{\contentsline {figure}{\numberline {3-2}{\ignorespaces \enspace  一次跨区域调用的控制流}}{40}{figure.caption.29}\protected@file@percent }
+\newlabel{fig:3-2}{{3-2}{40}{\enspace 一次跨区域调用的控制流}{figure.caption.29}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3-3}{\ignorespaces \enspace  一次跨区域调用往返的指令序列与周期分析}}{41}{table.caption.31}\protected@file@percent }
+\newlabel{tab:3-3}{{3-3}{41}{\enspace 一次跨区域调用往返的指令序列与周期分析}{table.caption.31}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3.3}函数粒度位置无关代码}{41}{subsection.3.3.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3-3}{\ignorespaces \enspace  两个平台的绝对地址物化形式}}{43}{figure.caption.32}\protected@file@percent }
+\newlabel{fig:3-3}{{3-3}{43}{\enspace 两个平台的绝对地址物化形式}{figure.caption.32}{}}
+\citation{liljestrand2021pacstack}
+\citation{ismail2022pactight}
+\@writefile{lof}{\contentsline {figure}{\numberline {3-4}{\ignorespaces \enspace  返回地址的位置无关表示}}{44}{figure.caption.33}\protected@file@percent }
+\newlabel{fig:3-4}{{3-4}{44}{\enspace 返回地址的位置无关表示}{figure.caption.33}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3.4}执行流追踪与安全暂停}{45}{subsection.3.3.4}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {3-5}{\ignorespaces \enspace  执行流追踪与无副本随机化的时序}}{46}{figure.caption.34}\protected@file@percent }
+\newlabel{fig:3-5}{{3-5}{46}{\enspace 执行流追踪与无副本随机化的时序}{figure.caption.34}{}}
+\citation{hawkins2017zipr}
+\citation{williamsking2020egalito}
+\citation{llvm2024newpm}
+\@writefile{toc}{\contentsline {section}{\numberline {3.4}系统实现}{47}{section.3.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4.1}LLVM 编译器扩展}{47}{subsection.3.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4.2}运行时随机化的实现}{48}{subsection.3.4.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3-4}{\ignorespaces \enspace  单次随机化的时间分解}}{49}{table.caption.35}\protected@file@percent }
+\newlabel{tab:3-4}{{3-4}{49}{\enspace 单次随机化的时间分解}{table.caption.35}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4.3}可随机化的边界}{50}{subsection.3.4.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3-5}{\ignorespaces \enspace  不可随机化函数的分类}}{50}{table.caption.36}\protected@file@percent }
+\newlabel{tab:3-5}{{3-5}{50}{\enspace 不可随机化函数的分类}{table.caption.36}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3.5}实验评估}{50}{section.3.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5.1}实验配置}{50}{subsection.3.5.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3-6}{\ignorespaces \enspace  实验平台与配置}}{51}{table.caption.37}\protected@file@percent }
+\newlabel{tab:3-6}{{3-6}{51}{\enspace 实验平台与配置}{table.caption.37}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5.2}随机化延迟}{51}{subsection.3.5.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3-7}{\ignorespaces \enspace  随机化抵达至开始的延迟}}{52}{table.caption.38}\protected@file@percent }
+\newlabel{tab:3-7}{{3-7}{52}{\enspace 随机化抵达至开始的延迟}{table.caption.38}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3-6}{\ignorespaces \enspace  随机化抵达至开始的延迟累积分布}}{52}{figure.caption.39}\protected@file@percent }
+\newlabel{fig:3-6}{{3-6}{52}{\enspace 随机化抵达至开始的延迟累积分布}{figure.caption.39}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3-8}{\ignorespaces \enspace  随机化开始至完成、完成至释放与抵达至释放的时长}}{53}{table.caption.40}\protected@file@percent }
+\newlabel{tab:3-8}{{3-8}{53}{\enspace 随机化开始至完成、完成至释放与抵达至释放的时长}{table.caption.40}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3-9}{\ignorespaces \enspace  四种方法在三个关键时刻上的时效对比}}{53}{table.caption.41}\protected@file@percent }
+\newlabel{tab:3-9}{{3-9}{53}{\enspace 四种方法在三个关键时刻上的时效对比}{table.caption.41}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3-7}{\ignorespaces \enspace  四种方法从随机化抵达到旧代码释放的时间线}}{54}{figure.caption.42}\protected@file@percent }
+\newlabel{fig:3-7}{{3-7}{54}{\enspace 四种方法从随机化抵达到旧代码释放的时间线}{figure.caption.42}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5.3}随机化内核核心子系统的开销}{54}{subsection.3.5.3}\protected@file@percent }
+\citation{li2024dbox}
+\citation{chang2024chaos}
+\@writefile{lot}{\contentsline {table}{\numberline {3-10}{\ignorespaces \enspace  随机化四个核心子系统的端到端开销}}{55}{table.caption.43}\protected@file@percent }
+\newlabel{tab:3-10}{{3-10}{55}{\enspace 随机化四个核心子系统的端到端开销}{table.caption.43}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5.4}与已有持续随机化工作的同条件对比}{55}{subsection.3.5.4}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3-11}{\ignorespaces \enspace  与已有持续随机化工作的同条件对比}}{55}{table.caption.44}\protected@file@percent }
+\newlabel{tab:3-11}{{3-11}{55}{\enspace 与已有持续随机化工作的同条件对比}{table.caption.44}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3-8}{\ignorespaces \enspace  与已有持续随机化工作的同条件对比}}{56}{figure.caption.45}\protected@file@percent }
+\newlabel{fig:3-8}{{3-8}{56}{\enspace 与已有持续随机化工作的同条件对比}{figure.caption.45}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5.5}随机化范围与跳板调用占比的关系}{56}{subsection.3.5.5}\protected@file@percent }
+\citation{wang2019safehidden}
+\@writefile{lof}{\contentsline {figure}{\numberline {3-9}{\ignorespaces \enspace  随机化范围与经过跳板的调用占比}}{57}{figure.caption.46}\protected@file@percent }
+\newlabel{fig:3-9}{{3-9}{57}{\enspace 随机化范围与经过跳板的调用占比}{figure.caption.46}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3-12}{\ignorespaces \enspace  跨区域调用频度与常驻开销随随机化范围的变化}}{57}{table.caption.47}\protected@file@percent }
+\newlabel{tab:3-12}{{3-12}{57}{\enspace 跨区域调用频度与常驻开销随随机化范围的变化}{table.caption.47}{}}
+\citation{clang2022kcfi}
+\citation{gaidis2023fineibt}
+\citation{yoo2022pal}
+\@writefile{toc}{\contentsline {section}{\numberline {3.6}安全性分析}{58}{section.3.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3.7}本章小结}{58}{section.3.7}\protected@file@percent }
+\citation{nikolaev2022adelie}
+\citation{chang2024chaos}
+\citation{williams2016shuffler}
+\@writefile{toc}{\contentsline {chapter}{\numberline {第4章\hspace  {.3em}}基于代码索引泄露的触发式随机化}{61}{chapter.4}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\@writefile{loappfig}{\addvspace {10\p@ }}
+\@writefile{loapptab}{\addvspace {10\p@ }}
+\newlabel{chap:4}{{4}{61}{基于代码索引泄露的触发式随机化}{chapter.4}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4.1}引言}{61}{section.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4.2}研究背景与动机}{61}{section.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2.1}跳板机制在开销上的局限}{61}{subsection.4.2.1}\protected@file@percent }
+\citation{bigelow2015tasr}
+\citation{wang2017reranz}
+\citation{wang2019safehidden}
+\citation{li2022mprobe}
+\citation{li2024randomize}
+\citation{pomonis2019krx}
+\citation{jang2019revisiting}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2.2}随机化的触发策略}{62}{subsection.4.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2.3}保护整个代码区域的代价}{62}{subsection.4.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2.4}研究动机与挑战}{63}{subsection.4.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4.3}系统设计}{63}{section.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3.1}总体架构}{63}{subsection.4.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3.2}只执行代码区域的设计}{63}{subsection.4.3.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {4-1}{\ignorespaces \enspace  本章机制的总体架构}}{64}{figure.caption.48}\protected@file@percent }
+\newlabel{fig:4-1}{{4-1}{64}{\enspace 本章机制的总体架构}{figure.caption.48}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3.3}信息泄露识别}{64}{subsection.4.3.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {4-2}{\ignorespaces \enspace  跳转桩读取事件的处置与失效窗口}}{65}{figure.caption.49}\protected@file@percent }
+\newlabel{fig:4-2}{{4-2}{65}{\enspace 跳转桩读取事件的处置与失效窗口}{figure.caption.49}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3.4}两级跳板与跳板激活}{66}{subsection.4.3.4}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {4-1}{\ignorespaces \enspace  两级跳板各段的指令序列与周期分析}}{67}{table.caption.50}\protected@file@percent }
+\newlabel{tab:4-1}{{4-1}{67}{\enspace 两级跳板各段的指令序列与周期分析}{table.caption.50}{}}
+\citation{gravani2021iskios}
+\@writefile{lof}{\contentsline {figure}{\numberline {4-3}{\ignorespaces \enspace  两级跳板与跳板激活}}{68}{figure.caption.51}\protected@file@percent }
+\newlabel{fig:4-3}{{4-3}{68}{\enspace 两级跳板与跳板激活}{figure.caption.51}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4.4}系统实现}{68}{section.4.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4.1}x86 平台：基于管理态保护键的只执行内存}{68}{subsection.4.4.1}\protected@file@percent }
+\citation{vahldiek2019erim,hedayati2019hodor}
+\citation{guo2025bulkhead,huang2022ksplit}
+\citation{kwon2019uxom}
+\citation{shen2020picoxom}
+\citation{jang2019revisiting}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4.2}ARM 平台：基于硬件调试观察点的实现}{69}{subsection.4.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.4.3}两级跳板的代码生成}{70}{subsection.4.4.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {4-4}{\ignorespaces \enspace  只执行保护施加的映射与跳转桩的改写路径}}{71}{figure.caption.52}\protected@file@percent }
+\newlabel{fig:4-4}{{4-4}{71}{\enspace 只执行保护施加的映射与跳转桩的改写路径}{figure.caption.52}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4.5}实验评估}{71}{section.4.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5.1}实验配置}{71}{subsection.4.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5.2}两条路径的单次检测开销}{72}{subsection.4.5.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {4-2}{\ignorespaces \enspace  两个平台单次检测开销的分解}}{72}{table.caption.53}\protected@file@percent }
+\newlabel{tab:4-2}{{4-2}{72}{\enspace 两个平台单次检测开销的分解}{table.caption.53}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5.3}触发频率与触发延迟}{72}{subsection.4.5.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {4-3}{\ignorespaces \enspace  各类负载下的触发频率与读取来源}}{73}{table.caption.54}\protected@file@percent }
+\newlabel{tab:4-3}{{4-3}{73}{\enspace 各类负载下的触发频率与读取来源}{table.caption.54}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {4-4}{\ignorespaces \enspace  检测到随机化完成的延迟分布}}{73}{table.caption.55}\protected@file@percent }
+\newlabel{tab:4-4}{{4-4}{73}{\enspace 检测到随机化完成的延迟分布}{table.caption.55}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5.4}泄露地址的有效期与利用竞态}{74}{subsection.4.5.4}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {4-5}{\ignorespaces \enspace  泄露地址利用竞态的结果}}{74}{table.caption.56}\protected@file@percent }
+\newlabel{tab:4-5}{{4-5}{74}{\enspace 泄露地址利用竞态的结果}{table.caption.56}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4-5}{\ignorespaces \enspace  泄露地址利用竞态的成功率随读取至解引用时延的变化}}{75}{figure.caption.57}\protected@file@percent }
+\newlabel{fig:4-5}{{4-5}{75}{\enspace 泄露地址利用竞态的成功率随读取至解引用时延的变化}{figure.caption.57}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.5.5}未激活与激活状态的单次调用开销}{75}{subsection.4.5.5}\protected@file@percent }
+\citation{clang2022kcfi}
+\citation{gaidis2023fineibt}
+\citation{yoo2022pal}
+\@writefile{lot}{\contentsline {table}{\numberline {4-6}{\ignorespaces \enspace  未激活与激活状态在真实规模下的单次调用开销}}{76}{table.caption.58}\protected@file@percent }
+\newlabel{tab:4-6}{{4-6}{76}{\enspace 未激活与激活状态在真实规模下的单次调用开销}{table.caption.58}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4.6}安全性分析}{76}{section.4.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {4.7}本章小结}{76}{section.4.7}\protected@file@percent }
+\citation{nikolaev2022adelie}
+\citation{chang2024chaos}
+\citation{li2024dbox}
+\citation{shanbhogue2019cet,arm2023armv8}
+\@writefile{toc}{\contentsline {chapter}{\numberline {第5章\hspace  {.3em}}基于随机化辅助的 ARM 指针认证机制}{79}{chapter.5}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\@writefile{loappfig}{\addvspace {10\p@ }}
+\@writefile{loapptab}{\addvspace {10\p@ }}
+\newlabel{chap:5}{{5}{79}{基于随机化辅助的 ARM 指针认证机制}{chapter.5}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.1}引言}{79}{section.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5.2}研究背景与动机}{79}{section.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2.1}部分随机化与非随机化区域}{79}{subsection.5.2.1}\protected@file@percent }
+\citation{liljestrand2019pac}
+\citation{liljestrand2021pacstack}
+\citation{ismail2022pactight}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2.2}指针认证与上下文传播}{80}{subsection.5.2.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {5-1}{\ignorespaces \enspace  指针认证的签名与认证过程}}{80}{figure.caption.59}\protected@file@percent }
+\newlabel{fig:5-1}{{5-1}{80}{\enspace 指针认证的签名与认证过程}{figure.caption.59}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5-2}{\ignorespaces \enspace  指针认证的上下文传播问题}}{81}{figure.caption.60}\protected@file@percent }
+\newlabel{fig:5-2}{{5-2}{81}{\enspace 指针认证的上下文传播问题}{figure.caption.60}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2.3}研究动机与挑战}{81}{subsection.5.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5.3}系统设计}{81}{section.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3.1}总体架构与核心思想}{81}{subsection.5.3.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {5-3}{\ignorespaces \enspace  本章机制的总体架构}}{82}{figure.caption.61}\protected@file@percent }
+\newlabel{fig:5-3}{{5-3}{82}{\enspace 本章机制的总体架构}{figure.caption.61}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3.2}以随机化打断上下文传播链}{82}{subsection.5.3.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {5-4}{\ignorespaces \enspace  高扇入函数的识别与绑定}}{83}{figure.caption.62}\protected@file@percent }
+\newlabel{fig:5-4}{{5-4}{83}{\enspace 高扇入函数的识别与绑定}{figure.caption.62}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3.3}跳板处的分区验证}{83}{subsection.5.3.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {5-5}{\ignorespaces \enspace  跳板处的分区验证}}{85}{figure.caption.63}\protected@file@percent }
+\newlabel{fig:5-5}{{5-5}{85}{\enspace 跳板处的分区验证}{figure.caption.63}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.4}系统实现}{85}{section.5.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4.1}编译期：指针认证插桩}{85}{subsection.5.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4.2}运行期：高扇入函数的跟踪、绑定与迁移}{86}{subsection.5.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4.3}跨区域出口的双重检查}{86}{subsection.5.4.3}\protected@file@percent }
+\@writefile{loa}{\contentsline {algorithm}{\numberline {5-1}{\ignorespaces 间接调用处的检查与归属仲裁}}{87}{algorithm.1}\protected@file@percent }
+\newlabel{alg:5-1}{{5-1}{87}{间接调用处的检查与归属仲裁}{algorithm.1}{}}
+\citation{yoo2022pal}
+\citation{tolvanen2018androidcfi}
+\citation{yoo2022pal}
+\citation{maar2024hekcfi}
+\citation{clang2022kcfi}
+\citation{gaidis2023fineibt}
+\@writefile{toc}{\contentsline {section}{\numberline {5.5}实验评估}{88}{section.5.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5.1}实验配置}{88}{subsection.5.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5.2}控制流完整性检查的精度与开销}{88}{subsection.5.5.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {5-1}{\ignorespaces \enspace  合法目标数分布对比}}{88}{table.caption.64}\protected@file@percent }
+\newlabel{tab:5-1}{{5-1}{88}{\enspace 合法目标数分布对比}{table.caption.64}{}}
+\citation{ge2016finegrained}
+\citation{moreira2017droptherop}
+\citation{khandaker2019oscfi}
+\citation{kasten2024hpcfi}
+\citation{burow2017cfi}
+\citation{li2020cracks}
+\@writefile{lot}{\contentsline {table}{\numberline {5-2}{\ignorespaces \enspace  类型哈希机制下最大的几个等价类}}{89}{table.caption.65}\protected@file@percent }
+\newlabel{tab:5-2}{{5-2}{89}{\enspace 类型哈希机制下最大的几个等价类}{table.caption.65}{}}
+\citation{maar2024hekcfi}
+\@writefile{lof}{\contentsline {figure}{\numberline {5-6}{\ignorespaces \enspace  每个间接调用点合法目标数的分布}}{90}{figure.caption.66}\protected@file@percent }
+\newlabel{fig:5-6}{{5-6}{90}{\enspace 每个间接调用点合法目标数的分布}{figure.caption.66}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {5-3}{\ignorespaces \enspace  三档上下文策略在三个快照时刻的精度}}{91}{table.caption.67}\protected@file@percent }
+\newlabel{tab:5-3}{{5-3}{91}{\enspace 三档上下文策略在三个快照时刻的精度}{table.caption.67}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5.3}高扇入函数识别的收敛与准确性}{91}{subsection.5.5.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {5-4}{\ignorespaces \enspace  高扇入函数识别的收敛}}{91}{table.caption.68}\protected@file@percent }
+\newlabel{tab:5-4}{{5-4}{91}{\enspace 高扇入函数识别的收敛}{table.caption.68}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5-7}{\ignorespaces \enspace  高扇入函数识别数量随启动进程的变化}}{92}{figure.caption.69}\protected@file@percent }
+\newlabel{fig:5-7}{{5-7}{92}{\enspace 高扇入函数识别数量随启动进程的变化}{figure.caption.69}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.5.4}其他部分随机化方法迁移}{92}{subsection.5.5.4}\protected@file@percent }
+\citation{chang2024chaos}
+\citation{nikolaev2022adelie}
+\citation{li2024dbox}
+\citation{chang2024chaos}
+\@writefile{lot}{\contentsline {table}{\numberline {5-5}{\ignorespaces \enspace  两种随机化原语的对照}}{93}{table.caption.70}\protected@file@percent }
+\newlabel{tab:5-5}{{5-5}{93}{\enspace 两种随机化原语的对照}{table.caption.70}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {5-6}{\ignorespaces \enspace  施加本章机制前后的效果}}{94}{table.caption.71}\protected@file@percent }
+\newlabel{tab:5-6}{{5-6}{94}{\enspace 施加本章机制前后的效果}{table.caption.71}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5-8}{\ignorespaces \enspace  Chaos 原文四组负载在三档随机化间隔下施加本章机制前后的吞吐下降}}{94}{figure.caption.72}\protected@file@percent }
+\newlabel{fig:5-8}{{5-8}{94}{\enspace Chaos 原文四组负载在三档随机化间隔下施加本章机制前后的吞吐下降}{figure.caption.72}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5-9}{\ignorespaces \enspace  施加本章机制前后的 CPU 开销与单次随机化的迁移时间}}{95}{figure.caption.73}\protected@file@percent }
+\newlabel{fig:5-9}{{5-9}{95}{\enspace 施加本章机制前后的 CPU 开销与单次随机化的迁移时间}{figure.caption.73}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {5-7}{\ignorespaces \enspace  向各方法移植所需的改造}}{96}{table.caption.74}\protected@file@percent }
+\newlabel{tab:5-7}{{5-7}{96}{\enspace 向各方法移植所需的改造}{table.caption.74}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {5.6}安全性分析}{96}{section.5.6}\protected@file@percent }
+\citation{ravichandran2022pacman}
+\citation{kim2024tiktag}
+\citation{burow2019shadow}
+\@writefile{toc}{\contentsline {section}{\numberline {5.7}本章小结}{97}{section.5.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {第6章\hspace  {.3em}}总结与展望}{99}{chapter.6}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\@writefile{loappfig}{\addvspace {10\p@ }}
+\@writefile{loapptab}{\addvspace {10\p@ }}
+\newlabel{chap:6}{{6}{99}{总结与展望}{chapter.6}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6.1}论文总结}{99}{section.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6.2}主要创新点}{100}{section.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6.3}局限性与未来工作}{100}{section.6.3}\protected@file@percent }
+\citation{ravichandran2022pacman}
+\@writefile{toc}{\contentsline {section}{\numberline {6.4}结语}{102}{section.6.4}\protected@file@percent }
+\bibdata{Biblio/ref}
+\bibcite{peng2025asterinas}{{1}{2025}{{Peng {等}}}{{Peng, Tian, Zhang, Li, Chen, Jiang, Xian, Wang, Xu, Zhou, Luo, Yan, and Zhang}}}
+\bibcite{cho2023bokasan}{{2}{2023}{{Cho {等}}}{{Cho, An, Jin, and Kwon}}}
+\bibcite{wu2018fuze}{{3}{2018}{{Wu {等}}}{{Wu, Chen, Xu, Xing, Gong, and Zou}}}
+\bibcite{chen2020koobe}{{4}{2020}{{Chen {等}}}{{Chen, Zou, Li, and Qian}}}
+\bibcite{zeng2022playing}{{5}{2022}{{Zeng {等}}}{{Zeng, Chen, Cho, Xing, Doup{\'e}, Shoshitaishvili, and Bao}}}
+\bibcite{lee2023pspray}{{6}{2023}{{Lee {等}}}{{Lee, Kwak, Kang, Jeon, and Lee}}}
+\bibcite{liang2024kleak}{{7}{2024}{{Liang {等}}}{{Liang, Zou, Song, and Qian}}}
+\bibcite{shacham2007geometry}{{8}{2007}{{Shacham}}{{}}}
+\bibcite{kernel2021fgkaslr}{{9}{2021}{{Accardi}}{{}}}
+\bibcite{abadi2005cfi}{{10}{2005}{{Abadi {等}}}{{Abadi, Budiu, Erlingsson, and Ligatti}}}
+\bibcite{shanbhogue2019cet}{{11}{2019}{{Shanbhogue {等}}}{{Shanbhogue, Gupta, and Sahita}}}
+\bibcite{arm2023armv8}{{12}{2023}{{arm}}{{}}}
+\bibcite{clang2022kcfi}{{13}{2022}{{The LLVM Project}}{{}}}
+\bibcite{gaidis2023fineibt}{{14}{2023}{{Gaidis {等}}}{{Gaidis, Atlidakis, and Kemerlis}}}
+\bibcite{burow2017cfi}{{15}{2017}{{Burow {等}}}{{Burow, Carr, Nash, Larsen, Franz, Brunthaler, and Payer}}}
+\bibcite{liljestrand2019pac}{{16}{2019}{{Liljestrand {等}}}{{Liljestrand, Nyman, Wang, Perez, Ekberg, and Asokan}}}
+\@writefile{toc}{\contentsline {chapter}{参考文献}{103}{section*.75}\protected@file@percent }
+\bibcite{vahldiek2019erim}{{17}{2019}{{Vahldiek-Oberwagner {等}}}{{Vahldiek-Oberwagner, Elnikety, Duarte, Sammler, Druschel, and Garg}}}
+\bibcite{hedayati2019hodor}{{18}{2019}{{Hedayati {等}}}{{Hedayati, Gravani, Johnson, Criswell, Scott, Shen, and Marty}}}
+\bibcite{dautenhahn2015nested}{{19}{2015}{{Dautenhahn {等}}}{{Dautenhahn, Kasampalis, Dietz, Criswell, and Adve}}}
+\bibcite{huang2022ksplit}{{20}{2022}{{Huang {等}}}{{Huang, Narayanan, Detweiler, Huang, Tan, Jaeger, and Burtsev}}}
+\bibcite{guo2025bulkhead}{{21}{2025}{{Guo {等}}}{{Guo, Wang, Bai, Zeng, and Lu}}}
+\bibcite{lefeuvre2025sok}{{22}{2025}{{Lefeuvre {等}}}{{Lefeuvre, Dautenhahn, Chisnall, and Olivier}}}
+\bibcite{hund2013practical}{{23}{2013}{{Hund {等}}}{{Hund, Willems, and Holz}}}
+\bibcite{jang2016drk}{{24}{2016}{{Jang {等}}}{{Jang, Lee, and Kim}}}
+\bibcite{evtyushkin2016jump}{{25}{2016}{{Evtyushkin {等}}}{{Evtyushkin, Ponomarev, and Abu-Ghazaleh}}}
+\bibcite{liu2023entrybleed}{{26}{2023}{{Liu {等}}}{{Liu, Ravichandran, and Yan}}}
+\bibcite{lipp2022amd}{{27}{2022}{{Lipp {等}}}{{Lipp, Gruss, and Schwarz}}}
+\bibcite{maar2025kernelsnitch}{{28}{2025}{{Maar {等}}}{{Maar, Juffinger, Steinbauer, Gruss, and Mangard}}}
+\bibcite{canella2019transient}{{29}{2019}{{Canella {等}}}{{Canella, Van~Bulck, Schwarz, Lipp, von Berg, Ortner, Piessens, Evtyushkin, and Gruss}}}
+\bibcite{gens2017lazarus}{{30}{2017}{{Gens {等}}}{{Gens, Arias, Sullivan, Liebchen, Jin, and Sadeghi}}}
+\bibcite{snow2013just}{{31}{2013}{{Snow {等}}}{{Snow, Monrose, Davi, Dmitrienko, Liebchen, and Sadeghi}}}
+\bibcite{williams2016shuffler}{{32}{2016}{{Williams-King {等}}}{{Williams-King, Gobieski, Williams-King, Blake, Yuan, Colp, Zheng, Kemerlis, Yang, and Aiello}}}
+\bibcite{ahmed2020methodologies}{{33}{2020}{{Ahmed {等}}}{{Ahmed, Xiao, Snow, Tan, Monrose, and Yao}}}
+\bibcite{nikolaev2022adelie}{{34}{2022}{{Nikolaev {等}}}{{Nikolaev, Nadeem, Stone, and Ravindran}}}
+\bibcite{chang2024chaos}{{35}{2024}{{Chang {等}}}{{Chang, Lin, Sun, Li, Wang, Hu, Zhao, Jiang, Sun, and Wang}}}
+\bibcite{chen2016remix}{{36}{2016}{{Chen {等}}}{{Chen, Wang, Whalley, and Lu}}}
+\bibcite{li2024dbox}{{37}{2024{}}{{Li {等}}}{{Li, Chen, Zhang, and Chung}}}
+\bibcite{backes2014oxymoron}{{38}{2014{}}{{Backes {等}}}{{Backes and N{\"u}rnberger}}}
+\bibcite{jelesnianski2020mardu}{{39}{2020}{{Jelesnianski {等}}}{{Jelesnianski, Yom, Min, and Jang}}}
+\bibcite{chen2017codearmor}{{40}{2017{}}{{Chen {等}}}{{Chen, Bos, and Giuffrida}}}
+\bibcite{tang2015heisenbyte}{{41}{2015}{{Tang {等}}}{{Tang, Sethumadhavan, and Stolfo}}}
+\bibcite{werner2016near}{{42}{2016}{{Werner {等}}}{{Werner, Baltas, Dallara, Joyce, Snow, Monrose, and Polychronakis}}}
+\bibcite{wang2019safehidden}{{43}{2019}{{Wang {等}}}{{Wang, Wu, Zhang, Tang, Yew, Xie, Lai, Kang, Cheng, and Shi}}}
+\bibcite{ravichandran2022pacman}{{44}{2022}{{Ravichandran {等}}}{{Ravichandran, Na, Liang, and Yan}}}
+\bibcite{szekeres2013sok}{{45}{2013}{{Szekeres {等}}}{{Szekeres, Payer, Wei, and Song}}}
+\bibcite{paxteam2003pax}{{46}{2003}{{PaX Team}}{{}}}
+\bibcite{bletsch2011jop}{{47}{2011}{{Bletsch {等}}}{{Bletsch, Jiang, Freeh, and Liang}}}
+\bibcite{schuster2015coop}{{48}{2015}{{Schuster {等}}}{{Schuster, Tendyck, Liebchen, Davi, Sadeghi, and Holz}}}
+\bibcite{shacham2004effectiveness}{{49}{2004}{{Shacham {等}}}{{Shacham, Page, Pfaff, Goh, Modadugu, and Boneh}}}
+\bibcite{kil2006aslp}{{50}{2006}{{Kil {等}}}{{Kil, Jun, Bookholt, Xu, and Ning}}}
+\bibcite{giuffrida2012enhanced}{{51}{2012}{{Giuffrida {等}}}{{Giuffrida, Kuijsten, and Tanenbaum}}}
+\bibcite{wartell2012stirring}{{52}{2012}{{Wartell {等}}}{{Wartell, Mohan, Hamlen, and Lin}}}
+\bibcite{pappas2012smashing}{{53}{2012}{{Pappas {等}}}{{Pappas, Polychronakis, and Keromytis}}}
+\bibcite{hiser2012ilr}{{54}{2012}{{Hiser {等}}}{{Hiser, Nguyen-Tuong, Co, Hall, and Davidson}}}
+\bibcite{larsen2014sok}{{55}{2014}{{Larsen {等}}}{{Larsen, Homescu, Brunthaler, and Franz}}}
+\bibcite{conti2016selfrando}{{56}{2016}{{Conti {等}}}{{Conti, Crane, Frassetto, Homescu, Koppen, Larsen, Liebchen, Perry, and Sadeghi}}}
+\bibcite{koo2018compiler}{{57}{2018}{{Koo {等}}}{{Koo, Chen, Lu, Kemerlis, and Polychronakis}}}
+\bibcite{bittau2014blind}{{58}{2014}{{Bittau {等}}}{{Bittau, Belay, Mashtizadeh, Mazi{\`e}res, and Boneh}}}
+\bibcite{kollenda2017crop}{{59}{2017}{{Kollenda {等}}}{{Kollenda, G{\"o}kta{\c s}, Blazytko, Koppe, Gawlik, Konoth, Giuffrida, Bos, and Holz}}}
+\bibcite{oikonomopoulos2016poking}{{60}{2016}{{Oikonomopoulos {等}}}{{Oikonomopoulos, Athanasopoulos, Bos, and Giuffrida}}}
+\bibcite{gruss2016prefetch}{{61}{2016}{{Gruss {等}}}{{Gruss, Maurice, Fogh, Lipp, and Mangard}}}
+\bibcite{koschel2020tagbleed}{{62}{2020}{{Koschel {等}}}{{Koschel, Giuffrida, Bos, and Razavi}}}
+\bibcite{song2025oreo}{{63}{2025}{{Song {等}}}{{Song, Zhang, and Yan}}}
+\bibcite{carlini2015bending}{{64}{2015}{{Carlini {等}}}{{Carlini, Barresi, Payer, Wagner, and Gross}}}
+\bibcite{hu2016dop}{{65}{2016}{{Hu {等}}}{{Hu, Shinde, Adrian, Chua, Saxena, and Liang}}}
+\bibcite{larsen2020adoption}{{66}{2020}{{Larsen {等}}}{{Larsen and Franz}}}
+\bibcite{shen2019survey}{{67}{2019}{{Shen {等}}}{{Shen and Chen}}}
+\bibcite{stanley2013improved}{{68}{2013}{{Stanley {等}}}{{Stanley, Xu, and Spafford}}}
+\bibcite{linux2024kernel}{{69}{2024}{{The Linux Kernel Organization}}{{}}}
+\bibcite{gruss2017kaiser}{{70}{2017}{{Gruss {等}}}{{Gruss, Lipp, Schwarz, Fellner, Maurice, and Mangard}}}
+\bibcite{canella2020kaslr}{{71}{2020}{{Canella {等}}}{{Canella, Schwarz, Haubenwallner, Schwarzl, and Gruss}}}
+\bibcite{goktas2018pir}{{72}{2018}{{G{\"o}kta{\c s} {等}}}{{G{\"o}kta{\c s}, Kollenda, Koppe, Bosman, Portokalidis, Holz, Bos, and Giuffrida}}}
+\bibcite{bigelow2015tasr}{{73}{2015}{{Bigelow {等}}}{{Bigelow, Hobson, Rudd, Streilein, and Okhravi}}}
+\bibcite{lu2016runtimeaslr}{{74}{2016}{{Lu {等}}}{{Lu, N{\"u}rnberger, Backes, and Lee}}}
+\bibcite{wang2017reranz}{{75}{2017}{{Wang {等}}}{{Wang, Wu, Li, Lai, Zhang, Hsu, and Cheng}}}
+\bibcite{davi2015isomeron}{{76}{2015}{{Davi {等}}}{{Davi, Liebchen, Sadeghi, Snow, and Monrose}}}
+\bibcite{hawkins2017mixr}{{77}{2017{}}{{Hawkins {等}}}{{Hawkins, Nguyen-Tuong, Hiser, Co, and Davidson}}}
+\bibcite{hawkins2017zipr}{{78}{2017{}}{{Hawkins {等}}}{{Hawkins, Hiser, Co, Nguyen-Tuong, and Davidson}}}
+\bibcite{williamsking2020egalito}{{79}{2020}{{Williams-King {等}}}{{Williams-King, Kobayashi, Williams-King, Patterson, Spano, Wu, Yang, and Kemerlis}}}
+\bibcite{nadeem2020kernelmodule}{{80}{2020}{{Nadeem}}{{}}}
+\bibcite{luo2025ptrproxy}{{81}{2025}{{Luo {等}}}{{Luo, Fu, Ming, Xie, and Peng}}}
+\bibcite{morton2017zombie}{{82}{2017}{{Morton {等}}}{{Morton, Koo, Li, Snow, Polychronakis, and Monrose}}}
+\bibcite{li2022mprobe}{{83}{2022}{{Li {等}}}{{Li, Chung, Xing, Bao, and Lin}}}
+\bibcite{li2024randomize}{{84}{2024{}}{{Li {等}}}{{Li, Bao, and Chung}}}
+\bibcite{backes2014xnr}{{85}{2014{}}{{Backes {等}}}{{Backes, Holz, Kollenda, Koppe, N{\"u}rnberger, and Pewny}}}
+\bibcite{gionta2015hidem}{{86}{2015}{{Gionta {等}}}{{Gionta, Enck, and Ning}}}
+\bibcite{braden2016leakage}{{87}{2016}{{Braden {等}}}{{Braden, Davi, Liebchen, Sadeghi, Crane, Franz, and Larsen}}}
+\bibcite{kwon2019uxom}{{88}{2019}{{Kwon {等}}}{{Kwon, Shin, Kim, Lee, Cho, and Paek}}}
+\bibcite{shen2020picoxom}{{89}{2020}{{Shen {等}}}{{Shen, Dharsee, and Criswell}}}
+\bibcite{chen2017norax}{{90}{2017{}}{{Chen {等}}}{{Chen, Zhang, Wang, Qiao, Azab, Lu, Vijayakumar, and Shen}}}
+\bibcite{intel2023sdm}{{91}{2023}{{int}}{{}}}
+\bibcite{crane2015readactor}{{92}{2015}{{Crane {等}}}{{Crane, Liebchen, Homescu, Davi, Larsen, Sadeghi, Brunthaler, and Franz}}}
+\bibcite{pomonis2019krx}{{93}{2019}{{Pomonis {等}}}{{Pomonis, Petsios, Keromytis, Polychronakis, and Kemerlis}}}
+\bibcite{tolvanen2018androidcfi}{{94}{2018}{{Tolvanen}}{{}}}
+\bibcite{burow2019shadow}{{95}{2019}{{Burow {等}}}{{Burow, Zhang, and Payer}}}
+\bibcite{kuznetsov2014cpi}{{96}{2014}{{Kuznetsov {等}}}{{Kuznetsov, Szekeres, Payer, Candea, Sekar, and Song}}}
+\bibcite{liljestrand2021pacstack}{{97}{2021}{{Liljestrand {等}}}{{Liljestrand, Nyman, Gunn, Ekberg, and Asokan}}}
+\bibcite{ismail2022pactight}{{98}{2022}{{Ismail {等}}}{{Ismail, Quach, Jelesnianski, Jang, and Min}}}
+\bibcite{llvm2024newpm}{{99}{2024}{{The LLVM Project}}{{}}}
+\bibcite{yoo2022pal}{{100}{2022}{{Yoo {等}}}{{Yoo, Park, Kim, Kim, and Kim}}}
+\bibcite{jang2019revisiting}{{101}{2019}{{Jang {等}}}{{Jang and Kang}}}
+\bibcite{gravani2021iskios}{{102}{2021}{{Gravani {等}}}{{Gravani, Hedayati, Criswell, and Scott}}}
+\bibcite{maar2024hekcfi}{{103}{2024}{{Maar {等}}}{{Maar, Nasahl, and Mangard}}}
+\bibcite{ge2016finegrained}{{104}{2016}{{Ge {等}}}{{Ge, Talele, Payer, and Jaeger}}}
+\bibcite{moreira2017droptherop}{{105}{2017}{{Moreira {等}}}{{Moreira, Rigo, Polychronakis, and Kemerlis}}}
+\bibcite{khandaker2019oscfi}{{106}{2019}{{Khandaker {等}}}{{Khandaker et~al.}}}
+\bibcite{kasten2024hpcfi}{{107}{2024}{{Kasten {等}}}{{Kasten, Zieris, and Horsch}}}
+\bibcite{li2020cracks}{{108}{2020}{{Li {等}}}{{Li, Wang, Zhang, Chen, Yang, and Liu}}}
+\bibcite{kim2024tiktag}{{109}{2024}{{Kim {等}}}{{Kim, Park, Roh, Chung, Lee, Kim, and Lee}}}
+\@writefile{toc}{\contentsline {chapter}{致谢}{111}{appendix*.77}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\@writefile{loappfig}{\addvspace {10\p@ }}
+\@writefile{loapptab}{\addvspace {10\p@ }}
+\@writefile{toc}{\contentsline {chapter}{作者简历及攻读学位期间发表的学术论文与其他相关学术成果}{113}{appendix*.78}\protected@file@percent }
+\@writefile{lof}{\addvspace {10\p@ }}
+\@writefile{lot}{\addvspace {10\p@ }}
+\@writefile{loappfig}{\addvspace {10\p@ }}
+\@writefile{loapptab}{\addvspace {10\p@ }}
+\gdef \@abspage@last{132}

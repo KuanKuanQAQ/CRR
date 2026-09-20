@@ -1,0 +1,186 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 430" width="720" height="430"
+     font-family="PingFang SC, Hiragino Sans GB, Noto Sans CJK SC, Microsoft YaHei, sans-serif">
+<!-- 图 5-8 Chaos 原文四组负载上的对照（预测值） -->
+<defs>
+  <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#000"/></marker>
+  <marker id="ahs" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#000"/></marker>
+  <marker id="oah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0.6,0.6 L7,4 L0.6,7.4 z" fill="#fff" stroke="#000" stroke-width="1"/></marker>
+  <marker id="ahb" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#0072B2"/></marker>
+  <marker id="ahr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#D55E00"/></marker>
+  <marker id="ahg" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#555"/></marker>
+  <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#fff"/><line x1="0" y1="0" x2="0" y2="6" stroke="#000" stroke-width="1"/></pattern>
+  <pattern id="hatch2" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><rect width="5" height="5" fill="#fff"/><line x1="0" y1="0" x2="0" y2="5" stroke="#000" stroke-width="0.7"/></pattern>
+  <pattern id="dots" width="5" height="5" patternUnits="userSpaceOnUse"><rect width="5" height="5" fill="#fff"/><circle cx="2.5" cy="2.5" r="0.9" fill="#000"/></pattern>
+</defs>
+<style>
+  text  { fill:#000; }
+  .lbl  { font-size:11.5px; letter-spacing:.06em; }
+  .box  { fill:#fff; stroke:#000; stroke-width:1.2; }
+  .thick{ fill:#fff; stroke:#000; stroke-width:2; }
+  .plain{ fill:#fff; stroke:#000; stroke-width:0.8; }
+  .nr   { fill:#fff; stroke:#000; stroke-width:1.2; stroke-dasharray:6 3; }
+  .tr   { fill:#fff; stroke:#0072B2; stroke-width:2; }
+  .rd   { fill:#F0F0F0; stroke:#000; stroke-width:1.2; stroke-dasharray:1.5 2.5; }
+  .dt   { fill:#E3EEF7; stroke:#0072B2; stroke-width:2; }
+  .hw   { fill:#EDEDED; stroke:#555; stroke-width:1.2; }
+  .ours { fill:#E3EEF7; stroke:#0072B2; stroke-width:2; }
+  .dis  { fill:#fff; stroke:#000; stroke-width:0.8; stroke-dasharray:2 2; }
+  .concl{ fill:#E3EEF7; stroke:#0072B2; stroke-width:1.6; }
+  .ghost{ fill:#fff; stroke:#D55E00; stroke-width:1.2; stroke-dasharray:4 3; }
+  .trap { fill:url(#hatch); stroke:#000; stroke-width:1.2; }
+  .shade{ fill:url(#hatch2); stroke:#000; stroke-width:1; }
+  .dotf { fill:url(#dots); stroke:#000; stroke-width:1.2; }
+  .c5   { fill:#fff; stroke:#000; stroke-width:1.2; }
+  .bt   { font-size:12.5px; text-anchor:middle; }
+  .btl  { font-size:12.5px; }
+  .bs   { font-size:11px; text-anchor:middle; }
+  .bsl  { font-size:11px; }
+  .ttl  { font-size:13.5px; font-weight:bold; text-anchor:middle; }
+  .ttll { font-size:13.5px; font-weight:bold; }
+  .mono { font-family:"SF Mono",Menlo,Consolas,"Courier New",monospace; font-size:11.5px; }
+  .monos{ font-family:"SF Mono",Menlo,Consolas,"Courier New",monospace; font-size:10.5px; }
+  .mn   { fill:#000; font-weight:bold; }
+  .off  { fill:#555; }
+  .cap  { font-size:11px; fill:#333; }
+  .capc { font-size:11px; fill:#333; text-anchor:middle; }
+  .note { font-size:11.5px; }
+  .key  { font-size:11.5px; font-weight:bold; fill:#0072B2; }
+  .keyc { font-size:11.5px; font-weight:bold; text-anchor:middle; fill:#0072B2; }
+  .red  { font-size:11.5px; font-weight:bold; fill:#D55E00; }
+  .redc { font-size:11.5px; font-weight:bold; text-anchor:middle; fill:#D55E00; }
+  .good { font-size:11.5px; font-weight:bold; }
+  .goodc{ font-size:11.5px; font-weight:bold; text-anchor:middle; }
+  .gold { font-size:11.5px; font-weight:bold; }
+  .cf   { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#ah); }
+  .cfb  { fill:none; stroke:#0072B2; stroke-width:2; marker-end:url(#ahb); }
+  .cfg  { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#ah); }
+  .cfr  { fill:none; stroke:#D55E00; stroke-width:1.6; stroke-dasharray:7 3; marker-end:url(#ahr); }
+  .cfy  { fill:none; stroke:#0072B2; stroke-width:2; marker-end:url(#ahb); }
+  .cfm  { fill:none; stroke:#000; stroke-width:0.9; marker-end:url(#ahs); }
+  .cfo  { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#oah); }
+  .df   { fill:none; stroke:#555; stroke-width:1.1; stroke-dasharray:4 3; marker-end:url(#ahg); }
+  .dfb  { fill:none; stroke:#0072B2; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahb); }
+  .dfr  { fill:none; stroke:#D55E00; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahr); }
+  .dfy  { fill:none; stroke:#0072B2; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahb); }
+  .dep  { fill:none; stroke:#000; stroke-width:1.1; stroke-dasharray:6 4; marker-end:url(#ahs); }
+  .ln   { fill:none; stroke:#000; stroke-width:1.1; }
+  .lnr  { fill:none; stroke:#D55E00; stroke-width:1.6; }
+  .lng  { fill:none; stroke:#000; stroke-width:1.3; }
+  .dash { fill:none; stroke:#000; stroke-width:1; stroke-dasharray:5 4; }
+  .div  { stroke:#000; stroke-width:0.6; }
+  .axis { stroke:#000; stroke-width:1.1; fill:none; }
+  .grid { stroke:#999; stroke-width:0.5; stroke-dasharray:2 3; }
+</style>
+<rect width="720" height="430" fill="#fff"/>
+<text class="btl" x="26" y="34">（a）virtio-net TCP</text>
+<path class="axis" d="M60,44 L60,158 L356,158"/>
+<line class="grid" x1="60" y1="158" x2="356" y2="158"/>
+<text class="cap" x="55" y="161.5" text-anchor="end">0%</text>
+<line class="grid" x1="60" y1="129.5" x2="356" y2="129.5"/>
+<text class="cap" x="55" y="133" text-anchor="end">2.5%</text>
+<line class="grid" x1="60" y1="101" x2="356" y2="101"/>
+<text class="cap" x="55" y="104.5" text-anchor="end">5%</text>
+<line class="grid" x1="60" y1="72.5" x2="356" y2="72.5"/>
+<text class="cap" x="55" y="76" text-anchor="end">7.5%</text>
+<line class="grid" x1="60" y1="44" x2="356" y2="44"/>
+<text class="cap" x="55" y="47.5" text-anchor="end">10%</text>
+<rect x="82.68" y="129.5" width="25.6533" height="28.5" fill="#BFD9EC" stroke="#000" stroke-width="0.6"/>
+<rect x="110.333" y="118.1" width="25.6533" height="39.9" fill="#0072B2" stroke="#000" stroke-width="0.6"/>
+<rect x="105.833" y="123.036" width="7" height="7" fill="#fff" stroke="#000" stroke-width="1.1"/>
+<text class="capc" x="109.333" y="172">50 ms</text>
+<text class="capc" x="109.333" y="113.1">+1.0</text>
+<rect x="181.347" y="115.82" width="25.6533" height="42.18" fill="#BFD9EC" stroke="#000" stroke-width="0.6"/>
+<rect x="209" y="104.42" width="25.6533" height="53.58" fill="#0072B2" stroke="#000" stroke-width="0.6"/>
+<text class="capc" x="208" y="172">30 ms</text>
+<text class="capc" x="208" y="99.42">+1.0</text>
+<rect x="280.013" y="74.78" width="25.6533" height="83.22" fill="#BFD9EC" stroke="#000" stroke-width="0.6"/>
+<rect x="307.667" y="63.38" width="25.6533" height="94.62" fill="#0072B2" stroke="#000" stroke-width="0.6"/>
+<rect x="303.167" y="62.73" width="7" height="7" fill="#fff" stroke="#000" stroke-width="1.1"/>
+<text class="capc" x="306.667" y="172">10 ms</text>
+<text class="capc" x="306.667" y="58.38">+1.0</text>
+<text class="btl" x="388" y="34">（b）virtio-net UDP</text>
+<path class="axis" d="M422,44 L422,158 L718,158"/>
+<line class="grid" x1="422" y1="158" x2="718" y2="158"/>
+<text class="cap" x="417" y="161.5" text-anchor="end">0%</text>
+<line class="grid" x1="422" y1="129.5" x2="718" y2="129.5"/>
+<text class="cap" x="417" y="133" text-anchor="end">4.5%</text>
+<line class="grid" x1="422" y1="101" x2="718" y2="101"/>
+<text class="cap" x="417" y="104.5" text-anchor="end">9%</text>
+<line class="grid" x1="422" y1="72.5" x2="718" y2="72.5"/>
+<text class="cap" x="417" y="76" text-anchor="end">13.5%</text>
+<line class="grid" x1="422" y1="44" x2="718" y2="44"/>
+<text class="cap" x="417" y="47.5" text-anchor="end">18%</text>
+<rect x="444.68" y="132.033" width="25.6533" height="25.9667" fill="#BFD9EC" stroke="#000" stroke-width="0.6"/>
+<rect x="472.333" y="125.067" width="25.6533" height="32.9333" fill="#0072B2" stroke="#000" stroke-width="0.6"/>
+<rect x="467.833" y="126.127" width="7" height="7" fill="#fff" stroke="#000" stroke-width="1.1"/>
+<text class="capc" x="471.333" y="172">50 ms</text>
+<text class="capc" x="471.333" y="120.067">+1.1</text>
+<rect x="543.347" y="114.3" width="25.6533" height="43.7" fill="#BFD9EC" stroke="#000" stroke-width="0.6"/>
+<rect x="571" y="107.333" width="25.6533" height="50.6667" fill="#0072B2" stroke="#000" stroke-width="0.6"/>
+<text class="capc" x="570" y="172">30 ms</text>
+<text class="capc" x="570" y="102.333">+1.1</text>
+<rect x="642.013" y="68.0667" width="25.6533" height="89.9333" fill="#BFD9EC" stroke="#000" stroke-width="0.6"/>
+<rect x="669.667" y="61.1" width="25.6533" height="96.9" fill="#0072B2" stroke="#000" stroke-width="0.6"/>
+<rect x="665.167" y="56.5867" width="7" height="7" fill="#fff" stroke="#000" stroke-width="1.1"/>
+<text class="capc" x="668.667" y="172">10 ms</text>
+<text class="capc" x="668.667" y="56.1">+1.1</text>
+<text class="btl" x="26" y="210">（c）virtio-scsi 读</text>
+<path class="axis" d="M60,220 L60,334 L356,334"/>
+<line class="grid" x1="60" y1="334" x2="356" y2="334"/>
+<text class="cap" x="55" y="337.5" text-anchor="end">0%</text>
+<line class="grid" x1="60" y1="305.5" x2="356" y2="305.5"/>
+<text class="cap" x="55" y="309" text-anchor="end">2%</text>
+<line class="grid" x1="60" y1="277" x2="356" y2="277"/>
+<text class="cap" x="55" y="280.5" text-anchor="end">4%</text>
+<line class="grid" x1="60" y1="248.5" x2="356" y2="248.5"/>
+<text class="cap" x="55" y="252" text-anchor="end">6%</text>
+<line class="grid" x1="60" y1="220" x2="356" y2="220"/>
+<text class="cap" x="55" y="223.5" text-anchor="end">8%</text>
+<rect x="82.68" y="269.875" width="25.6533" height="64.125" fill="#BFD9EC" stroke="#000" stroke-width="0.6"/>
+<rect x="110.333" y="258.475" width="25.6533" height="75.525" fill="#0072B2" stroke="#000" stroke-width="0.6"/>
+<rect x="105.833" y="259.962" width="7" height="7" fill="#fff" stroke="#000" stroke-width="1.1"/>
+<text class="capc" x="109.333" y="348">50 ms</text>
+<text class="capc" x="109.333" y="253.475">+0.8</text>
+<rect x="181.347" y="264.175" width="25.6533" height="69.825" fill="#BFD9EC" stroke="#000" stroke-width="0.6"/>
+<rect x="209" y="252.775" width="25.6533" height="81.225" fill="#0072B2" stroke="#000" stroke-width="0.6"/>
+<text class="capc" x="208" y="348">30 ms</text>
+<text class="capc" x="208" y="247.775">+0.8</text>
+<rect x="280.013" y="254.2" width="25.6533" height="79.8" fill="#BFD9EC" stroke="#000" stroke-width="0.6"/>
+<rect x="307.667" y="242.8" width="25.6533" height="91.2" fill="#0072B2" stroke="#000" stroke-width="0.6"/>
+<rect x="303.167" y="242.863" width="7" height="7" fill="#fff" stroke="#000" stroke-width="1.1"/>
+<text class="capc" x="306.667" y="348">10 ms</text>
+<text class="capc" x="306.667" y="237.8">+0.8</text>
+<text class="btl" x="388" y="210">（d）virtio-scsi 写</text>
+<path class="axis" d="M422,220 L422,334 L718,334"/>
+<line class="grid" x1="422" y1="334" x2="718" y2="334"/>
+<text class="cap" x="417" y="337.5" text-anchor="end">0%</text>
+<line class="grid" x1="422" y1="305.5" x2="718" y2="305.5"/>
+<text class="cap" x="417" y="309" text-anchor="end">0.6%</text>
+<line class="grid" x1="422" y1="277" x2="718" y2="277"/>
+<text class="cap" x="417" y="280.5" text-anchor="end">1.2%</text>
+<line class="grid" x1="422" y1="248.5" x2="718" y2="248.5"/>
+<text class="cap" x="417" y="252" text-anchor="end">1.9%</text>
+<line class="grid" x1="422" y1="220" x2="718" y2="220"/>
+<text class="cap" x="417" y="223.5" text-anchor="end">2.5%</text>
+<rect x="444.68" y="320.32" width="25.6533" height="13.68" fill="#BFD9EC" stroke="#000" stroke-width="0.6"/>
+<rect x="472.333" y="288.4" width="25.6533" height="45.6" fill="#0072B2" stroke="#000" stroke-width="0.6"/>
+<rect x="467.833" y="314.996" width="7" height="7" fill="#fff" stroke="#000" stroke-width="1.1"/>
+<text class="capc" x="471.333" y="348">50 ms</text>
+<text class="capc" x="471.333" y="283.4">+0.7</text>
+<rect x="543.347" y="311.2" width="25.6533" height="22.8" fill="#BFD9EC" stroke="#000" stroke-width="0.6"/>
+<rect x="571" y="279.28" width="25.6533" height="54.72" fill="#0072B2" stroke="#000" stroke-width="0.6"/>
+<text class="capc" x="570" y="348">30 ms</text>
+<text class="capc" x="570" y="274.28">+0.7</text>
+<rect x="642.013" y="279.28" width="25.6533" height="54.72" fill="#BFD9EC" stroke="#000" stroke-width="0.6"/>
+<rect x="669.667" y="247.36" width="25.6533" height="86.64" fill="#0072B2" stroke="#000" stroke-width="0.6"/>
+<rect x="665.167" y="268.484" width="7" height="7" fill="#fff" stroke="#000" stroke-width="1.1"/>
+<text class="capc" x="668.667" y="348">10 ms</text>
+<text class="capc" x="668.667" y="242.36">+0.7</text>
+<rect x="47" y="392" width="7" height="7" fill="#fff" stroke="#000" stroke-width="1.1"/>
+<text class="cap" x="68" y="400">Chaos 原文报告值（虚拟机，仅 50 ms 与 10 ms 两档）</text>
+<rect x="387" y="389" width="22" height="13" fill="#BFD9EC" stroke="#000" stroke-width="0.6"/>
+<text class="cap" x="415" y="400">本文平台复现：施加前</text>
+<rect x="547" y="389" width="22" height="13" fill="#0072B2" stroke="#000" stroke-width="0.6"/>
+<text class="cap" x="575" y="400">施加本章机制后</text>
+<text class="cap" x="40" y="420">纵轴为相对无随机化基线的吞吐下降，柱上数字为施加本章机制带来的增量</text>
+</svg>

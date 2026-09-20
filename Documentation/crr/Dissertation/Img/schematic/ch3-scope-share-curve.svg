@@ -1,0 +1,155 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 388" width="720" height="388"
+     font-family="PingFang SC, Hiragino Sans GB, Noto Sans CJK SC, Microsoft YaHei, sans-serif">
+<!-- 图 3-9 随机化范围与经过跳板的调用占比（实测点为预测值） -->
+<defs>
+  <marker id="ah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#000"/></marker>
+  <marker id="ahs" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#000"/></marker>
+  <marker id="oah" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0.6,0.6 L7,4 L0.6,7.4 z" fill="#fff" stroke="#000" stroke-width="1"/></marker>
+  <marker id="ahb" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#0072B2"/></marker>
+  <marker id="ahr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#D55E00"/></marker>
+  <marker id="ahg" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5.5" markerHeight="5.5" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#555"/></marker>
+  <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#fff"/><line x1="0" y1="0" x2="0" y2="6" stroke="#000" stroke-width="1"/></pattern>
+  <pattern id="hatch2" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(-45)"><rect width="5" height="5" fill="#fff"/><line x1="0" y1="0" x2="0" y2="5" stroke="#000" stroke-width="0.7"/></pattern>
+  <pattern id="dots" width="5" height="5" patternUnits="userSpaceOnUse"><rect width="5" height="5" fill="#fff"/><circle cx="2.5" cy="2.5" r="0.9" fill="#000"/></pattern>
+</defs>
+<style>
+  text  { fill:#000; }
+  .lbl  { font-size:11.5px; letter-spacing:.06em; }
+  .box  { fill:#fff; stroke:#000; stroke-width:1.2; }
+  .thick{ fill:#fff; stroke:#000; stroke-width:2; }
+  .plain{ fill:#fff; stroke:#000; stroke-width:0.8; }
+  .nr   { fill:#fff; stroke:#000; stroke-width:1.2; stroke-dasharray:6 3; }
+  .tr   { fill:#fff; stroke:#0072B2; stroke-width:2; }
+  .rd   { fill:#F0F0F0; stroke:#000; stroke-width:1.2; stroke-dasharray:1.5 2.5; }
+  .dt   { fill:#E3EEF7; stroke:#0072B2; stroke-width:2; }
+  .hw   { fill:#EDEDED; stroke:#555; stroke-width:1.2; }
+  .ours { fill:#E3EEF7; stroke:#0072B2; stroke-width:2; }
+  .dis  { fill:#fff; stroke:#000; stroke-width:0.8; stroke-dasharray:2 2; }
+  .concl{ fill:#E3EEF7; stroke:#0072B2; stroke-width:1.6; }
+  .ghost{ fill:#fff; stroke:#D55E00; stroke-width:1.2; stroke-dasharray:4 3; }
+  .trap { fill:url(#hatch); stroke:#000; stroke-width:1.2; }
+  .shade{ fill:url(#hatch2); stroke:#000; stroke-width:1; }
+  .dotf { fill:url(#dots); stroke:#000; stroke-width:1.2; }
+  .c5   { fill:#fff; stroke:#000; stroke-width:1.2; }
+  .bt   { font-size:12.5px; text-anchor:middle; }
+  .btl  { font-size:12.5px; }
+  .bs   { font-size:11px; text-anchor:middle; }
+  .bsl  { font-size:11px; }
+  .ttl  { font-size:13.5px; font-weight:bold; text-anchor:middle; }
+  .ttll { font-size:13.5px; font-weight:bold; }
+  .mono { font-family:"SF Mono",Menlo,Consolas,"Courier New",monospace; font-size:11.5px; }
+  .monos{ font-family:"SF Mono",Menlo,Consolas,"Courier New",monospace; font-size:10.5px; }
+  .mn   { fill:#000; font-weight:bold; }
+  .off  { fill:#555; }
+  .cap  { font-size:11px; fill:#333; }
+  .capc { font-size:11px; fill:#333; text-anchor:middle; }
+  .note { font-size:11.5px; }
+  .key  { font-size:11.5px; font-weight:bold; fill:#0072B2; }
+  .keyc { font-size:11.5px; font-weight:bold; text-anchor:middle; fill:#0072B2; }
+  .red  { font-size:11.5px; font-weight:bold; fill:#D55E00; }
+  .redc { font-size:11.5px; font-weight:bold; text-anchor:middle; fill:#D55E00; }
+  .good { font-size:11.5px; font-weight:bold; }
+  .goodc{ font-size:11.5px; font-weight:bold; text-anchor:middle; }
+  .gold { font-size:11.5px; font-weight:bold; }
+  .cf   { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#ah); }
+  .cfb  { fill:none; stroke:#0072B2; stroke-width:2; marker-end:url(#ahb); }
+  .cfg  { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#ah); }
+  .cfr  { fill:none; stroke:#D55E00; stroke-width:1.6; stroke-dasharray:7 3; marker-end:url(#ahr); }
+  .cfy  { fill:none; stroke:#0072B2; stroke-width:2; marker-end:url(#ahb); }
+  .cfm  { fill:none; stroke:#000; stroke-width:0.9; marker-end:url(#ahs); }
+  .cfo  { fill:none; stroke:#000; stroke-width:1.3; marker-end:url(#oah); }
+  .df   { fill:none; stroke:#555; stroke-width:1.1; stroke-dasharray:4 3; marker-end:url(#ahg); }
+  .dfb  { fill:none; stroke:#0072B2; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahb); }
+  .dfr  { fill:none; stroke:#D55E00; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahr); }
+  .dfy  { fill:none; stroke:#0072B2; stroke-width:1.3; stroke-dasharray:4 3; marker-end:url(#ahb); }
+  .dep  { fill:none; stroke:#000; stroke-width:1.1; stroke-dasharray:6 4; marker-end:url(#ahs); }
+  .ln   { fill:none; stroke:#000; stroke-width:1.1; }
+  .lnr  { fill:none; stroke:#D55E00; stroke-width:1.6; }
+  .lng  { fill:none; stroke:#000; stroke-width:1.3; }
+  .dash { fill:none; stroke:#000; stroke-width:1; stroke-dasharray:5 4; }
+  .div  { stroke:#000; stroke-width:0.6; }
+  .axis { stroke:#000; stroke-width:1.1; fill:none; }
+  .grid { stroke:#999; stroke-width:0.5; stroke-dasharray:2 3; }
+</style>
+<rect width="720" height="388" fill="#fff"/>
+<path class="axis" d="M80,40 L80,320 L670,320"/>
+<line class="grid" x1="80" y1="40" x2="80" y2="320"/>
+<text class="capc" x="80" y="336">0%</text>
+<line class="grid" x1="225" y1="40" x2="225" y2="320"/>
+<text class="capc" x="225" y="336">5%</text>
+<line class="grid" x1="370" y1="40" x2="370" y2="320"/>
+<text class="capc" x="370" y="336">10%</text>
+<line class="grid" x1="515" y1="40" x2="515" y2="320"/>
+<text class="capc" x="515" y="336">15%</text>
+<line class="grid" x1="660" y1="40" x2="660" y2="320"/>
+<text class="capc" x="660" y="336">20%</text>
+<line class="grid" x1="80" y1="320" x2="660" y2="320"/>
+<text class="cap" x="72" y="324" text-anchor="end">0%</text>
+<line class="grid" x1="80" y1="273.333" x2="660" y2="273.333"/>
+<text class="cap" x="72" y="277.333" text-anchor="end">6%</text>
+<line class="grid" x1="80" y1="226.667" x2="660" y2="226.667"/>
+<text class="cap" x="72" y="230.667" text-anchor="end">12%</text>
+<line class="grid" x1="80" y1="180" x2="660" y2="180"/>
+<text class="cap" x="72" y="184" text-anchor="end">18%</text>
+<line class="grid" x1="80" y1="133.333" x2="660" y2="133.333"/>
+<text class="cap" x="72" y="137.333" text-anchor="end">24%</text>
+<line class="grid" x1="80" y1="86.6667" x2="660" y2="86.6667"/>
+<text class="cap" x="72" y="90.6667" text-anchor="end">30%</text>
+<line class="grid" x1="80" y1="40" x2="660" y2="40"/>
+<text class="cap" x="72" y="44" text-anchor="end">36%</text>
+<path d="M80,320 L85.8,316.892 L91.6,313.79 L97.4,310.695 L103.2,307.605 L109,304.522 L114.8,301.445 L120.6,298.375 L126.4,295.31 L132.2,292.252 L138,289.2 L143.8,286.154 L149.6,283.115 L155.4,280.081 L161.2,277.054 L167,274.033 L172.8,271.019 L178.6,268.01 L184.4,265.008 L190.2,262.012 L196,259.022 L201.8,256.039 L207.6,253.061 L213.4,250.09 L219.2,247.125 L225,244.167 L230.8,241.214 L236.6,238.268 L242.4,235.328 L248.2,232.394 L254,229.467 L259.8,226.545 L265.6,223.63 L271.4,220.721 L277.2,217.819 L283,214.922 L288.8,212.032 L294.6,209.148 L300.4,206.27 L306.2,203.399 L312,200.533 L317.8,197.674 L323.6,194.821 L329.4,191.975 L335.2,189.134 L341,186.3 L346.8,183.472 L352.6,180.65 L358.4,177.835 L364.2,175.025 L370,172.222 L375.8,169.425 L381.6,166.635 L387.4,163.85 L393.2,161.072 L399,158.3 L404.8,155.534 L410.6,152.775 L416.4,150.021 L422.2,147.274 L428,144.533 L433.8,141.799 L439.6,139.07 L445.4,136.348 L451.2,133.632 L457,130.922 L462.8,128.219 L468.6,125.521 L474.4,122.83 L480.2,120.145 L486,117.467 L491.8,114.794 L497.6,112.128 L503.4,109.468 L509.2,106.814 L515,104.167 L520.8,101.525 L526.6,98.8902 L532.4,96.2613 L538.2,93.6387 L544,91.0222 L549.8,88.412 L555.6,85.808 L561.4,83.2102 L567.2,80.6187 L573,78.0333 L578.8,75.4542 L584.6,72.8813 L590.4,70.3147 L596.2,67.7542 L602,65.2 L607.8,62.652 L613.6,60.1102 L619.4,57.5747 L625.2,55.0453 L631,52.5222 L636.8,50.0053 L642.6,47.4947 L648.4,44.9902 L654.2,42.492 L660,40" fill="none" stroke="#000" stroke-width="2"/>
+<line x1="80" y1="320" x2="660" y2="164.444" stroke="#000" stroke-width="1.2" stroke-dasharray="6 4"/>
+<text class="key" x="91.6" y="201.778">均匀模型 2p − p²</text>
+<text class="cap" x="500.5" y="237.222">对角线：p 本身</text>
+<circle cx="82.03" cy="318.444" r="4.5" fill="#0072B2" stroke="#000" stroke-width="0.8"/>
+<circle cx="86.09" cy="315.567" r="4.5" fill="#0072B2" stroke="#000" stroke-width="0.8"/>
+<circle cx="89.86" cy="312.767" r="4.5" fill="#0072B2" stroke="#000" stroke-width="0.8"/>
+<circle cx="103.2" cy="305.767" r="4.5" fill="#0072B2" stroke="#000" stroke-width="0.8"/>
+<circle cx="233.7" cy="244.556" r="4.5" fill="#0072B2" stroke="#000" stroke-width="0.8"/>
+<text class="bsl" x="242.7" y="248.556">外推范围（3,285 函数，p = 5.3%）：常驻开销 28.83%</text>
+<text class="cap" x="120.8" y="296.444">前四档见左上放大</text>
+<rect class="box" x="256" y="24" width="458" height="200"/>
+<path class="axis" d="M300,52 L300,190 L504,190"/>
+<text class="capc" x="300" y="203">0.0%</text>
+<text class="capc" x="340" y="203">0.2%</text>
+<text class="capc" x="380" y="203">0.4%</text>
+<text class="capc" x="420" y="203">0.6%</text>
+<text class="capc" x="460" y="203">0.8%</text>
+<text class="capc" x="500" y="203">1.0%</text>
+<line class="grid" x1="300" y1="190" x2="500" y2="190"/>
+<text class="cap" x="294" y="194" text-anchor="end">0.0%</text>
+<line class="grid" x1="300" y1="155.5" x2="500" y2="155.5"/>
+<text class="cap" x="294" y="159.5" text-anchor="end">0.6%</text>
+<line class="grid" x1="300" y1="121" x2="500" y2="121"/>
+<text class="cap" x="294" y="125" text-anchor="end">1.2%</text>
+<line class="grid" x1="300" y1="86.5" x2="500" y2="86.5"/>
+<text class="cap" x="294" y="90.5" text-anchor="end">1.8%</text>
+<line class="grid" x1="300" y1="52" x2="500" y2="52"/>
+<text class="cap" x="294" y="56" text-anchor="end">2.4%</text>
+<path d="M300,190 L302,188.85 L304,187.7 L306,186.551 L308,185.401 L310,184.251 L312,183.102 L314,181.953 L316,180.804 L318,179.655 L320,178.506 L322,177.357 L324,176.208 L326,175.06 L328,173.911 L330,172.763 L332,171.615 L334,170.467 L336,169.319 L338,168.171 L340,167.023 L342,165.875 L344,164.728 L346,163.58 L348,162.433 L350,161.286 L352,160.139 L354,158.992 L356,157.845 L358,156.698 L360,155.552 L362,154.405 L364,153.259 L366,152.113 L368,150.966 L370,149.82 L372,148.675 L374,147.529 L376,146.383 L378,145.237 L380,144.092 L382,142.947 L384,141.801 L386,140.656 L388,139.511 L390,138.366 L392,137.222 L394,136.077 L396,134.932 L398,133.788 L400,132.644 L402,131.5 L404,130.355 L406,129.212 L408,128.068 L410,126.924 L412,125.78 L414,124.637 L416,123.493 L418,122.35 L420,121.207 L422,120.064 L424,118.921 L426,117.778 L428,116.636 L430,115.493 L432,114.35 L434,113.208 L436,112.066 L438,110.924 L440,109.782 L442,108.64 L444,107.498 L446,106.356 L448,105.215 L450,104.073 L452,102.932 L454,101.791 L456,100.65 L458,99.5089 L460,98.368 L462,97.2273 L464,96.0866 L466,94.9461 L468,93.8057 L470,92.6654 L472,91.5253 L474,90.3852 L476,89.2453 L478,88.1055 L480,86.9658 L482,85.8262 L484,84.6867 L486,83.5473 L488,82.4081 L490,81.2689 L492,80.1299 L494,78.991 L496,77.8522 L498,76.7136 L500,75.575" fill="none" stroke="#000" stroke-width="1.6"/>
+<line x1="300" y1="190" x2="500" y2="132.5" stroke="#000" stroke-width="1" stroke-dasharray="5 3"/>
+<circle cx="314" cy="178.5" r="4" fill="#0072B2" stroke="#000" stroke-width="0.8"/>
+<text class="cap" x="321" y="172.5">1</text>
+<text class="cap" x="534" y="82">1  文件系统核心（40）：0.22%</text>
+<circle cx="342" cy="157.225" r="4" fill="#0072B2" stroke="#000" stroke-width="0.8"/>
+<text class="cap" x="349" y="151.225">2</text>
+<text class="cap" x="534" y="100">2  加块层（128）：0.61%</text>
+<circle cx="368" cy="136.525" r="4" fill="#0072B2" stroke="#000" stroke-width="0.8"/>
+<text class="cap" x="375" y="130.525">3</text>
+<text class="cap" x="534" y="118">3  加网络核心（208）：1.01%</text>
+<circle cx="460" cy="84.775" r="4" fill="#0072B2" stroke="#000" stroke-width="0.8"/>
+<text class="cap" x="467" y="78.775">4</text>
+<text class="cap" x="534" y="136">4  默认范围（483）：1.98%</text>
+<text class="cap" x="534" y="64">范围（函数数）：常驻开销</text>
+<text class="cap" x="264" y="38">放大：p 不超过 1%</text>
+<text class="cap" x="674" y="324">p</text>
+<text class="capc" x="370" y="354">随机化函数占全部函数的比例 p（0 至 20%）</text>
+<text class="cap" x="30" y="180" transform="rotate(-90 30 180)" text-anchor="middle">经过跳板的</text>
+<text class="cap" x="46" y="180" transform="rotate(-90 46 180)" text-anchor="middle">调用占比</text>
+<path class="lng" d="M80,368 L110,368"/>
+<text class="cap" x="116" y="372">均匀模型 2p − p²</text>
+<path class="dash" d="M230.8,368 L260.8,368"/>
+<text class="cap" x="266.8" y="372">p 本身</text>
+<circle cx="352" cy="368" r="4.5" fill="#0072B2" stroke="#000" stroke-width="0.8"/>
+<text class="cap" x="362" y="372">各档范围的实测占比（netperf TCP_RR），旁注常驻开销</text>
+</svg>

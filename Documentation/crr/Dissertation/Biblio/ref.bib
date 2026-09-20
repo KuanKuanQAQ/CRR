@@ -1,0 +1,992 @@
+%---------------------------------------------------------------------------%
+%-                                                                         -%
+%-                 I-KASLR 学位论文参考文献                                -%
+%-                                                                         -%
+%---------------------------------------------------------------------------%
+
+%==== 内存安全与攻击模型 ====================================================%
+
+@inproceedings{szekeres2013sok,
+    title = {{SoK}: Eternal War in Memory},
+    author = {Szekeres, L{\'a}szl{\'o} and Payer, Mathias and Wei, Tao and Song, Dawn},
+    booktitle = {Proceedings of the 2013 IEEE Symposium on Security and Privacy (S\&P)},
+    pages = {48--62},
+    year = {2013},
+    doi = {10.1109/SP.2013.13}
+}
+
+@inproceedings{shacham2007geometry,
+    title = {The Geometry of Innocent Flesh on the Bone: Return-into-libc without Function Calls (on the x86)},
+    author = {Shacham, Hovav},
+    booktitle = {Proceedings of the 14th ACM Conference on Computer and Communications Security (CCS)},
+    pages = {552--561},
+    year = {2007},
+    doi = {10.1145/1315245.1315313}
+}
+
+@inproceedings{bletsch2011jop,
+    title = {Jump-Oriented Programming: A New Class of Code-Reuse Attack},
+    author = {Bletsch, Tyler and Jiang, Xuxian and Freeh, Vince W. and Liang, Zhenkai},
+    booktitle = {Proceedings of the 6th ACM Symposium on Information, Computer and Communications Security (AsiaCCS)},
+    pages = {30--40},
+    year = {2011},
+    doi = {10.1145/1966913.1966919}
+}
+
+@inproceedings{schuster2015coop,
+    title = {Counterfeit Object-Oriented Programming: On the Difficulty of Preventing Code Reuse Attacks in {C++} Applications},
+    author = {Schuster, Felix and Tendyck, Thomas and Liebchen, Christopher and Davi, Lucas and Sadeghi, Ahmad-Reza and Holz, Thorsten},
+    booktitle = {Proceedings of the 2015 IEEE Symposium on Security and Privacy (S\&P)},
+    pages = {745--762},
+    year = {2015},
+    doi = {10.1109/SP.2015.51}
+}
+
+@inproceedings{hu2016dop,
+    title = {Data-Oriented Programming: On the Expressiveness of Non-control Data Attacks},
+    author = {Hu, Hong and Shinde, Shweta and Adrian, Sendroiu and Chua, Zheng Leong and Saxena, Prateek and Liang, Zhenkai},
+    booktitle = {Proceedings of the 2016 IEEE Symposium on Security and Privacy (S\&P)},
+    pages = {969--986},
+    year = {2016},
+    doi = {10.1109/SP.2016.62}
+}
+
+@misc{paxteam2003pax,
+    title = {{PaX}: Address Space Layout Randomization and Non-Executable Pages},
+    author = {{PaX Team}},
+    howpublished = {\url{https://pax.grsecurity.net/docs/}},
+    year = {2003}
+}
+
+%==== 控制流完整性 ==========================================================%
+
+@inproceedings{abadi2005cfi,
+    title = {Control-Flow Integrity},
+    author = {Abadi, Mart{\'\i}n and Budiu, Mihai and Erlingsson, {\'U}lfar and Ligatti, Jay},
+    booktitle = {Proceedings of the 12th ACM Conference on Computer and Communications Security (CCS)},
+    pages = {340--353},
+    year = {2005},
+    doi = {10.1145/1102120.1102165}
+}
+
+@inproceedings{yoo2022pal,
+    title = {In-Kernel Control-Flow Integrity on Commodity {OSes} using {ARM} Pointer Authentication},
+    author = {Yoo, Sungbae and Park, Jinbum and Kim, Seolheui and Kim, Yeji and Kim, Taesoo},
+    booktitle = {Proceedings of the 31st USENIX Security Symposium},
+    year = {2022},
+    note = {\url{https://www.usenix.org/conference/usenixsecurity22/presentation/yoo}}
+}
+
+@inproceedings{ge2016finegrained,
+    title = {Fine-Grained Control-Flow Integrity for Kernel Software},
+    author = {Ge, Xinyang and Talele, Nirupama and Payer, Mathias and Jaeger, Trent},
+    booktitle = {Proceedings of the 2016 IEEE European Symposium on Security and Privacy (EuroS\&P)},
+    pages = {179--194},
+    year = {2016},
+    doi = {10.1109/EuroSP.2016.24}
+}
+
+@misc{tolvanen2018androidcfi,
+    title = {Control Flow Integrity in the {Android} Kernel},
+    author = {Tolvanen, Sami},
+    howpublished = {Google Security Blog, \url{https://security.googleblog.com/2018/10/posted-by-sami-tolvanen-staff-software.html}},
+    year = {2018}
+}
+
+@misc{moreira2017droptherop,
+    title = {{DROP THE ROP}: Fine-grained Control-flow Integrity for the {Linux} Kernel},
+    author = {Moreira, Jo{\~a}o and Rigo, Sandro and Polychronakis, Michalis and Kemerlis, Vasileios P.},
+    howpublished = {Black Hat Asia 2017 whitepaper, \url{https://blackhat.com/docs/asia-17/materials/asia-17-Moreira-Drop-The-Rop-Fine-Grained-Control-Flow-Integrity-For-The-Linux-Kernel-wp.pdf}},
+    year = {2017}
+}
+
+% TODO(作者名单待核): usenix.org/dblp/openalex 均无法访问，仅第一作者已核实
+@inproceedings{khandaker2019oscfi,
+    title = {Origin-sensitive Control Flow Integrity},
+    author = {Khandaker, Mustakimur Rahman and others},
+    booktitle = {Proceedings of the 28th USENIX Security Symposium},
+    year = {2019},
+    note = {\url{https://www.usenix.org/conference/usenixsecurity19/presentation/khandaker}}
+}
+
+@inproceedings{kasten2024hpcfi,
+    title = {Integrating Static Analyses for High-Precision Control-Flow Integrity},
+    author = {Kasten, Florian and Zieris, Philipp and Horsch, Julian},
+    booktitle = {Proceedings of the 27th International Symposium on Research in Attacks, Intrusions and Defenses (RAID)},
+    year = {2024},
+    doi = {10.1145/3678890.3678920}
+}
+
+@inproceedings{li2020cracks,
+    title = {Finding Cracks in Shields: On the Security of Control Flow Integrity Mechanisms},
+    author = {Li, Yuan and Wang, Mingzhe and Zhang, Chao and Chen, Xingman and Yang, Songtao and Liu, Ying},
+    booktitle = {Proceedings of the 2020 ACM SIGSAC Conference on Computer and Communications Security (CCS)},
+    year = {2020},
+    doi = {10.1145/3372297.3417867}
+}
+
+@article{burow2017cfi,
+    title = {Control-Flow Integrity: Precision, Security, and Performance},
+    author = {Burow, Nathan and Carr, Scott A. and Nash, Joseph and Larsen, Per and Franz, Michael and Brunthaler, Stefan and Payer, Mathias},
+    journal = {ACM Computing Surveys},
+    volume = {50},
+    number = {1},
+    pages = {16:1--16:33},
+    year = {2017},
+    doi = {10.1145/3054924}
+}
+
+@inproceedings{carlini2015bending,
+    title = {Control-Flow Bending: On the Effectiveness of Control-Flow Integrity},
+    author = {Carlini, Nicholas and Barresi, Antonio and Payer, Mathias and Wagner, David and Gross, Thomas R.},
+    booktitle = {Proceedings of the 24th USENIX Security Symposium},
+    pages = {161--176},
+    year = {2015}
+}
+
+@inproceedings{gaidis2023fineibt,
+    title = {{FineIBT}: Fine-Grain Control-Flow Enforcement with Indirect Branch Tracking},
+    author = {Gaidis, Alexander J. and Atlidakis, Vaggelis and Kemerlis, Vasileios P.},
+    booktitle = {Proceedings of the 26th International Symposium on Research in Attacks, Intrusions and Defenses (RAID)},
+    pages = {527--546},
+    year = {2023},
+    doi = {10.1145/3607199.3607219}
+}
+
+@misc{clang2022kcfi,
+    title = {Kernel Control Flow Integrity ({KCFI})},
+    author = {{The LLVM Project}},
+    howpublished = {LLVM Documentation, \url{https://clang.llvm.org/docs/ControlFlowIntegrity.html}},
+    year = {2022}
+}
+
+%==== ARM 指针认证 ==========================================================%
+
+@inproceedings{liljestrand2019pac,
+    title = {{PAC} it up: Towards Pointer Integrity using {ARM} Pointer Authentication},
+    author = {Liljestrand, Hans and Nyman, Thomas and Wang, Kui and Perez, Carlos Chinea and Ekberg, Jan-Erik and Asokan, N.},
+    booktitle = {Proceedings of the 28th USENIX Security Symposium},
+    pages = {177--194},
+    year = {2019}
+}
+
+@inproceedings{liljestrand2021pacstack,
+    title = {{PACStack}: An Authenticated Call Stack},
+    author = {Liljestrand, Hans and Nyman, Thomas and Gunn, Lachlan J. and Ekberg, Jan-Erik and Asokan, N.},
+    booktitle = {Proceedings of the 30th USENIX Security Symposium},
+    pages = {357--374},
+    year = {2021}
+}
+
+@inproceedings{ismail2022pactight,
+    title = {Tightly Seal Your Sensitive Pointers with {PACTight}},
+    author = {Ismail, Mohannad and Quach, Andrew and Jelesnianski, Christopher and Jang, Yeongjin and Min, Changwoo},
+    booktitle = {Proceedings of the 31st USENIX Security Symposium},
+    pages = {3717--3734},
+    year = {2022}
+}
+
+@inproceedings{ravichandran2022pacman,
+    title = {{PACMAN}: Attacking {ARM} Pointer Authentication with Speculative Execution},
+    author = {Ravichandran, Joseph and Na, Weon Taek and Liang, Jay and Yan, Mengjia},
+    booktitle = {Proceedings of the 49th Annual International Symposium on Computer Architecture (ISCA)},
+    pages = {685--698},
+    year = {2022},
+    doi = {10.1145/3470496.3527429}
+}
+
+@manual{arm2023armv8,
+    title = {{Arm} Architecture Reference Manual for {A}-profile Architecture},
+    organization = {Arm Limited},
+    note = {DDI 0487},
+    year = {2023}
+}
+
+%==== 装载时刻的代码随机化 ==================================================%
+
+@inproceedings{shacham2004effectiveness,
+    title = {On the Effectiveness of Address-Space Randomization},
+    author = {Shacham, Hovav and Page, Matthew and Pfaff, Ben and Goh, Eu-Jin and Modadugu, Nagendra and Boneh, Dan},
+    booktitle = {Proceedings of the 11th ACM Conference on Computer and Communications Security (CCS)},
+    pages = {298--307},
+    year = {2004},
+    doi = {10.1145/1030083.1030124}
+}
+
+@inproceedings{backes2014oxymoron,
+    title = {Oxymoron: Making Fine-Grained Memory Randomization Practical by Allowing Code Sharing},
+    author = {Backes, Michael and N{\"u}rnberger, Stefan},
+    booktitle = {Proceedings of the 23rd USENIX Security Symposium},
+    pages = {433--447},
+    year = {2014}
+}
+
+@inproceedings{kil2006aslp,
+    title = {Address Space Layout Permutation ({ASLP}): Towards Fine-Grained Randomization of Commodity Software},
+    author = {Kil, Chongkyung and Jun, Jinsuk and Bookholt, Christopher and Xu, Jun and Ning, Peng},
+    booktitle = {Proceedings of the 22nd Annual Computer Security Applications Conference (ACSAC)},
+    pages = {339--348},
+    year = {2006},
+    doi = {10.1109/ACSAC.2006.9}
+}
+
+@inproceedings{giuffrida2012enhanced,
+    title = {Enhanced Operating System Security through Efficient and Fine-Grained Address Space Randomization},
+    author = {Giuffrida, Cristiano and Kuijsten, Anton and Tanenbaum, Andrew S.},
+    booktitle = {Proceedings of the 21st USENIX Security Symposium},
+    pages = {475--490},
+    year = {2012}
+}
+
+@inproceedings{wartell2012stirring,
+    title = {Binary Stirring: Self-Randomizing Instruction Addresses of Legacy x86 Binary Code},
+    author = {Wartell, Richard and Mohan, Vishwath and Hamlen, Kevin W. and Lin, Zhiqiang},
+    booktitle = {Proceedings of the 2012 ACM Conference on Computer and Communications Security (CCS)},
+    pages = {157--168},
+    year = {2012},
+    doi = {10.1145/2382196.2382216}
+}
+
+@inproceedings{pappas2012smashing,
+    title = {Smashing the Gadgets: Hindering Return-Oriented Programming Using In-Place Code Randomization},
+    author = {Pappas, Vasilis and Polychronakis, Michalis and Keromytis, Angelos D.},
+    booktitle = {Proceedings of the 2012 IEEE Symposium on Security and Privacy (S\&P)},
+    pages = {601--615},
+    year = {2012},
+    doi = {10.1109/SP.2012.41}
+}
+
+@inproceedings{hiser2012ilr,
+    title = {{ILR}: Where'd My Gadgets Go?},
+    author = {Hiser, Jason and Nguyen-Tuong, Anh and Co, Michele and Hall, Matthew and Davidson, Jack W.},
+    booktitle = {Proceedings of the 2012 IEEE Symposium on Security and Privacy (S\&P)},
+    pages = {571--585},
+    year = {2012},
+    doi = {10.1109/SP.2012.39}
+}
+
+@inproceedings{koo2018compiler,
+    title = {Compiler-Assisted Code Randomization},
+    author = {Koo, Hyungjoon and Chen, Yaohui and Lu, Long and Kemerlis, Vasileios P. and Polychronakis, Michalis},
+    booktitle = {Proceedings of the 2018 IEEE Symposium on Security and Privacy (S\&P)},
+    pages = {461--477},
+    year = {2018},
+    doi = {10.1109/SP.2018.00029}
+}
+
+@inproceedings{larsen2020adoption,
+    title = {Adoption Challenges of Code Randomization},
+    author = {Larsen, Per and Franz, Michael},
+    booktitle = {Proceedings of the 7th ACM Workshop on Moving Target Defense (MTD)},
+    pages = {45--46},
+    year = {2020},
+    doi = {10.1145/3411496.3421229}
+}
+
+%==== 内核地址空间布局随机化 ================================================%
+
+@inproceedings{stanley2013improved,
+    title = {Improved Kernel Security through Memory Layout Randomization},
+    author = {Stanley, Dannie M. and Xu, Dongyan and Spafford, Eugene H.},
+    booktitle = {Proceedings of the 32nd IEEE International Performance Computing and Communications Conference (IPCCC)},
+    pages = {1--10},
+    year = {2013},
+    doi = {10.1109/PCCC.2013.6742779}
+}
+
+@inproceedings{gruss2017kaiser,
+    title = {{KASLR} is Dead: Long Live {KASLR}},
+    author = {Gruss, Daniel and Lipp, Moritz and Schwarz, Michael and Fellner, Richard and Maurice, Cl{\'e}mentine and Mangard, Stefan},
+    booktitle = {Proceedings of the 9th International Symposium on Engineering Secure Software and Systems (ESSoS)},
+    pages = {161--176},
+    year = {2017},
+    doi = {10.1007/978-3-319-62105-0_11}
+}
+
+@inproceedings{canella2020kaslr,
+    title = {{KASLR}: Break It, Fix It, Repeat},
+    author = {Canella, Claudio and Schwarz, Michael and Haubenwallner, Martin and Schwarzl, Martin and Gruss, Daniel},
+    booktitle = {Proceedings of the 15th ACM Asia Conference on Computer and Communications Security (AsiaCCS)},
+    pages = {481--493},
+    year = {2020},
+    doi = {10.1145/3320269.3384747}
+}
+
+@misc{kernel2021fgkaslr,
+    title = {Function Granular {KASLR} ({FG-KASLR}) Patch Series, v10},
+    author = {Accardi, Kristen Carlson},
+    howpublished = {Linux Kernel Mailing List, \url{https://lore.kernel.org/lkml/}},
+    year = {2021}
+}
+
+@phdthesis{pomonis2019krx,
+    title = {Kernel Protection against Just-In-Time Code Reuse},
+    author = {Pomonis, Marios and Petsios, Theofilos and Keromytis, Angelos D. and Polychronakis, Michalis and Kemerlis, Vasileios P.},
+    note = {ACM Transactions on Privacy and Security, 22(1):5:1--5:28},
+    school = {Columbia University},
+    year = {2019},
+    doi = {10.1145/3277592}
+}
+
+%==== 信息泄露与 JIT-ROP ====================================================%
+
+@inproceedings{snow2013just,
+    title = {Just-In-Time Code Reuse: On the Effectiveness of Fine-Grained Address Space Layout Randomization},
+    author = {Snow, Kevin Z. and Monrose, Fabian and Davi, Lucas and Dmitrienko, Alexandra and Liebchen, Christopher and Sadeghi, Ahmad-Reza},
+    booktitle = {Proceedings of the 2013 IEEE Symposium on Security and Privacy (S\&P)},
+    pages = {574--588},
+    year = {2013},
+    doi = {10.1109/SP.2013.45}
+}
+
+@inproceedings{bittau2014blind,
+    title = {Hacking Blind},
+    author = {Bittau, Andrea and Belay, Adam and Mashtizadeh, Ali and Mazi{\`e}res, David and Boneh, Dan},
+    booktitle = {Proceedings of the 2014 IEEE Symposium on Security and Privacy (S\&P)},
+    pages = {227--242},
+    year = {2014},
+    doi = {10.1109/SP.2014.22}
+}
+
+@inproceedings{kollenda2017crop,
+    title = {Towards Automated Discovery of Crash-Resistant Primitives in Binary Executables},
+    author = {Kollenda, Benjamin and G{\"o}kta{\c s}, Enes and Blazytko, Tim and Koppe, Philipp and Gawlik, Robert and Konoth, Radhesh Krishnan and Giuffrida, Cristiano and Bos, Herbert and Holz, Thorsten},
+    booktitle = {Proceedings of the 47th Annual IEEE/IFIP International Conference on Dependable Systems and Networks (DSN)},
+    pages = {189--200},
+    year = {2017},
+    doi = {10.1109/DSN.2017.58}
+}
+
+@inproceedings{oikonomopoulos2016poking,
+    title = {Poking Holes in Information Hiding},
+    author = {Oikonomopoulos, Angelos and Athanasopoulos, Elias and Bos, Herbert and Giuffrida, Cristiano},
+    booktitle = {Proceedings of the 25th USENIX Security Symposium},
+    pages = {121--138},
+    year = {2016}
+}
+
+@inproceedings{gruss2016prefetch,
+    title = {Prefetch Side-Channel Attacks: Bypassing {SMAP} and Kernel {ASLR}},
+    author = {Gruss, Daniel and Maurice, Cl{\'e}mentine and Fogh, Anders and Lipp, Moritz and Mangard, Stefan},
+    booktitle = {Proceedings of the 2016 ACM SIGSAC Conference on Computer and Communications Security (CCS)},
+    pages = {368--379},
+    year = {2016},
+    doi = {10.1145/2976749.2978356}
+}
+
+@inproceedings{koschel2020tagbleed,
+    title = {{TagBleed}: Breaking {KASLR} on the Isolated Kernel Address Space Using Tagged {TLBs}},
+    author = {Koschel, Jakob and Giuffrida, Cristiano and Bos, Herbert and Razavi, Kaveh},
+    booktitle = {Proceedings of the 2020 IEEE European Symposium on Security and Privacy (EuroS\&P)},
+    pages = {309--321},
+    year = {2020},
+    doi = {10.1109/EuroSP48549.2020.00027}
+}
+
+@inproceedings{song2025oreo,
+    title = {Oreo: Protecting {ASLR} against Microarchitectural Attacks},
+    author = {Song, Shixin and Zhang, Joseph and Yan, Mengjia},
+    booktitle = {Proceedings of the 2025 Network and Distributed System Security Symposium (NDSS)},
+    year = {2025}
+}
+
+@inproceedings{goktas2018pir,
+    title = {Position-Independent Code Reuse: On the Effectiveness of {ASLR} in the Absence of Information Disclosure},
+    author = {G{\"o}kta{\c s}, Enes and Kollenda, Benjamin and Koppe, Philipp and Bosman, Erik and Portokalidis, Georgios and Holz, Thorsten and Bos, Herbert and Giuffrida, Cristiano},
+    booktitle = {Proceedings of the 2018 IEEE European Symposium on Security and Privacy (EuroS\&P)},
+    pages = {227--242},
+    year = {2018},
+    doi = {10.1109/EuroSP.2018.00024}
+}
+
+@inproceedings{ahmed2020methodologies,
+    title = {Methodologies for Quantifying (Re-)randomization Security and Timing under {JIT-ROP}},
+    author = {Ahmed, Salman and Xiao, Ya and Snow, Kevin Z. and Tan, Gang and Monrose, Fabian and Yao, Danfeng},
+    booktitle = {Proceedings of the 2020 ACM SIGSAC Conference on Computer and Communications Security (CCS)},
+    pages = {1803--1820},
+    year = {2020},
+    doi = {10.1145/3372297.3417248}
+}
+
+%==== 持续随机化 ============================================================%
+
+@inproceedings{bigelow2015tasr,
+    title = {Timely Rerandomization for Mitigating Memory Disclosures},
+    author = {Bigelow, David and Hobson, Thomas and Rudd, Robert and Streilein, William and Okhravi, Hamed},
+    booktitle = {Proceedings of the 22nd ACM SIGSAC Conference on Computer and Communications Security (CCS)},
+    pages = {268--279},
+    year = {2015},
+    doi = {10.1145/2810103.2813691}
+}
+
+@inproceedings{williams2016shuffler,
+    title = {Shuffler: Fast and Deployable Continuous Code Re-Randomization},
+    author = {Williams-King, David and Gobieski, Graham and Williams-King, Kent and Blake, James P. and Yuan, Xinhao and Colp, Patrick and Zheng, Michelle and Kemerlis, Vasileios P. and Yang, Junfeng and Aiello, William},
+    booktitle = {Proceedings of the 12th USENIX Symposium on Operating Systems Design and Implementation (OSDI)},
+    pages = {367--382},
+    year = {2016}
+}
+
+@inproceedings{chen2016remix,
+    title = {Remix: On-Demand Live Randomization},
+    author = {Chen, Yue and Wang, Zhi and Whalley, David and Lu, Long},
+    booktitle = {Proceedings of the 6th ACM Conference on Data and Application Security and Privacy (CODASPY)},
+    pages = {50--61},
+    year = {2016},
+    doi = {10.1145/2857705.2857726}
+}
+
+@inproceedings{lu2016runtimeaslr,
+    title = {How to Make {ASLR} Win the Clone Wars: Runtime Re-Randomization},
+    author = {Lu, Kangjie and N{\"u}rnberger, Stefan and Backes, Michael and Lee, Wenke},
+    booktitle = {Proceedings of the 2016 Network and Distributed System Security Symposium (NDSS)},
+    year = {2016}
+}
+
+@inproceedings{chen2017codearmor,
+    title = {{CodeArmor}: Virtualizing the Code Space to Counter Disclosure Attacks},
+    author = {Chen, Xi and Bos, Herbert and Giuffrida, Cristiano},
+    booktitle = {Proceedings of the 2017 IEEE European Symposium on Security and Privacy (EuroS\&P)},
+    pages = {514--529},
+    year = {2017},
+    doi = {10.1109/EuroSP.2017.17}
+}
+
+@inproceedings{wang2017reranz,
+    title = {{RERANZ}: A Light-Weight Virtual Machine to Mitigate Memory Disclosure Attacks},
+    author = {Wang, Zhe and Wu, Chenggang and Li, Jianjun and Lai, Yuanming and Zhang, Xiangyu and Hsu, Wei-Chung and Cheng, Yueqiang},
+    booktitle = {Proceedings of the 13th ACM SIGPLAN/SIGOPS International Conference on Virtual Execution Environments (VEE)},
+    pages = {143--156},
+    year = {2017},
+    doi = {10.1145/3050748.3050752}
+}
+
+@inproceedings{jelesnianski2020mardu,
+    title = {{MARDU}: Efficient and Scalable Code Re-randomization},
+    author = {Jelesnianski, Christopher and Yom, Jinwoo and Min, Changwoo and Jang, Yeongjin},
+    booktitle = {Proceedings of the 13th ACM International Systems and Storage Conference (SYSTOR)},
+    pages = {29--40},
+    year = {2020},
+    doi = {10.1145/3383669.3398280}
+}
+
+@inproceedings{morton2017zombie,
+    title = {Defeating Zombie Gadgets by Re-randomizing Code upon Disclosure},
+    author = {Morton, Micah and Koo, Hyungjoon and Li, Forrest and Snow, Kevin Z. and Polychronakis, Michalis and Monrose, Fabian},
+    booktitle = {Proceedings of the 9th International Symposium on Engineering Secure Software and Systems (ESSoS)},
+    pages = {143--160},
+    year = {2017},
+    doi = {10.1007/978-3-319-62105-0_10}
+}
+
+@inproceedings{hawkins2017mixr,
+    title = {Mixr: Flexible Runtime Rerandomization for Binaries},
+    author = {Hawkins, William and Nguyen-Tuong, Anh and Hiser, Jason D. and Co, Michele and Davidson, Jack W.},
+    booktitle = {Proceedings of the 2017 Workshop on Moving Target Defense (MTD)},
+    pages = {27--37},
+    year = {2017},
+    doi = {10.1145/3140549.3140552}
+}
+
+@inproceedings{wang2019safehidden,
+    title = {{SafeHidden}: An Efficient and Secure Information Hiding Technique Using Re-randomization},
+    author = {Wang, Zhe and Wu, Chenggang and Zhang, Yinqian and Tang, Bowen and Yew, Pen-Chung and Xie, Mengyao and Lai, Yuanming and Kang, Yan and Cheng, Yueqiang and Shi, Zhiping},
+    booktitle = {Proceedings of the 28th USENIX Security Symposium},
+    pages = {1239--1256},
+    year = {2019}
+}
+
+@inproceedings{nikolaev2022adelie,
+    title = {Adelie: Continuous Address Space Layout Re-randomization for {Linux} Drivers},
+    author = {Nikolaev, Ruslan and Nadeem, Hassan and Stone, Cathlyn and Ravindran, Binoy},
+    booktitle = {Proceedings of the 27th ACM International Conference on Architectural Support for Programming Languages and Operating Systems (ASPLOS)},
+    pages = {483--498},
+    year = {2022},
+    doi = {10.1145/3503222.3507743}
+}
+
+@mastersthesis{nadeem2020kernelmodule,
+    title = {Linux Kernel Module Continuous Address Space Re-Randomization},
+    author = {Nadeem, Muhammad Hassan},
+    school = {Virginia Polytechnic Institute and State University},
+    year = {2020}
+}
+
+@article{luo2025ptrproxy,
+    title = {{PtrProxy}: Efficient Code Re-Randomization on {AArch64} Platform},
+    author = {Luo, Chenke and Fu, Jianming and Ming, Jiang and Xie, Mengfei and Peng, Guojun},
+    journal = {China Communications},
+    volume = {22},
+    number = {1},
+    year = {2025}
+}
+
+@article{li2024randomize,
+    title = {Randomize the Running Function When It Is Disclosed},
+    author = {Li, YongGang and Bao, Yu and Chung, Yeh-Ching},
+    journal = {IEEE Transactions on Computers},
+    volume = {73},
+    number = {6},
+    pages = {1516--1530},
+    year = {2024},
+    doi = {10.1109/TC.2024.3377497}
+}
+
+@inproceedings{li2024dbox,
+    title = {Isolate and Detect the Untrusted Driver with a Virtual Box},
+    author = {Li, YongGang and Chen, PengPeng and Zhang, Yi and Chung, Yeh-Ching},
+    booktitle = {Proceedings of the 2024 ACM SIGSAC Conference on Computer and Communications Security (CCS)},
+    year = {2024},
+    doi = {10.1145/3658644.3670283}
+}
+
+@article{shen2019survey,
+    title = {A Survey of Research on Runtime Rerandomization under Memory Disclosure},
+    author = {Shen, Zhidong and Chen, Weiying},
+    journal = {IEEE Access},
+    volume = {7},
+    pages = {105432--105440},
+    year = {2019},
+    doi = {10.1109/ACCESS.2019.2931707}
+}
+
+%==== 只执行内存与代码读取防护 ==============================================%
+
+@inproceedings{backes2014xnr,
+    title = {You Can Run but You Can't Read: Preventing Disclosure Exploits in Executable Code},
+    author = {Backes, Michael and Holz, Thorsten and Kollenda, Benjamin and Koppe, Philipp and N{\"u}rnberger, Stefan and Pewny, Jannik},
+    booktitle = {Proceedings of the 2014 ACM SIGSAC Conference on Computer and Communications Security (CCS)},
+    pages = {1342--1353},
+    year = {2014},
+    doi = {10.1145/2660267.2660378}
+}
+
+@inproceedings{gionta2015hidem,
+    title = {{HideM}: Protecting the Contents of Userspace Memory in the Face of Disclosure Vulnerabilities},
+    author = {Gionta, Jason and Enck, William and Ning, Peng},
+    booktitle = {Proceedings of the 5th ACM Conference on Data and Application Security and Privacy (CODASPY)},
+    pages = {325--336},
+    year = {2015},
+    doi = {10.1145/2699026.2699107}
+}
+
+@inproceedings{crane2015readactor,
+    title = {Readactor: Practical Code Randomization Resilient to Memory Disclosure},
+    author = {Crane, Stephen and Liebchen, Christopher and Homescu, Andrei and Davi, Lucas and Larsen, Per and Sadeghi, Ahmad-Reza and Brunthaler, Stefan and Franz, Michael},
+    booktitle = {Proceedings of the 2015 IEEE Symposium on Security and Privacy (S\&P)},
+    pages = {763--780},
+    year = {2015},
+    doi = {10.1109/SP.2015.52}
+}
+
+@inproceedings{tang2015heisenbyte,
+    title = {Heisenbyte: Thwarting Memory Disclosure Attacks Using Destructive Code Reads},
+    author = {Tang, Adrian and Sethumadhavan, Simha and Stolfo, Salvatore},
+    booktitle = {Proceedings of the 22nd ACM SIGSAC Conference on Computer and Communications Security (CCS)},
+    pages = {256--267},
+    year = {2015},
+    doi = {10.1145/2810103.2813685}
+}
+
+@inproceedings{werner2016near,
+    title = {No-Execute-After-Read: Preventing Code Disclosure in Commodity Software},
+    author = {Werner, Jan and Baltas, George and Dallara, Rob and Joyce, Nathan and Snow, Kevin Z. and Monrose, Fabian and Polychronakis, Michalis},
+    booktitle = {Proceedings of the 11th ACM Asia Conference on Computer and Communications Security (AsiaCCS)},
+    pages = {35--46},
+    year = {2016},
+    doi = {10.1145/2897845.2897891}
+}
+
+%==== 硬件辅助的随机化 ======================================================%
+
+@inproceedings{gallagher2019morpheus,
+    title = {Morpheus: A Vulnerability-Tolerant Secure Architecture Based on Ensembles of Moving Target Defenses with Churn},
+    author = {Gallagher, Mark and Biernacki, Lauren and Chen, Shibo and Aweke, Zelalem Birhanu and Yitbarek, Salessawi Ferede and Aga, Misiker Tadesse and Harris, Austin and Xu, Zhixing and Kasikci, Baris and Bertacco, Valeria and Malik, Sharad and Tiwari, Mohit and Austin, Todd},
+    booktitle = {Proceedings of the 24th International Conference on Architectural Support for Programming Languages and Operating Systems (ASPLOS)},
+    pages = {469--484},
+    year = {2019},
+    doi = {10.1145/3297858.3304037}
+}
+
+@inproceedings{papadogiannakis2013asist,
+    title = {{ASIST}: Architectural Support for Instruction Set Randomization},
+    author = {Papadogiannakis, Antonis and Loutsis, Laertis and Papaefstathiou, Vassilis and Ioannidis, Sotiris},
+    booktitle = {Proceedings of the 2013 ACM SIGSAC Conference on Computer and Communications Security (CCS)},
+    pages = {981--992},
+    year = {2013},
+    doi = {10.1145/2508859.2516670}
+}
+
+@inproceedings{shi2022harm,
+    title = {{HARM}: Hardware-Assisted Continuous Re-randomization for Microcontrollers},
+    author = {Shi, Jiameng and Guan, Le and Li, Wenqiang and Zhang, Dayou and Chen, Ping and Zhang, Ning},
+    booktitle = {Proceedings of the 2022 IEEE European Symposium on Security and Privacy (EuroS\&P)},
+    pages = {520--536},
+    year = {2022},
+    doi = {10.1109/EuroSP53844.2022.00039}
+}
+
+@inproceedings{shao2022faslr,
+    title = {{fASLR}: Function-Based {ASLR} for Resource-Constrained {IoT} Systems},
+    author = {Shao, Xinhui and Luo, Lan and Ling, Zhen and Yan, Huaiyu and Wei, Yumeng and Fu, Xinwen},
+    booktitle = {Proceedings of the 27th European Symposium on Research in Computer Security (ESORICS)},
+    pages = {531--548},
+    year = {2022},
+    doi = {10.1007/978-3-031-17143-7_26}
+}
+
+%==== 工具链与平台文档 ======================================================%
+
+@misc{llvm2024newpm,
+    title = {Writing an {LLVM} Pass and the New Pass Manager},
+    author = {{The LLVM Project}},
+    howpublished = {LLVM Documentation, \url{https://llvm.org/docs/WritingAnLLVMNewPMPass.html}},
+    year = {2024}
+}
+
+@manual{intel2023sdm,
+    title = {{Intel} 64 and {IA-32} Architectures Software Developer's Manual},
+    organization = {Intel Corporation},
+    year = {2023}
+}
+
+@misc{linux2024kernel,
+    title = {The {Linux} Kernel, Version 6.8},
+    author = {{The Linux Kernel Organization}},
+    howpublished = {\url{https://www.kernel.org/}},
+    year = {2024}
+}
+
+@inproceedings{gravani2021iskios,
+    author = {Gravani, Spyridoula and Hedayati, Mohammad and Criswell, John and Scott, Michael L.},
+    title = {Fast Intra-kernel Isolation and Security with {IskiOS}},
+    booktitle = {Proceedings of the 24th International Symposium on Research in Attacks, Intrusions and Defenses (RAID)},
+    year = {2021},
+    doi = {10.1145/3471621.3471849}
+}
+
+@inproceedings{guo2025bulkhead,
+    author = {Guo, Yinggang and Wang, Zicheng and Bai, Weiheng and Zeng, Qingkai and Lu, Kangjie},
+    title = {{BULKHEAD}: Secure, Scalable, and Efficient Kernel Compartmentalization with {PKS}},
+    booktitle = {Proceedings of the 32nd Network and Distributed System Security Symposium (NDSS)},
+    year = {2025},
+    note = {arXiv:2409.09606}
+}
+
+@inproceedings{li2022mprobe,
+    author = {Li, YongGang and Chung, Yeh-Ching and Xing, Jinbiao and Bao, Yu and Lin, GuoYuan},
+    title = {{MProbe}: Make the Code Probing Meaningless},
+    booktitle = {Proceedings of the 38th Annual Computer Security Applications Conference (ACSAC)},
+    year = {2022},
+    doi = {10.1145/3564625.3567967}
+}
+
+@inproceedings{chang2024chaos,
+    author = {Chang, Zihao and Lin, Jihan and Sun, Haifeng and Li, Runkuan and Wang, Ying and Hu, Bing and Zhao, Xiaofang and Jiang, Dejun and Sun, Ninghui and Wang, Sa},
+    title = {Chaos: Function Granularity Runtime Address Layout Space Randomization for Kernel Module},
+    booktitle = {Proceedings of the 15th ACM SIGOPS Asia-Pacific Workshop on Systems (APSys)},
+    year = {2024},
+    doi = {10.1145/3678015.3680476}
+}
+
+@inproceedings{chen2017norax,
+    author = {Chen, Yaohui and Zhang, Dongli and Wang, Ruowen and Qiao, Rui and Azab, Ahmed M. and Lu, Long and Vijayakumar, H. and Shen, Wenbo},
+    title = {{NORAX}: Enabling Execute-Only Memory for {COTS} Binaries on {AArch64}},
+    booktitle = {Proceedings of the 38th IEEE Symposium on Security and Privacy (S\&P)},
+    year = {2017},
+    doi = {10.1109/SP.2017.30}
+}
+
+@inproceedings{kwon2019uxom,
+    author = {Kwon, Donghyun and Shin, Jangseop and Kim, Giyeol and Lee, Byoungyoung and Cho, Yeongpil and Paek, Yunheung},
+    title = {{uXOM}: Efficient {eXecute-Only} Memory on {ARM} {Cortex-M}},
+    booktitle = {Proceedings of the 28th USENIX Security Symposium},
+    year = {2019},
+    url = {https://www.usenix.org/conference/usenixsecurity19/presentation/kwon}
+}
+
+@inproceedings{shen2020picoxom,
+    author = {Shen, Zhuojia and Dharsee, Komail and Criswell, John},
+    title = {Fast Execute-Only Memory for Embedded Systems},
+    booktitle = {Proceedings of the IEEE Secure Development Conference (SecDev)},
+    year = {2020},
+    url = {https://ieeexplore.ieee.org/document/9229982}
+}
+
+@inproceedings{braden2016leakage,
+    author = {Braden, Kjell and Davi, Lucas and Liebchen, Christopher and Sadeghi, Ahmad-Reza and Crane, Stephen and Franz, Michael and Larsen, Per},
+    title = {Leakage-Resilient Layout Randomization for Mobile Devices},
+    booktitle = {Proceedings of the 23rd Network and Distributed System Security Symposium (NDSS)},
+    year = {2016},
+    url = {https://www.ndss-symposium.org/wp-content/uploads/2017/09/leakage-resilient-layout-randomization-mobile-devices.pdf}
+}
+
+@inproceedings{jang2019revisiting,
+    author = {Jang, Jinsoo and Kang, Brent Byunghoon},
+    title = {Revisiting the {ARM} Debug Facility for {OS} Kernel Security},
+    booktitle = {Proceedings of the 56th Annual Design Automation Conference (DAC)},
+    year = {2019},
+    doi = {10.1145/3316781.3317897}
+}
+
+%==== 新增：内核漏洞利用与去随机化侧信道 ====================================%
+
+@inproceedings{wu2018fuze,
+    title = {{FUZE}: Towards Facilitating Exploit Generation for Kernel Use-After-Free Vulnerabilities},
+    author = {Wu, Wei and Chen, Yueqi and Xu, Jun and Xing, Xinyu and Gong, Xiaorui and Zou, Wei},
+    booktitle = {Proceedings of the 27th USENIX Security Symposium},
+    pages = {781--797},
+    year = {2018}
+}
+
+@inproceedings{chen2020koobe,
+    title = {{KOOBE}: Towards Facilitating Exploit Generation of Kernel Out-Of-Bounds Write Vulnerabilities},
+    author = {Chen, Weiteng and Zou, Xiaochen and Li, Guoren and Qian, Zhiyun},
+    booktitle = {Proceedings of the 29th USENIX Security Symposium},
+    pages = {1093--1110},
+    year = {2020}
+}
+
+@inproceedings{zeng2022playing,
+    title = {Playing for {K(H)eaps}: Understanding and Improving Linux Kernel Exploit Reliability},
+    author = {Zeng, Kyle and Chen, Yueqi and Cho, Haehyun and Xing, Xinyu and Doup{\'e}, Adam and Shoshitaishvili, Yan and Bao, Tiffany},
+    booktitle = {Proceedings of the 31st USENIX Security Symposium},
+    pages = {71--88},
+    year = {2022}
+}
+
+@inproceedings{lee2023pspray,
+    title = {{PSPRAY}: Timing Side-Channel based Linux Kernel Heap Exploitation Technique},
+    author = {Lee, Yoochan and Kwak, Jinhan and Kang, Junesoo and Jeon, Yuseok and Lee, Byoungyoung},
+    booktitle = {Proceedings of the 32nd USENIX Security Symposium},
+    pages = {6825--6842},
+    year = {2023}
+}
+
+@inproceedings{liang2024kleak,
+    title = {{K-LEAK}: Towards Automating the Generation of Multi-Step Infoleak Exploits against the Linux Kernel},
+    author = {Liang, Zhengchuan and Zou, Xiaochen and Song, Chengyu and Qian, Zhiyun},
+    booktitle = {Proceedings of the 2024 Network and Distributed System Security Symposium (NDSS)},
+    year = {2024},
+    doi = {10.14722/ndss.2024.24935}
+}
+
+@inproceedings{hund2013practical,
+    title = {Practical Timing Side Channel Attacks Against Kernel Space {ASLR}},
+    author = {Hund, Ralf and Willems, Carsten and Holz, Thorsten},
+    booktitle = {Proceedings of the 2013 IEEE Symposium on Security and Privacy},
+    pages = {191--205},
+    year = {2013},
+    doi = {10.1109/SP.2013.23}
+}
+
+@inproceedings{jang2016drk,
+    title = {Breaking Kernel Address Space Layout Randomization with {Intel TSX}},
+    author = {Jang, Yeongjin and Lee, Sangho and Kim, Taesoo},
+    booktitle = {Proceedings of the 2016 ACM SIGSAC Conference on Computer and Communications Security (CCS)},
+    pages = {380--392},
+    year = {2016},
+    doi = {10.1145/2976749.2978321}
+}
+
+@inproceedings{evtyushkin2016jump,
+    title = {Jump over {ASLR}: Attacking Branch Predictors to Bypass {ASLR}},
+    author = {Evtyushkin, Dmitry and Ponomarev, Dmitry and Abu-Ghazaleh, Nael},
+    booktitle = {Proceedings of the 49th Annual IEEE/ACM International Symposium on Microarchitecture (MICRO)},
+    pages = {1--13},
+    year = {2016},
+    doi = {10.1109/MICRO.2016.7783743}
+}
+
+@inproceedings{liu2023entrybleed,
+    title = {{EntryBleed}: A Universal {KASLR} Bypass against {KPTI} on Linux},
+    author = {Liu, William and Ravichandran, Joseph and Yan, Mengjia},
+    booktitle = {Proceedings of the 12th International Workshop on Hardware and Architectural Support for Security and Privacy (HASP)},
+    pages = {10--18},
+    year = {2023},
+    doi = {10.1145/3623652.3623669}
+}
+
+@inproceedings{lipp2022amd,
+    title = {{AMD} Prefetch Attacks through Power and Time},
+    author = {Lipp, Moritz and Gruss, Daniel and Schwarz, Michael},
+    booktitle = {Proceedings of the 31st USENIX Security Symposium},
+    pages = {643--660},
+    year = {2022}
+}
+
+@inproceedings{maar2025kernelsnitch,
+    title = {{KernelSnitch}: Side Channel-Attacks on Kernel Data Structures},
+    author = {Maar, Lukas and Juffinger, Jonas and Steinbauer, Thomas and Gruss, Daniel and Mangard, Stefan},
+    booktitle = {Proceedings of the 2025 Network and Distributed System Security Symposium (NDSS)},
+    year = {2025},
+    doi = {10.14722/ndss.2025.240223}
+}
+
+@inproceedings{canella2019transient,
+    title = {A Systematic Evaluation of Transient Execution Attacks and Defenses},
+    author = {Canella, Claudio and Van Bulck, Jo and Schwarz, Michael and Lipp, Moritz and von Berg, Benjamin and Ortner, Philipp and Piessens, Frank and Evtyushkin, Dmitry and Gruss, Daniel},
+    booktitle = {Proceedings of the 28th USENIX Security Symposium},
+    pages = {249--266},
+    year = {2019}
+}
+
+@inproceedings{gens2017lazarus,
+    title = {{LAZARUS}: Practical Side-Channel Resilient Kernel-Space Randomization},
+    author = {Gens, David and Arias, Orlando and Sullivan, Dean and Liebchen, Christopher and Jin, Yier and Sadeghi, Ahmad-Reza},
+    booktitle = {Proceedings of the 20th International Symposium on Research in Attacks, Intrusions, and Defenses (RAID)},
+    pages = {238--258},
+    year = {2017},
+    doi = {10.1007/978-3-319-66332-6_11}
+}
+
+%==== 新增：软件多样化与代码随机化 ==========================================%
+
+@inproceedings{larsen2014sok,
+    title = {{SoK}: Automated Software Diversity},
+    author = {Larsen, Per and Homescu, Andrei and Brunthaler, Stefan and Franz, Michael},
+    booktitle = {Proceedings of the 2014 IEEE Symposium on Security and Privacy},
+    pages = {276--291},
+    year = {2014},
+    doi = {10.1109/SP.2014.25}
+}
+
+@inproceedings{davi2015isomeron,
+    title = {Isomeron: Code Randomization Resilient to (Just-In-Time) Return-Oriented Programming},
+    author = {Davi, Lucas and Liebchen, Christopher and Sadeghi, Ahmad-Reza and Snow, Kevin Z. and Monrose, Fabian},
+    booktitle = {Proceedings of the 2015 Network and Distributed System Security Symposium (NDSS)},
+    year = {2015}
+}
+
+@article{conti2016selfrando,
+    title = {Selfrando: Securing the {Tor} Browser against De-anonymization Exploits},
+    author = {Conti, Mauro and Crane, Stephen and Frassetto, Tommaso and Homescu, Andrei and Koppen, Georg and Larsen, Per and Liebchen, Christopher and Perry, Mike and Sadeghi, Ahmad-Reza},
+    journal = {Proceedings on Privacy Enhancing Technologies},
+    volume = {2016},
+    number = {4},
+    pages = {454--469},
+    year = {2016},
+    doi = {10.1515/popets-2016-0050}
+}
+
+@inproceedings{hawkins2017zipr,
+    title = {Zipr: Efficient Static Binary Rewriting for Security},
+    author = {Hawkins, William H. and Hiser, Jason D. and Co, Michele and Nguyen-Tuong, Anh and Davidson, Jack W.},
+    booktitle = {Proceedings of the 47th Annual IEEE/IFIP International Conference on Dependable Systems and Networks (DSN)},
+    pages = {559--566},
+    year = {2017},
+    doi = {10.1109/DSN.2017.27}
+}
+
+@inproceedings{williamsking2020egalito,
+    title = {Egalito: Layout-Agnostic Binary Recompilation},
+    author = {Williams-King, David and Kobayashi, Hidenori and Williams-King, Kent and Patterson, Graham and Spano, Frank and Wu, Yu Jian and Yang, Junfeng and Kemerlis, Vasileios P.},
+    booktitle = {Proceedings of the 25th International Conference on Architectural Support for Programming Languages and Operating Systems (ASPLOS)},
+    pages = {133--147},
+    year = {2020},
+    doi = {10.1145/3373376.3378470}
+}
+
+%==== 新增：控制流完整性与指针保护 ==========================================%
+
+@inproceedings{kuznetsov2014cpi,
+    title = {Code-Pointer Integrity},
+    author = {Kuznetsov, Volodymyr and Szekeres, L{\'a}szl{\'o} and Payer, Mathias and Candea, George and Sekar, R. and Song, Dawn},
+    booktitle = {Proceedings of the 11th USENIX Symposium on Operating Systems Design and Implementation (OSDI)},
+    pages = {147--163},
+    year = {2014}
+}
+
+@inproceedings{burow2019shadow,
+    title = {{SoK}: Shining Light on Shadow Stacks},
+    author = {Burow, Nathan and Zhang, Xinping and Payer, Mathias},
+    booktitle = {Proceedings of the 2019 IEEE Symposium on Security and Privacy},
+    pages = {985--999},
+    year = {2019},
+    doi = {10.1109/SP.2019.00076}
+}
+
+@inproceedings{shanbhogue2019cet,
+    title = {Security Analysis of Processor Instruction Set Architecture for Enforcing Control-Flow Integrity},
+    author = {Shanbhogue, Vedvyas and Gupta, Deepak and Sahita, Ravi},
+    booktitle = {Proceedings of the 8th International Workshop on Hardware and Architectural Support for Security and Privacy (HASP)},
+    pages = {1--11},
+    year = {2019},
+    doi = {10.1145/3337167.3337175}
+}
+
+@inproceedings{kim2024tiktag,
+    title = {{TikTag}: Breaking {ARM}'s Memory Tagging Extension with Speculative Execution},
+    author = {Kim, Juhee and Park, Jinbum and Roh, Sihyeon and Chung, Jaeyoung and Lee, Youngjoo and Kim, Taesoo and Lee, Byoungyoung},
+    booktitle = {arXiv preprint arXiv:2406.08719},
+    year = {2024},
+    doi = {10.48550/arXiv.2406.08719}
+}
+
+%==== 新增：内核隔离、保护键与分区化 ========================================%
+
+@inproceedings{dautenhahn2015nested,
+    title = {Nested Kernel: An Operating System Architecture for Intra-Kernel Privilege Separation},
+    author = {Dautenhahn, Nathan and Kasampalis, Theodoros and Dietz, Will and Criswell, John and Adve, Vikram},
+    booktitle = {Proceedings of the 20th International Conference on Architectural Support for Programming Languages and Operating Systems (ASPLOS)},
+    pages = {191--206},
+    year = {2015},
+    doi = {10.1145/2775054.2694386}
+}
+
+@inproceedings{vahldiek2019erim,
+    title = {{ERIM}: Secure, Efficient In-process Isolation with Protection Keys ({MPK})},
+    author = {Vahldiek-Oberwagner, Anjo and Elnikety, Eslam and Duarte, Nuno O. and Sammler, Michael and Druschel, Peter and Garg, Deepak},
+    booktitle = {Proceedings of the 28th USENIX Security Symposium},
+    pages = {1221--1238},
+    year = {2019}
+}
+
+@inproceedings{hedayati2019hodor,
+    title = {Hodor: Intra-Process Isolation for High-Throughput Data Plane Libraries},
+    author = {Hedayati, Mohammad and Gravani, Spyridoula and Johnson, Ethan and Criswell, John and Scott, Michael L. and Shen, Kai and Marty, Mike},
+    booktitle = {Proceedings of the 2019 USENIX Annual Technical Conference (ATC)},
+    pages = {489--504},
+    year = {2019}
+}
+
+@inproceedings{huang2022ksplit,
+    title = {{KSplit}: Automating Device Driver Isolation},
+    author = {Huang, Yongzhe and Narayanan, Vikram and Detweiler, David and Huang, Kaiming and Tan, Gang and Jaeger, Trent and Burtsev, Anton},
+    booktitle = {Proceedings of the 16th USENIX Symposium on Operating Systems Design and Implementation (OSDI)},
+    pages = {613--631},
+    year = {2022}
+}
+
+@inproceedings{lefeuvre2025sok,
+    title = {{SoK}: Software Compartmentalization},
+    author = {Lefeuvre, Hugo and Dautenhahn, Nathan and Chisnall, David and Olivier, Pierre},
+    booktitle = {Proceedings of the 2025 IEEE Symposium on Security and Privacy},
+    year = {2025}
+}
+
+%==== 新增：内存安全与动态检测 ==============================================%
+
+@inproceedings{cho2023bokasan,
+    title = {{BoKASAN}: Binary-only Kernel Address Sanitizer for Effective Kernel Fuzzing},
+    author = {Cho, Mingi and An, Dohyeon and Jin, Hoyong and Kwon, Taekyoung},
+    booktitle = {Proceedings of the 32nd USENIX Security Symposium},
+    pages = {4985--5002},
+    year = {2023}
+}
+
+@inproceedings{peng2025asterinas,
+    title = {{Asterinas}: A {Linux} {ABI}-Compatible, {Rust}-Based Framekernel {OS} with a Small and Sound {TCB}},
+    author = {Peng, Yuke and Tian, Hongliang and Zhang, Junyang and Li, Ruihan and Chen, Chengjun and Jiang, Jianfeng and Xian, Jinyi and Wang, Xiaolin and Xu, Chenren and Zhou, Diyu and Luo, Yingwei and Yan, Shoumeng and Zhang, Yinqian},
+    booktitle = {Proceedings of the 2025 USENIX Annual Technical Conference (ATC)},
+    year = {2025}
+}
+
+@inproceedings{maar2024hekcfi,
+    title = {Beyond the Edges of Kernel Control-Flow Hijacking Protection with {HEK-CFI}},
+    author = {Maar, Lukas and Nasahl, Pascal and Mangard, Stefan},
+    booktitle = {Proceedings of the 19th ACM Asia Conference on Computer and Communications Security (ASIA CCS)},
+    pages = {1214--1230},
+    year = {2024},
+    doi = {10.1145/3634737.3661135}
+}
