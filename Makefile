@@ -776,6 +776,16 @@ ifdef need-config
 include include/config/auto.conf
 endif
 
+# I-KASLR: the pass emits the trampolines' counting sequence, so it has to know
+# which counter layout the kernel was configured with.  The -D keeps the choice
+# on the command line, so flipping it rebuilds every object.
+ifeq ($(CRR_TRAMPOLINE),y)
+ifdef CONFIG_IKASLR_COUNT_GLOBAL
+export IKASLR_COUNT_GLOBAL := 1
+KBUILD_CFLAGS += -DIKASLR_PASS_COUNT_GLOBAL
+endif
+endif
+
 ifeq ($(KBUILD_EXTMOD),)
 # Objects we will link into vmlinux / subdirs we need to visit
 core-y		:=

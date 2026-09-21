@@ -27,8 +27,20 @@ int  ikaslr_wait_region_empty(unsigned int timeout_ms);
 /* 当前位于随机化区域内的执行流数量。*/
 int ikaslr_active_count(void);
 
-/* 间接调用出口的计数辅助（由 arm64 __ikaslr_indirect_out 汇编 thunk 调用）。*/
+/* arm64：跳板查到阻断标志后的慢路径（tramp.S 的 __ikaslr_blocked_slow 调用）。*/
+asmlinkage void ikaslr_blocked_slow(void);
+
+/* x86 旧路径：间接调用出口的计数辅助。*/
 void ikaslr_out_enter_indirect(void);
+
+/* arm64：判空协议自测（track.c）。wrong 非零即协议有误；naive_* 是朴素方案的对照。*/
+struct ikaslr_track_result {
+	unsigned int  threads;
+	unsigned long checks;		/* 阻断 + 判空的轮数 */
+	unsigned long empty, wrong;	/* 双计数：判为空的次数 / 其中真值非零的次数 */
+	unsigned long naive_empty, naive_wrong;	/* 朴素可加可减计数：同上 */
+};
+int ikaslr_track_selftest(unsigned int ms, struct ikaslr_track_result *res);
 
 /* 第 i 个随机化函数当前的代码入口地址（随机化后变化）。供 /proc/ikaslr/layout。*/
 unsigned long ikaslr_func_addr(int i);
@@ -79,6 +91,7 @@ int ikaslr_rf_branch(void);
 int ikaslr_rf_nofault(unsigned long addr);
 struct proc_dir_entry;
 int ikaslr_bench_init(struct proc_dir_entry *dir);
+int ikaslr_microbench_init(struct proc_dir_entry *dir);
 int ikaslr_detect_mark(const char *name, void *trap_at, void *copy_src, size_t size);
 bool ikaslr_detect_audit(unsigned long faulting, unsigned long *newp);
 void ikaslr_detect_stats(unsigned long *benign, unsigned long *gadget, unsigned long *triggers);

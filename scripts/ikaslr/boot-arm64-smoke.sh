@@ -13,7 +13,8 @@ if [ -z "$IRFS" ]; then
     ( cd "$T" && mkdir -p proc sys dev &&
       find . -print0 | cpio --null -o --format=newc 2>/dev/null | gzip -9 > initramfs.cpio.gz )
 fi
-# -cpu max 提供 FEAT_PAuth 等（第5章 PA CFI 需要）；单核（EPT/单核策略，见 04a）。
-exec qemu-system-aarch64 -M virt -cpu max -smp 1 -m 2G \
+# -cpu max 提供 FEAT_PAuth 等（第5章 PA CFI 需要）。核数由 SMP 环境变量给出（默认 1）；
+# per-CPU 计数与判空协议自测要多核才有意义：SMP=4 ./boot-arm64-smoke.sh ...
+exec qemu-system-aarch64 -M virt -cpu max -smp "${SMP:-1}" -m 2G \
     -kernel "$BA/arch/arm64/boot/Image" -initrd "$IRFS" -nographic \
     -append "console=ttyAMA0 nokaslr"

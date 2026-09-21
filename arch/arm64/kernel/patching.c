@@ -105,6 +105,45 @@ noinstr int aarch64_insn_write_literal_u64(void *addr, u64 val)
 	return ret;
 }
 
+/*
+ * Overwrite a run of 8-byte text slots in one go: each page is mapped writable
+ * once, every slot is replaced by a single 64-bit store, and the instruction
+ * cache is invalidated once for the whole range.  Compared with calling
+ * aarch64_insn_patch_text_nosync() per instruction this pays the fixmap
+ * map/unmap (two PTE writes and two TLB invalidations) per page instead of per
+ * instruction, which is what matters when the caller is rewriting a dense
+ * table of branch stubs inside a stop-the-world window (kernel/ikaslr).
+ *
+ * @vals are in memory order (already little-endian instruction pairs).  Zero
+ * allocation, never sleeps; patch_lock is dropped between pages so interrupts
+ * are not held off for the whole range.  Like the _nosync variant, the caller
+ * guarantees no CPU executes the range concurrently, or that every
+ * intermediate state is executable.
+ */
+int aarch64_insn_write_u64s(void *addr, const __le64 *vals, size_t n)
+{
+	unsigned long start = (unsigned long)addr;
+	unsigned long cur = start, end = start + n * sizeof(u64);
+
+	if (start & (sizeof(u64) - 1))
+		return -EINVAL;
+
+	while (cur < end) {
+		unsigned long stop = min(end, (cur | ~PAGE_MASK) + 1);
+		unsigned long flags;
+		__le64 *w;
+
+		raw_spin_lock_irqsave(&patch_lock, flags);
+		w = patch_map((void *)cur, FIX_TEXT_POKE0);
+		for (; cur < stop; cur += sizeof(u64))
+			WRITE_ONCE(*w++, *vals++);
+		patch_unmap(FIX_TEXT_POKE0);
+		raw_spin_unlock_irqrestore(&patch_lock, flags);
+	}
+	caches_clean_inval_pou(start, end);
+	return 0;
+}
+
 int __kprobes aarch64_insn_patch_text_nosync(void *addr, u32 insn)
 {
 	u32 *tp = addr;

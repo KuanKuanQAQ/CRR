@@ -31,6 +31,10 @@ int main(void)
   DEFINE(TSK_ACTIVE_MM,		offsetof(struct task_struct, active_mm));
   BLANK();
   DEFINE(TSK_TI_CPU,		offsetof(struct task_struct, thread_info.cpu));
+#ifdef CONFIG_IKASLR
+  DEFINE(TSK_TI_IKASLR_INSIDE,	offsetof(struct task_struct, thread_info.ikaslr_inside));
+  DEFINE(S_IKASLR_INSIDE,	offsetof(struct pt_regs, unused2));
+#endif
   DEFINE(TSK_TI_FLAGS,		offsetof(struct task_struct, thread_info.flags));
   DEFINE(TSK_TI_PREEMPT,	offsetof(struct task_struct, thread_info.preempt_count));
 #ifdef CONFIG_ARM64_SW_TTBR0_PAN

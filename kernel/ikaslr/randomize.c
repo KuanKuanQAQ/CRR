@@ -60,15 +60,19 @@
  * target 槽。变体须落在跳转桩的 ±128 MB 直接分支量程内，故用 module_alloc 分配。
  */
 #define IKASLR_PREFIX_BYTES 12
-extern char __ikaslr_stubs[];
+extern char __ikaslr_stubs[], __ikaslr_stubs_end[];
 
-/* 改写第 k 个跳转桩：入口桩 -> 变体体入口，重入桩 -> 变体 prefix 起点。*/
-static int ikaslr_write_stub(int k, unsigned long entry, unsigned long reentry)
+/*
+ * 第 k 对跳转桩的 8 字节内容：入口桩 `b entry` 在低 4 字节、重入桩 `b reentry`
+ * 在高 4 字节（内存序）。越出 ±128 MB 直接分支量程时返回 -ERANGE。
+ */
+static int ikaslr_stub_pair(int k, unsigned long entry, unsigned long reentry,
+			    __le64 *out)
 {
-	u32 *stub = (u32 *)((unsigned long)__ikaslr_stubs + 8 * k);
-	u32 e = aarch64_insn_gen_branch_imm((unsigned long)stub, entry,
+	unsigned long stub = (unsigned long)__ikaslr_stubs + 8 * k;
+	u32 e = aarch64_insn_gen_branch_imm(stub, entry,
 					    AARCH64_INSN_BRANCH_NOLINK);
-	u32 r = aarch64_insn_gen_branch_imm((unsigned long)(stub + 1), reentry,
+	u32 r = aarch64_insn_gen_branch_imm(stub + 4, reentry,
 					    AARCH64_INSN_BRANCH_NOLINK);
 
 	if (e == AARCH64_BREAK_FAULT || r == AARCH64_BREAK_FAULT) {
@@ -76,8 +80,7 @@ static int ikaslr_write_stub(int k, unsigned long entry, unsigned long reentry)
 				   k, entry);
 		return -ERANGE;
 	}
-	aarch64_insn_patch_text_nosync(stub, e);
-	aarch64_insn_patch_text_nosync(stub + 1, r);
+	*out = cpu_to_le64((u64)r << 32 | e);
 	return 0;
 }
 /* ikaslr_point_stubs() 定义在 struct ikaslr_variant 之后。*/
@@ -119,6 +122,12 @@ struct ikaslr_variant {
 	struct page		**code_pg;/* base 自身的物理页（分配时捕获，用于回指）*/
 	struct page		**trap_pg; /* trap_base 的物理页 */
 	bool			 trapped; /* base 当前是否已重指到 trap_pg */
+
+	/*
+	 * arm64：指向本变体的整个跳转桩区内容，每槽 8 字节、与桩区等长（含缺失 k 的
+	 * brk 占位）。在 prepare 里——也就是阻断窗口之外——编好，切换时只需整段写入。
+	 */
+	__le64			*stub_img;
 };
 
 static struct ikaslr_variant ikaslr_vars[IKASLR_NR_VARIANTS];
@@ -127,17 +136,56 @@ static bool ikaslr_pool_ready;
 static bool ikaslr_image_retired;
 
 #ifdef CONFIG_ARM64
-/* 让全部跳转桩指向变体 v 的对应函数体（入口桩→体入口，重入桩→prefix 起点）。*/
-static void ikaslr_point_stubs(struct ikaslr_variant *v)
+static inline unsigned long ikaslr_nr_stub_slots(void)
 {
-	int i;
+	return (__ikaslr_stubs_end - __ikaslr_stubs) / 8;
+}
+
+/*
+ * 按变体 v 的排布编出它的跳转桩区内容（入口桩→体入口，重入桩→prefix 起点）。
+ * 在 prepare 里调用：分支立即数的编码与量程检查都发生在阻断窗口之外，量程不够的
+ * 变体根本不会变成 READY。
+ */
+static int ikaslr_build_stub_img(struct ikaslr_variant *v)
+{
+	/* 缺失 k 的槽：与 gen_stubs.sh 发出的占位相同，一对 `brk #0x100`。*/
+	const __le64 hole = cpu_to_le64(0xd4202000d4202000ULL);
+	unsigned long s, nslot = ikaslr_nr_stub_slots();
+	int i, ret;
+
+	/*
+	 * 占位用常量填而不是从桩区读回来：第 4 章要对桩区做只执行保护，届时读桩
+	 * 本身就是被检测的事件，内核自己不该成为它的读者。
+	 */
+	for (s = 0; s < nslot; s++)
+		v->stub_img[s] = hole;
 
 	for (i = 0; i < ikaslr_ntramp; i++) {
-		unsigned long e = (unsigned long)v->base + v->off[i] +
-				  IKASLR_PREFIX_BYTES;
+		unsigned long unit = (unsigned long)v->base + v->off[i];
+		int k = ikaslr_tbl[i]->k;
 
-		ikaslr_write_stub(ikaslr_tbl[i]->k, e, e - IKASLR_PREFIX_BYTES);
+		ret = ikaslr_stub_pair(k, unit + IKASLR_PREFIX_BYTES, unit,
+				       &v->stub_img[k]);
+		if (ret)
+			return ret;
 	}
+	return 0;
+}
+
+/*
+ * 让全部跳转桩指向变体 v —— 一次随机化里唯一的索引更新，位于阻断窗口之内。
+ *
+ * 桩区是连续的、每函数 8 字节，因此整段写入：每页只映射一次，每个函数一次
+ * 64 位存储（入口桩与重入桩同时替换），最后对整个桩区刷一次指令缓存。早先逐条
+ * 调 aarch64_insn_patch_text_nosync()，每函数要付两次「fixmap 映射 + 撤销 + 刷
+ * 指令缓存」，那是阻断窗口的主要成分。
+ *
+ * 可写别名只在这次调用期间存在（fixmap 临时映射），不保留常驻的可写映射。
+ */
+static void ikaslr_point_stubs(struct ikaslr_variant *v)
+{
+	aarch64_insn_write_u64s(__ikaslr_stubs, v->stub_img,
+				ikaslr_nr_stub_slots());
 }
 #endif
 
@@ -409,6 +457,12 @@ static int ikaslr_prepare(struct ikaslr_variant *v)
 	ret = ikaslr_make_exec(v->base, npages);
 	if (ret)
 		return ret;
+
+#ifdef CONFIG_ARM64
+	ret = ikaslr_build_stub_img(v);
+	if (ret)
+		return ret;
+#endif
 
 	/*
 	 * 预建本变体的陷阱影像，供它将来退役时的一步重映射使用（§3.5.5）。
@@ -944,6 +998,12 @@ int __init ikaslr_pool_init(void)
 		v->off = kcalloc(ikaslr_ntramp, sizeof(*v->off), GFP_KERNEL);
 		if (!v->off)
 			return -ENOMEM;
+#ifdef CONFIG_ARM64
+		v->stub_img = kcalloc(ikaslr_nr_stub_slots(),
+				      sizeof(*v->stub_img), GFP_KERNEL);
+		if (!v->stub_img)
+			return -ENOMEM;
+#endif
 		/*
 		 * 以可读写、不可执行分配（PAGE_KERNEL 而非 PAGE_KERNEL_EXEC）：
 		 * 分配出来就是 RWX 同样构成 W^X 违规。执行权限在 prepare 写完

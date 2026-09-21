@@ -278,6 +278,17 @@ alternative_else_nop_endif
 	.else
 	add	x21, sp, #PT_REGS_SIZE
 	get_current_task tsk
+#ifdef CONFIG_IKASLR
+	/*
+	 * I-KASLR: the handler must not inherit the interrupted flow's
+	 * in-region flag, or its own trampoline crossings would be accounted
+	 * to (and could un-count) the interrupted flow.  Park the flag in
+	 * pt_regs and clear it; kernel_exit puts it back.
+	 */
+	ldr	w20, [tsk, #TSK_TI_IKASLR_INSIDE]
+	str	w20, [sp, #S_IKASLR_INSIDE]
+	str	wzr, [tsk, #TSK_TI_IKASLR_INSIDE]
+#endif
 	.endif /* \el == 0 */
 	mrs	x22, elr_el1
 	mrs	x23, spsr_el1
@@ -335,6 +346,11 @@ alternative_else_nop_endif
 	.macro	kernel_exit, el
 	.if	\el != 0
 	disable_daif
+#ifdef CONFIG_IKASLR
+	get_current_task x20
+	ldr	w21, [sp, #S_IKASLR_INSIDE]
+	str	w21, [x20, #TSK_TI_IKASLR_INSIDE]
+#endif
 	.endif
 
 #ifdef CONFIG_ARM64_PSEUDO_NMI

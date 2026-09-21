@@ -134,16 +134,6 @@ do {									\
 	ikaslr_out_leave();						\
 } while (0)
 
-#if defined(CONFIG_IKASLR) && defined(CONFIG_ARM64)
-/*
- * 早期把 arm64 地址物化的 movn/movk 立即数补进映像母本（设计对齐改造 M3）。
- * 必须在任何被随机化函数首次执行前调用；由 start_kernel 在 mm_init() 之后调用。
- */
-void ikaslr_apply_fixups(void);
-#else
-static inline void ikaslr_apply_fixups(void) { }
-#endif
-
 #ifdef CONFIG_IKASLR
 
 /*
