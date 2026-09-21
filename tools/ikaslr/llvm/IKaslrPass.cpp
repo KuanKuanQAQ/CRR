@@ -60,10 +60,11 @@ static cl::opt<bool> VerifyOnly(
 
 /// 关闭 fixed_out 改写（仅用于 A/B 测量 fixed_out 本身的开销）。
 /// 用环境变量而非 cl::opt：-mllvm 选项在插件注册之前就被解析，那条路走不通。
-static bool noOutWrap() {
-  const char *E = getenv("IKASLR_NO_OUTWRAP");
+static bool envFlag(const char *Name) {
+  const char *E = getenv(Name);
   return E && *E && strcmp(E, "0") != 0;
 }
+static bool noOutWrap() { return envFlag("IKASLR_NO_OUTWRAP"); }
 
 static cl::opt<bool> Verbose(
     "ikaslr-verbose", cl::init(false),
@@ -101,6 +102,14 @@ static std::vector<std::string> loadFuncListOrdered() {
       continue;
     Names.push_back(Line);
   }
+  // 微基准用的被随机化函数（kernel/ikaslr/microbench.c）总是排在名单之后：它们
+  // 得经过真实的跳板才量得出跳板的开销，又不该要求每份名单都手工带上。未开
+  // CONFIG_IKASLR_MICROBENCH 时这些函数不存在，对应的 k 只是桩表末尾的几个空槽。
+  if (!Names.empty())
+    for (const char *N : {"ikaslr_mb_leaf", "ikaslr_mb_out", "ikaslr_mb_in",
+                          "ikaslr_mb_ind", "ikaslr_mb_poly0", "ikaslr_mb_poly1",
+                          "ikaslr_mb_poly2", "ikaslr_mb_poly3"})
+      Names.push_back(N);
   return Names;
 }
 
@@ -136,6 +145,9 @@ struct IKaslrMarkPass : PassInfoMixin<IKaslrMarkPass> {
 
 struct IKaslrPass : PassInfoMixin<IKaslrPass> {
   bool IsAArch64 = false;   /* 由 run() 按模块 triple 设定 */
+  /// CONFIG_IKASLR_COUNT_GLOBAL：所有核共用第 0 对计数（扩展性实验的对照实现）。
+  /// 由顶层 Makefile 经环境变量传入（cl::opt 走不通，见 noOutWrap）。
+  bool CountGlobal = envFlag("IKASLR_COUNT_GLOBAL");
   std::set<std::string> Sel;/* 被随机化的函数名单，由 run() 载入 */
   std::map<std::string, unsigned> Kmap; /* 函数名 -> 返回标记里的 k（名单下标）*/
   unsigned NrOutWrapped = 0;/* 被包成 fixed_out 序列的调用点数 */
@@ -606,10 +618,20 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
       bool Indirect = !Callee;
 
       // 收集参数，统一成 i64。
+      //
+      // 参数里若是引用全局符号的常量（&global、GEP 常量表达式等）必须**先绝对
+      // 物化**再放进标记序列的内联汇编：makeBodyPositionIndependent 会“整条跳过
+      // 内联汇编”，而标记序列本身就是内联汇编且在它之前生成，因此这类参数不会被
+      // 它处理，后端会把 &global 降级成 PC 相对的 adrp/add——函数体一搬移就指错
+      // （实测 find_vm_area 体内 spin_lock(&vmap_area_lock) 在 S3 变体里崩在错误
+      // 的锁地址上）。这里就地物化，与函数体内其它全局引用一致走 .ikaslr_fixups。
       SmallVector<Value *, 10> Ops;
       unsigned N = CI->arg_size();
       for (unsigned i = 0; i < N; ++i) {
         Value *A = CI->getArgOperand(i);
+        if (auto *C = dyn_cast<Constant>(A))
+          if (refsGlobal(C))
+            A = rebuildAbs(B, C);
         Type *T = A->getType();
         if (T->isPointerTy())
           A = B.CreatePtrToInt(A, I64);
@@ -633,7 +655,16 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
               FunctionType::get(Type::getVoidTy(Ctx), false),
               GlobalValue::ExternalLinkage, "__ikaslr_indirect_out", &M);
       } else if (Sel.count(Callee->getName().str())) {
-        TargetSym = Callee;               // 被随机化函数：入口跳板即其原名
+        // 被随机化函数：token+br 到它所在模块导出的 __ikaslr_in_<Kc>，而非函数名
+        // 本身。转换成功者该符号是 fixed_in 的别名；被拒者是 fixed_out 式包装。
+        // 这样即便被调方在它自己的 TU 里被拒（本模块看不到），也不会 br 到一个末尾
+        // 是 ret 的普通函数上（曾致 S3 崩溃）。
+        std::string IN = "__ikaslr_in_" + std::to_string(Kmap[Callee->getName().str()]);
+        GlobalValue *G = M.getNamedValue(IN);
+        if (!G)
+          G = Function::Create(FunctionType::get(Type::getVoidTy(Ctx), false),
+                               GlobalValue::ExternalLinkage, IN, &M);
+        TargetSym = G;
       } else {
         // 外部目标：出口跳板 fixed_out_<G>。每模块本地一份（不同模块各自发出，
         // 故用 InternalLinkage，避免跨模块重定义）。
@@ -772,9 +803,38 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
     }
   }
 
-  // ---- M1d：方案甲的汇编跳板（arm64）----
-  // 模板经 2026-09-20 汇编验证，见 kernel/ikaslr/tramp.S 头注释。计数暂走 C 调用
-  // （栈上保存/恢复参数寄存器），冒烟通过后再改内联汇编以达表 3-3 常驻税。
+  // ---- 方案甲的汇编跳板（arm64，论文 §3.3.2 形态）----
+  // 模板与逐条说明见 kernel/ikaslr/tramp.S 头注释；追踪协议见 kernel/ikaslr/track.c。
+  // 跳板只用 x16/x17 与 x9/x10，不碰参数/返回值寄存器，热路径无寄存器保存。
+
+  /// 本核计数加一。x16 = current；破坏 x9、x10、x17。Exit 选 exit（+8）还是 enter。
+  /// thread_info 的字段偏移经绝对符号 + :lo12: 在链接期填入（tramp.S 定义）。
+  std::string countAsm(bool Exit) {
+    std::string Sym = Exit ? "ikaslr_cnt+8" : "ikaslr_cnt";
+    std::string s;
+    if (!CountGlobal)
+      s += "\tldr\tw17, [x16, :lo12:__ikaslr_ti_cpu]\n";
+    s += "\tadrp\tx9, " + Sym + "\n";
+    s += "\tadd\tx9, x9, :lo12:" + Sym + "\n";
+    if (!CountGlobal)
+      s += "\tadd\tx9, x9, x17, lsl #6\n";
+    s += "1:\tldxr\tx17, [x9]\n";
+    s += "\tadd\tx17, x17, #1\n";
+    s += "\tstxr\tw10, x17, [x9]\n";
+    s += "\tcbnz\tw10, 1b\n";
+    return s;
+  }
+
+  static std::string setInsideAsm() {
+    return "\tdmb\tish\n"
+           "\tmov\tw17, #1\n"
+           "\tstr\tw17, [x16, :lo12:__ikaslr_ti_inside]\n";
+  }
+
+  static std::string loadBlockedAsm() {
+    return "\tadrp\tx9, ikaslr_blocked\n"
+           "\tldr\tw9, [x9, :lo12:ikaslr_blocked]\n";
+  }
 
   /// 每函数入口跳板 fixed_in_<Name>，符号名即原函数名（外部调用者不改）。
   /// 落在 .tramp.text.<Name>（固定区）。经 `bl __ikaslr_stub_<K>` 直接分支到桩。
@@ -785,69 +845,110 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
     if (External)
       s += "\t.globl " + Name + "\n";
     s += "\t.type " + Name + ",%function\n";
+    // 每随机化函数由**本模块**导出 __ikaslr_in_<K>：区域内调用点一律 token+br 到它
+    // （见 rewriteCallSitesAArch64）。转换成功者它就是 fixed_in 的别名；被拒者由
+    // buildRejectedInAsm 发一个 fixed_out 式包装。这样调用方不必知道被调方在它自己
+    // 那个 TU 里是否被拒（跨模块拒绝不一致曾致 S3 崩在 token 上）。
+    s += "\t.globl __ikaslr_in_" + std::to_string(K) + "\n";
+    s += "__ikaslr_in_" + std::to_string(K) + ":\n";
     s += Name + ":\n";
-    s += "\tsub\tsp, sp, #96\n";
-    s += "\tstp\tx0, x1, [sp, #0]\n";
-    s += "\tstp\tx2, x3, [sp, #16]\n";
-    s += "\tstp\tx4, x5, [sp, #32]\n";
-    s += "\tstp\tx6, x7, [sp, #48]\n";
-    s += "\tstp\tx8, x30, [sp, #64]\n";      // x8=sret；x30=调用者返回地址/标记
-    s += "\tstr\tx29, [sp, #80]\n";
-    s += "\tadd\tx29, sp, #80\n";
-    s += "\tbl\tikaslr_enter\n";
-    s += "\tldp\tx0, x1, [sp, #0]\n";
-    s += "\tldp\tx2, x3, [sp, #16]\n";
-    s += "\tldp\tx4, x5, [sp, #32]\n";
-    s += "\tldp\tx6, x7, [sp, #48]\n";
-    s += "\tldr\tx8, [sp, #64]\n";
-    s += "\tbl\t__ikaslr_stub_" + std::to_string(K) + "\n";  // 入口桩 -> 函数体
-    s += "\tstp\tx0, x1, [sp, #0]\n";        // 保存函数体返回值
-    s += "\tbl\tikaslr_leave\n";
-    s += "\tldp\tx0, x1, [sp, #0]\n";
-    s += "\tldr\tx30, [sp, #72]\n";          // 取回调用者返回地址/标记
-    s += "\tldr\tx29, [sp, #80]\n";
-    s += "\tadd\tsp, sp, #96\n";
-    s += "\ttbz\tx30, #63, 1f\n";            // 标记 -> 解析；真实地址 -> ret
+    s += "\tmrs\tx16, sp_el0\n";
+    s += "\tldr\tw17, [x16, :lo12:__ikaslr_ti_inside]\n";
+    s += "\tstp\tx17, x30, [sp, #-16]!\n";   // 进入前的标志 + 返回地址/标记
+    s += "\tcbnz\tw17, 2f\n";                // 区域内部的调用：不计数
+    s += countAsm(/*Exit=*/false);
+    s += setInsideAsm();
+    s += "2:";
+    s += loadBlockedAsm();
+    s += "\tcbnz\tw9, 8f\n";
+    s += "3:\tbl\t__ikaslr_stub_" + std::to_string(K) + "\n";  // 入口桩 -> 函数体
+    s += "\tldr\tw17, [sp]\n";
+    s += "\tcbnz\tw17, 5f\n";
+    s += "\tmrs\tx16, sp_el0\n";             // 跨边界返回：清标志先于 exit++
+    s += "\tstr\twzr, [x16, :lo12:__ikaslr_ti_inside]\n";
+    s += countAsm(/*Exit=*/true);
+    s += "\tldp\tx17, x30, [sp], #16\n";
     s += "\tret\n";
-    s += "1:\tb\tresolve_token\n";
+    s += "5:";                               // 返回到区域内的调用者
+    s += loadBlockedAsm();
+    s += "\tcbnz\tw9, 9f\n";
+    s += "6:\tldp\tx17, x30, [sp], #16\n";
+    s += "\ttbz\tx30, #63, 7f\n";
+    s += "\tret\n";                          // 兜底：继承标志的异常处理程序
+    s += "7:\tb\tresolve_token\n";
+    s += "8:\tbl\t__ikaslr_blocked_slow\n";
+    s += "\tb\t3b\n";
+    s += "9:\tbl\t__ikaslr_blocked_slow\n";
+    s += "\tb\t6b\n";
     s += "\t.size " + Name + ", .-" + Name + "\n";
     s += "\t.popsection\n";
     return s;
   }
 
-  /// 每目标出口跳板 fixed_out_<GName>。本地符号（每模块一份）。固定代码，
-  /// 用 adrp/add 与 bl 直接引用外部函数 G；总是经 resolve_token 回函数体。
+  /// 每目标出口跳板 fixed_out_<GName>。本地符号（每模块一份）。`bl G` 写死在
+  /// 只读固定区，目标集合由构造保证；总是经 resolve_token 回函数体。
   std::string buildFixedOutAsm(const std::string &GName, bool /*GLocal*/) {
     std::string t = "fixed_out_" + GName;
     std::string s;
     s += "\t.pushsection .tramp.text." + t + ",\"ax\",%progbits\n";
     s += "\t.type " + t + ",%function\n";
     s += t + ":\n";
-    s += "\tsub\tsp, sp, #96\n";
-    s += "\tstp\tx0, x1, [sp, #0]\n";
-    s += "\tstp\tx2, x3, [sp, #16]\n";
-    s += "\tstp\tx4, x5, [sp, #32]\n";
-    s += "\tstp\tx6, x7, [sp, #48]\n";
-    s += "\tstp\tx8, x30, [sp, #64]\n";      // x30 = 返回标记
-    s += "\tstr\tx29, [sp, #80]\n";
-    s += "\tadd\tx29, sp, #80\n";
-    s += "\tadrp\tx0, " + GName + "\n";
-    s += "\tadd\tx0, x0, :lo12:" + GName + "\n";   // &G 供白名单
-    s += "\tbl\tikaslr_out_enter\n";
-    s += "\tldp\tx0, x1, [sp, #0]\n";
-    s += "\tldp\tx2, x3, [sp, #16]\n";
-    s += "\tldp\tx4, x5, [sp, #32]\n";
-    s += "\tldp\tx6, x7, [sp, #48]\n";
-    s += "\tldr\tx8, [sp, #64]\n";
-    s += "\tbl\t" + GName + "\n";             // 直接调用外部函数
-    s += "\tstp\tx0, x1, [sp, #0]\n";         // 保存 G 的返回值
-    s += "\tbl\tikaslr_out_leave\n";
-    s += "\tldp\tx0, x1, [sp, #0]\n";
-    s += "\tldr\tx30, [sp, #72]\n";           // 取回返回标记
-    s += "\tldr\tx29, [sp, #80]\n";
-    s += "\tadd\tsp, sp, #96\n";
+    s += "\tmrs\tx16, sp_el0\n";
+    s += "\tldr\tw17, [x16, :lo12:__ikaslr_ti_inside]\n";
+    s += "\tstp\tx17, x30, [sp, #-16]!\n";   // 进入前的标志 + 返回标记
+    s += "\tcbz\tw17, 2f\n";                 // 未被计数的执行流：直接调用
+    s += "\tstr\twzr, [x16, :lo12:__ikaslr_ti_inside]\n";
+    s += countAsm(/*Exit=*/true);            // 离开区域
+    s += "2:\tbl\t" + GName + "\n";
+    s += "\tldr\tw17, [sp]\n";
+    s += "\tcbz\tw17, 4f\n";
+    s += "\tmrs\tx16, sp_el0\n";
+    s += countAsm(/*Exit=*/false);           // 回到区域：先加一再查阻断
+    s += setInsideAsm();
+    s += loadBlockedAsm();
+    s += "\tcbnz\tw9, 9f\n";
+    s += "4:\tldp\tx17, x30, [sp], #16\n";
     s += "\tb\tresolve_token\n";
+    s += "9:\tbl\t__ikaslr_blocked_slow\n";
+    s += "\tb\t4b\n";
     s += "\t.size " + t + ", .-" + t + "\n";
+    s += "\t.popsection\n";
+    return s;
+  }
+
+  /// 名单里但被拒的函数的 __ikaslr_in_<K>：它不被随机化，函数体留在原地，因此
+  /// 区域内调用点对它的 token+br 应当被当作**离开区域调用一个外部函数**处理——
+  /// 即一个 fixed_out 式包装（正常 bl 原函数，返回后按标记 resolve_token 回去）。
+  /// 全局符号，由本函数的定义模块发出一份。签名被拒者（>8 参）不会被这条路命中：
+  /// 任何要 token 调用它的函数自己就先因“体内 >8 参调用”被拒了。
+  std::string buildRejectedInAsm(const std::string &Name, unsigned K) {
+    std::string sym = "__ikaslr_in_" + std::to_string(K);
+    std::string s;
+    s += "\t.pushsection .tramp.text." + sym + ",\"ax\",%progbits\n";
+    s += "\t.globl " + sym + "\n";
+    s += "\t.type " + sym + ",%function\n";
+    s += sym + ":\n";
+    s += "\tmrs\tx16, sp_el0\n";
+    s += "\tldr\tw17, [x16, :lo12:__ikaslr_ti_inside]\n";
+    s += "\tstp\tx17, x30, [sp, #-16]!\n";
+    s += "\tcbz\tw17, 2f\n";
+    s += "\tstr\twzr, [x16, :lo12:__ikaslr_ti_inside]\n";
+    s += countAsm(/*Exit=*/true);              // 离开区域
+    s += "2:\tbl\t" + Name + "\n";           // 调原地未搬移的函数
+    s += "\tldr\tw17, [sp]\n";
+    s += "\tcbz\tw17, 4f\n";
+    s += "\tmrs\tx16, sp_el0\n";
+    s += countAsm(/*Exit=*/false);             // 回到区域
+    s += setInsideAsm();
+    s += loadBlockedAsm();
+    s += "\tcbnz\tw9, 9f\n";
+    s += "4:\tldp\tx17, x30, [sp], #16\n";
+    s += "\ttbz\tx30, #63, 5f\n";
+    s += "\tret\n";                           // 兜底：真实返回地址（继承标志的异常）
+    s += "5:\tb\tresolve_token\n";
+    s += "9:\tbl\t__ikaslr_blocked_slow\n";
+    s += "\tb\t4b\n";
+    s += "\t.size " + sym + ", .-" + sym + "\n";
     s += "\t.popsection\n";
     return s;
   }
@@ -870,8 +971,12 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
                                    Name + ".ikaslr.tramp", &M);
     F->replaceAllUsesWith(T);
 
-    // 2. 改名落段。
+    // 2. 改名落段。占名声明随即改回原名——必须在改写调用点**之前**：自递归函数
+    //    体内对自己的调用此刻已指向 T，调用点改写按名字判断目标是否在名单里，
+    //    T 若还叫 "<Name>.ikaslr.tramp" 就会被当成外部函数、发出一个引用不存在
+    //    符号的 fixed_out（S3 规模下 ___pskb_trim 等 6 个递归函数实测链接失败）。
     F->setName(Name + "_body");
+    T->setName(Name);
     F->setSection(".rand.text." + Name);
     F->addFnAttr(Attribute::NoInline);
     F->addFnAttr("frame-pointer", "all");   // 调用全变内联汇编后仍要保存 x30
@@ -895,8 +1000,7 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
     GlobalAlias::create(F->getValueType(), 0, GlobalValue::ExternalLinkage,
                         "__ikaslr_body_" + std::to_string(K), F);
 
-    // 6. 占名声明改回原名；module asm 定义它（fixed_in_F）。
-    T->setName(Name);
+    // 6. module asm 定义原名符号（fixed_in_F）；IR 里的 T 只是它的声明。
     M.appendModuleInlineAsm(buildFixedInAsm(Name, K, External));
 
     if (Verbose)
@@ -1068,6 +1172,11 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
       if (const char *Why = rejectReason(&F)) {
         errs() << "ikaslr: skipping " << F.getName() << ": " << Why << "\n";
         Skipped.push_back(F.getName().str());
+        // 仍要为它导出 __ikaslr_in_<K>（fixed_out 式包装），否则别的模块里对它的
+        // token+br 会落到一个不处理标记的普通函数上。
+        if (IsAArch64)
+          M.appendModuleInlineAsm(
+              buildRejectedInAsm(F.getName().str(), Kmap[F.getName().str()]));
         continue;
       }
       Todo.push_back(&F);

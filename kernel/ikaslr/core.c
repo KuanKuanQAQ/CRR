@@ -37,61 +37,40 @@
 
 #ifdef CONFIG_ARM64
 /*
- * ---- arm64 地址物化的早期修补（设计对齐改造 M3，§3 问题 4）----
+ * ---- arm64 地址物化的修补表 ----
  *
  * 被随机化的函数体用 `movn/movk/movk` 占位序列物化区域外地址（全局变量、
  * fixed_out 跳板），立即数在映像里留空（0）。真实地址记在 .ikaslr_fixups：
  * 每条 16 字节 = { s32 off（本条到那条 movn 的相对偏移）, s32 保留, u64 sym }。
- * sym 带 R_AARCH64_RELATIVE，内核早期重定位已把它填成最终地址。
  *
  * 物化的都是**固定**对象的绝对地址（不随随机化改变），故映像母本与所有变体
  * 用同一套立即数——只需在母本上一次性补好，变体从母本复制即天然带上。
  *
- * **时机**：必须在任何被随机化函数首次执行之前。这些函数（VFS 等）在启动早期
- * 就会被调用，远早于 late_initcall(ikaslr_init)，因此由 start_kernel 在 mm_init()
- * 之后（文本修补可用）、子系统大量使用 VFS 之前显式调用 ikaslr_apply_fixups()。
- * （这修正了 19 号文档 §4 里"在 ikaslr_init 里补"的时机错误。）
+ * **补的时机在 head.S 的 __ikaslr_apply_fixups**（紧跟 __relocate_kernel，MMU 刚开、
+ * 映像仍整体可写）。必须那么早：S3 名单里的 memblock_reserve 在 setup_arch() 里
+ * 就被调用，远早于文本修补设施可用——早先放在 start_kernel 的 poking_init() 之后，
+ * 37 个 VFS 函数够用，一到 S3 规模就在控制台起来之前崩在 0xffff00000000ffff。
+ * 这里只剩一个计数，供启动日志核对。
  */
 struct ikaslr_fixup {
-	s32 off;	/* 本条目到 movn 指令的相对偏移（1b - .）*/
+	s32 off;
 	s32 resv;
-	u64 sym;	/* 目标绝对地址（已由早期重定位填好）*/
+	u64 sym;
 };
 
 extern struct ikaslr_fixup __start_ikaslr_fixups[], __end_ikaslr_fixups[];
-
-/* 把一条 MOVN/MOVK 的 imm16 字段（bits[20:5]）替换为 imm，其余位不动。*/
-static void ikaslr_set_movw_imm(u32 *insn, u16 imm)
-{
-	u32 v = le32_to_cpu(READ_ONCE(*insn));
-
-	v = (v & ~(0xffffu << 5)) | ((u32)imm << 5);
-	aarch64_insn_patch_text_nosync(insn, v);
-}
-
-void __init ikaslr_apply_fixups(void)
-{
-	struct ikaslr_fixup *e;
-	unsigned long n = 0;
-
-	for (e = __start_ikaslr_fixups; e < __end_ikaslr_fixups; e++) {
-		u32 *movn = (u32 *)((unsigned long)&e->off + e->off);
-		u64 s = e->sym;
-
-		/* movn xN,#a：结果低 16 位 = ~a，故 a = ~sym[15:0] 得到 sym[15:0]；
-		 * 高位由 movn 置 1（内核地址高 16 位恒为 1）。随后两条 movk 补中段。*/
-		ikaslr_set_movw_imm(movn + 0, (u16)(~s & 0xffff));
-		ikaslr_set_movw_imm(movn + 1, (u16)((s >> 16) & 0xffff));
-		ikaslr_set_movw_imm(movn + 2, (u16)((s >> 32) & 0xffff));
-		n++;
-	}
-	pr_info("applied %lu address materialization fixup(s)\n", n);
-}
 #endif /* CONFIG_ARM64 */
 
 struct ikaslr_tramp **ikaslr_tbl;	/* 指针数组，见 ikaslr.h 说明 */
 int ikaslr_ntramp;
 
+/*
+ * 执行流追踪有两套实现：
+ *   arm64 —— track.c：每任务内外标志 + SRCU 式 per-CPU 双计数，热路径由汇编跳板
+ *            内联完成（论文 §3.3.2 形态，交接文档 §4.1）；
+ *   x86   —— 下面的旧实现（全局原子计数 + C 跳板），待 M7 移植时替换。
+ */
+#ifndef CONFIG_ARM64
 /*
  * ---- S1.3 精确线程追踪（论文 §3.4.5）----
  *
@@ -453,6 +432,8 @@ int ikaslr_wait_region_empty(unsigned int timeout_ms)
 	}
 }
 
+#endif /* !CONFIG_ARM64 */
+
 int ikaslr_nr_funcs(void)
 {
 	return ikaslr_ntramp;
@@ -660,6 +641,11 @@ static int __init ikaslr_init(void)
 	}
 
 	ikaslr_control_init();		/* 接口缺失不应阻止机制本身工作 */
+
+#ifdef CONFIG_ARM64
+	pr_info("%ld address materialization fixup(s) applied at early boot\n",
+		(long)(__end_ikaslr_fixups - __start_ikaslr_fixups));
+#endif
 
 	pr_info("registered %d randomizable function(s), rand region %lu B\n",
 		ikaslr_ntramp, rand_sz);

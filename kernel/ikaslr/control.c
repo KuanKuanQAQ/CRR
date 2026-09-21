@@ -22,6 +22,7 @@
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
 #include <linux/init.h>
+#include <linux/mutex.h>
 
 #include "internal.h"
 
@@ -149,6 +150,59 @@ static const struct proc_ops ikaslr_layout_ops = {
 	.proc_release	= single_release,
 };
 
+#ifdef CONFIG_IKASLR_TRACK_SELFTEST
+/* 写入毫秒数运行一次判空协议自测（track.c）；读出最近一次的结果。*/
+static struct ikaslr_track_result ikaslr_st_res;
+static int ikaslr_st_ret = -ENODATA;
+static DEFINE_MUTEX(ikaslr_st_lock);
+
+static ssize_t ikaslr_st_write(struct file *f, const char __user *buf,
+			       size_t len, loff_t *ppos)
+{
+	unsigned int ms;
+	int ret = kstrtouint_from_user(buf, len, 0, &ms);
+
+	if (ret)
+		return ret;
+	ms = clamp(ms, 10U, 600000U);
+	mutex_lock(&ikaslr_st_lock);
+	ikaslr_st_ret = ikaslr_track_selftest(ms, &ikaslr_st_res);
+	mutex_unlock(&ikaslr_st_lock);
+	return len;
+}
+
+static int ikaslr_st_show(struct seq_file *m, void *v)
+{
+	const struct ikaslr_track_result *r = &ikaslr_st_res;
+
+	mutex_lock(&ikaslr_st_lock);
+	seq_printf(m, "result        %s\n", ikaslr_st_ret == -ENODATA ? "not run" :
+		   ikaslr_st_ret ? "FAIL" : "PASS");
+	seq_printf(m, "cpus          %u\n", num_online_cpus());
+	seq_printf(m, "threads       %u\n", r->threads);
+	seq_printf(m, "checks        %lu\n", r->checks);
+	seq_printf(m, "srcu_empty    %lu\n", r->empty);
+	seq_printf(m, "srcu_wrong    %lu\n", r->wrong);
+	seq_printf(m, "naive_empty   %lu\n", r->naive_empty);
+	seq_printf(m, "naive_wrong   %lu\n", r->naive_wrong);
+	mutex_unlock(&ikaslr_st_lock);
+	return 0;
+}
+
+static int ikaslr_st_open(struct inode *i, struct file *f)
+{
+	return single_open(f, ikaslr_st_show, NULL);
+}
+
+static const struct proc_ops ikaslr_st_ops = {
+	.proc_open	= ikaslr_st_open,
+	.proc_read	= seq_read,
+	.proc_write	= ikaslr_st_write,
+	.proc_lseek	= seq_lseek,
+	.proc_release	= single_release,
+};
+#endif /* CONFIG_IKASLR_TRACK_SELFTEST */
+
 int __init ikaslr_control_init(void)
 {
 	struct proc_dir_entry *dir;
@@ -164,6 +218,13 @@ int __init ikaslr_control_init(void)
 	/* 布局等同于泄露随机化结果，仅 root 可读（安全提示见文件头）。*/
 	if (!proc_create("layout", 0400, dir, &ikaslr_layout_ops))
 		return -ENOMEM;
+#ifdef CONFIG_IKASLR_TRACK_SELFTEST
+	if (!proc_create("track_selftest", 0600, dir, &ikaslr_st_ops))
+		return -ENOMEM;
+#endif
+#ifdef CONFIG_IKASLR_MICROBENCH
+	ikaslr_microbench_init(dir);
+#endif
 #ifdef CONFIG_IKASLR_DEBUG
 	ikaslr_bench_init(dir);		/* §3.6.3 微观开销测量 */
 #endif

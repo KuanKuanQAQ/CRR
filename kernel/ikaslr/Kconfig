@@ -23,6 +23,33 @@ config IKASLR_STATS
 	  跳板开销时应关掉本项；它与 IKASLR_DEBUG 独立，正是为了能在开着调试
 	  接口（/proc/ikaslr/bench）的同时关掉统计。
 
+config IKASLR_COUNT_GLOBAL
+	bool "I-KASLR: single shared execution-flow counter (comparison baseline)"
+	depends on IKASLR && ARM64
+	help
+	  执行流追踪默认用 SRCU 式的 per-CPU 进入/离开双计数。选中本项后所有核共用
+	  同一对计数（同一条缓存行），即「全局共享计数」的对照实现，只用于多核
+	  扩展性对比实验。跳板序列由 LLVM pass 按本项生成，切换后须全量重编。
+
+	  若不确定，选 N。
+
+config IKASLR_TRACK_SELFTEST
+	bool "I-KASLR: region-empty protocol self-test"
+	depends on IKASLR && ARM64
+	help
+	  提供 /proc/ikaslr/track_selftest：写入毫秒数即运行一次判空协议自测——
+	  多核并发进出并强制迁移，反复「阻断、判空」，校验从不在区域非空时判为空；
+	  同时统计朴素的「每核可加可减计数」方案在同样交错下的误判次数。
+
+config IKASLR_MICROBENCH
+	bool "I-KASLR: trampoline micro-benchmark"
+	depends on IKASLR && ARM64 && PERF_EVENTS
+	help
+	  提供 /proc/ikaslr/microbench：读取即运行一次跳板微基准，输出 CSV——
+	  跳板各段指令序列的分项成本，以及经真实跳板的调用相对普通调用的差值
+	  （纳秒、周期、分支预测失败）。被测的几个随机化函数由 LLVM pass 自动加入
+	  名单。数字只有在真机上才有意义。
+
 config IKASLR_DEBUG
 	bool "I-KASLR debugging output"
 	depends on IKASLR

@@ -96,6 +96,29 @@ int main(void)
 	printf("---- after 8 triggers ----\n%s", after);
 	dump("/proc/ikaslr/stats");
 	dump("/proc/ikaslr/bench");
+	/* 判空协议自测（CONFIG_IKASLR_TRACK_SELFTEST；没有该文件则跳过）。*/
+	{
+		int fd = open("/proc/ikaslr/track_selftest", O_WRONLY);
+
+		if (fd >= 0) {
+			if (write(fd, "8000", 4) < 0)
+				printf("SMOKE: track selftest write failed\n");
+			close(fd);
+			dump("/proc/ikaslr/track_selftest");
+		}
+	}
+	/* 跳板微基准（CONFIG_IKASLR_MICROBENCH）。冒烟里只跑极少的迭代，验证它能跑、
+	 * 被测函数确实走了跳板；数字在 QEMU 上没有意义。*/
+	{
+		int fd = open("/proc/ikaslr/microbench", O_WRONLY);
+
+		if (fd >= 0) {
+			if (write(fd, "2000 3", 6) < 0)
+				printf("SMOKE: microbench write failed\n");
+			close(fd);
+			dump("/proc/ikaslr/microbench");
+		}
+	}
 	printf("SMOKE: layout changed = %d\n", changed);
 	printf("SMOKE: %s\n", changed ? "PASS" : "FAIL (layout did not change)");
 

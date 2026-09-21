@@ -43,6 +43,15 @@ struct thread_info {
 	void			*scs_sp;
 #endif
 	u32			cpu;
+#ifdef CONFIG_IKASLR
+	/*
+	 * 1 while this task's execution flow is inside the randomized region
+	 * and accounted in the per-CPU enter/exit counters.  Read and written
+	 * by the trampolines (see kernel/ikaslr/tramp.S); parked in pt_regs
+	 * across EL1 exceptions (entry.S).
+	 */
+	u32			ikaslr_inside;
+#endif
 };
 
 #define thread_saved_pc(tsk)	\

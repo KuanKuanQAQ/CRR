@@ -25,7 +25,6 @@
 #include <linux/delay.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
-#include <linux/ikaslr.h>
 #include <linux/initrd.h>
 #include <linux/memblock.h>
 #include <linux/acpi.h>
@@ -932,12 +931,6 @@ void start_kernel(void)
 	trap_init();
 	mm_core_init();
 	poking_init();
-	/*
-	 * I-KASLR（arm64）：文本修补设施已就绪（poking_init），在此把被随机化函数体
-	 * 里 movn/movk 的空立即数补成最终地址。必须早于任何被随机化函数首次执行，
-	 * 因此放在这里而非 late_initcall。见 kernel/ikaslr/core.c。
-	 */
-	ikaslr_apply_fixups();
 	ftrace_init();
 
 	/* trace_printk can be enabled here */

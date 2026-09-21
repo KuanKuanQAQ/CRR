@@ -870,6 +870,71 @@ SYM_FUNC_START_LOCAL(__relocate_kernel)
 SYM_FUNC_END(__relocate_kernel)
 #endif
 
+#ifdef CONFIG_IKASLR
+/*
+ * I-KASLR: fill in the address-materialization immediates of the randomized
+ * function bodies.
+ *
+ * The LLVM pass materializes every out-of-region address in a movable body as
+ *	movn xN, #0 ; movk xN, #0, lsl #16 ; movk xN, #0, lsl #32
+ * with the immediates left empty, and records { s32 off; s32 resv; u64 sym }
+ * in .ikaslr_fixups (off = movn - &entry).  The immediates must hold the final
+ * virtual address of sym before the first randomized function runs -- and with
+ * a realistic function list that is as early as setup_arch() (memblock_*), long
+ * before text patching works.  So do it here: __relocate_kernel has just made
+ * every `sym` final, only the boot CPU is running, and init_pg_dir still maps
+ * the whole image read-write.
+ *
+ * We execute from the ID map, where text is read-only, so both the table and
+ * the instructions are accessed through the TTBR1 alias.  x23 = KASLR offset.
+ */
+SYM_FUNC_START_LOCAL(__ikaslr_apply_fixups)
+	adr_l	x9, __start_ikaslr_fixups
+	adr_l	x10, __end_ikaslr_fixups
+	cmp	x9, x10
+	b.hs	2f
+	adrp	x11, _text			// runtime __pa(_text)
+	mov_q	x12, KIMAGE_VADDR
+#ifdef CONFIG_RELOCATABLE
+	add	x12, x12, x23
+#endif
+	sub	x12, x12, x11			// PA -> kernel VA
+	add	x9, x9, x12
+	add	x10, x10, x12
+
+	.macro	ikaslr_set_imm16, insnp, imm, tmp
+	ldr	\tmp, [\insnp]
+	and	\imm, \imm, #0xffff
+	bic	\tmp, \tmp, #(0xffff << 5)
+	orr	\tmp, \tmp, \imm, lsl #5
+	str	\tmp, [\insnp], #4
+	.endm
+
+0:	ldrsw	x13, [x9]			// off
+	ldr	x14, [x9, #8]			// sym
+	add	x13, x9, x13			// -> movn
+	mov	x16, x13
+	mvn	x15, x14			// movn imm = ~sym[15:0]
+	ikaslr_set_imm16 x13, w15, w17
+	lsr	x15, x14, #16
+	ikaslr_set_imm16 x13, w15, w17
+	lsr	x15, x14, #32
+	ikaslr_set_imm16 x13, w15, w17
+	dc	cvau, x16			// 12 bytes may straddle a line
+	add	x16, x16, #8
+	dc	cvau, x16
+	add	x9, x9, #16
+	cmp	x9, x10
+	b.lo	0b
+
+	dsb	ish
+	ic	iallu
+	dsb	nsh
+	isb
+2:	ret
+SYM_FUNC_END(__ikaslr_apply_fixups)
+#endif /* CONFIG_IKASLR */
+
 SYM_FUNC_START_LOCAL(__primary_switch)
 	adrp	x1, reserved_pg_dir
 	adrp	x2, init_idmap_pg_dir
@@ -895,6 +960,9 @@ SYM_FUNC_START_LOCAL(__primary_switch)
 	load_ttbr1 x1, x1, x2
 #ifdef CONFIG_RELOCATABLE
 	bl	__relocate_kernel
+#endif
+#ifdef CONFIG_IKASLR
+	bl	__ikaslr_apply_fixups
 #endif
 	ldr	x8, =__primary_switched
 	adrp	x0, KERNEL_START		// __pa(KERNEL_START)
