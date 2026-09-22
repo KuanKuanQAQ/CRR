@@ -35,6 +35,9 @@ static void __used common(void)
 {
 	BLANK();
 	OFFSET(TASK_threadsp, task_struct, thread.sp);
+#ifdef CONFIG_IKASLR
+	OFFSET(IKASLR_TI_INSIDE, task_struct, thread_info.ikaslr_inside);
+#endif
 #ifdef CONFIG_STACKPROTECTOR
 	OFFSET(TASK_stack_canary, task_struct, stack_canary);
 #endif

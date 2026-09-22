@@ -60,6 +60,11 @@ struct thread_info {
 #ifdef CONFIG_SMP
 	u32			cpu;		/* current CPU */
 #endif
+#ifdef CONFIG_IKASLR
+	/* I-KASLR：本任务执行流是否在随机化区域内并已计入。跳板（tramp_x86.S 与
+	 * pass 发出的序列）读写；跨内核态异常由 entry 保存/清零。见 kernel/ikaslr/track.c。*/
+	u32			ikaslr_inside;
+#endif
 };
 
 #define INIT_THREAD_INFO(tsk)			\

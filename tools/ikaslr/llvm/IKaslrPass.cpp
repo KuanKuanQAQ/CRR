@@ -263,6 +263,20 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
     return B.CreateCall(IA, {Sym});
   }
 
+  /// fixed_out 的 `call G`（以及被拒包装的 `call F`）是**模块汇编**里的引用，
+  /// 对 LLVM 不可见。若 G 是本模块里可丢弃的定义（static inline 内联器又决定不内联、
+  /// 或 available_externally / linkonce），把它原来的 IR 调用点删掉后就再无可见引用，
+  /// clang 便不再发出它的实体符号 —— 链接期 undefined（实测 x86 s1-vfs 的
+  /// file_start_write 等）。这里强制保留并落地：内联候选改内部链接，并挂 compiler.used。
+  void ensureEmitted(Module &M, Function *G) {
+    if (!G || G->isDeclaration())
+      return;                               // 外部声明：实体符号在别处，无需处理
+    if (G->hasAvailableExternallyLinkage() || G->hasLinkOnceLinkage() ||
+        G->hasLinkOnceODRLinkage())
+      G->setLinkage(GlobalValue::InternalLinkage);
+    appendToCompilerUsed(M, {G});
+  }
+
   /// 常量里是否（递归地）引用了全局符号。
   static bool refsGlobal(Constant *C, unsigned Depth = 0) {
     if (Depth > 8)
@@ -545,8 +559,8 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
             return "fp arg in body call (token sequence handles int/ptr only)";
           ++IntN;
         }
-        if (IntN > 8)
-          return "call with >8 int args in body (would misalign sp)";
+        if (IntN > (IsAArch64 ? 8u : 6u))
+          return "call with too many int args in body (would misalign sp)";
         Type *RT = CB->getType();
         if (!RT->isVoidTy() && !RT->isIntegerTy() && !RT->isPointerTy())
           return "non-int/ptr return in body call";
@@ -573,10 +587,10 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
     // 经栈传递参数的函数：跳板 stp 后 bl 会使被调方栈参数错位。
     if (const char *R = stackArgReason(F))
       return R;
-    // arm64 标记—分支序列对函数体内调用点的限制。
-    if (IsAArch64)
-      if (const char *R = callSiteRejectReason(F))
-        return R;
+    // 标记—分支序列对函数体内调用点的限制（arm64 与 x86 方案甲同样受此约束：
+    // 含浮点/聚合参、sret、>寄存器数参、非整型/指针返回、musttail 的调用点暂不支持）。
+    if (const char *R = callSiteRejectReason(F))
+      return R;
     return nullptr;
   }
 
@@ -677,6 +691,7 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
         TargetSym = G;
         if (OutEmitted.insert(GN).second)
           M.appendModuleInlineAsm(buildFixedOutAsm(GN, Callee->hasLocalLinkage()));
+        ensureEmitted(M, Callee);
         emitWhitelist(M, Callee);
       }
 
@@ -796,6 +811,170 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
           R = B.CreateIntToPtr(R, RT);
         else
           R = B.CreateZExtOrTrunc(R, RT);
+        CI->replaceAllUsesWith(R);
+      }
+      CI->eraseFromParent();
+      ++NrTokenCalls;
+    }
+  }
+
+  /// x86-64：把函数体内每个调用点改写成「push 返回标记 + jmp 目标」序列（方案甲）。
+  /// x86 的返回地址在栈上，故标记也 push 到栈上（arm64 是放 x30）。marker=(k<<32)|Δ，
+  /// Δ=返回点-函数体入口（运行期由两条 lea 相减求得，与搬移无关）。直接调用的目标是
+  /// __ikaslr_in_<Kc>（被随机化）或 fixed_out_<G>（外部），movabs 绝对物化后 `jmp *`；
+  /// 间接调用经 __ikaslr_indirect_out（目标放 r11）。只用 r10/r11(+rax 作间接的临时)，
+  /// 不碰参数寄存器 rdi..r9 与 rcx（rcx 可能是第 4 参）。
+  void rewriteCallSitesX86(Module &M, Function *Body, unsigned K) {
+    LLVMContext &Ctx = M.getContext();
+    Type *I8Ptr = Type::getInt8PtrTy(Ctx);
+    Type *I64 = Type::getInt64Ty(Ctx);
+    static const char *ArgOut[6] = {"={di}","={si}","={dx}","={cx}","={r8}","={r9}"};
+    static const char *ArgClob[6] = {"~{di}","~{si}","~{dx}","~{cx}","~{r8}","~{r9}"};
+
+    SmallVector<CallInst *, 32> Calls;
+    for (BasicBlock &BB : *Body)
+      for (Instruction &I : BB)
+        if (auto *CI = dyn_cast<CallInst>(&I)) {
+          if (CI->isInlineAsm())
+            continue;
+          Function *Cal = CI->getCalledFunction();
+          if (Cal && Cal->isIntrinsic())
+            continue;
+          Calls.push_back(CI);
+        }
+
+    for (CallInst *CI : Calls) {
+      IRBuilder<> B(CI);
+      Function *Callee = dyn_cast_or_null<Function>(
+          CI->getCalledOperand()->stripPointerCasts());
+      bool Indirect = !Callee;
+
+      // 收集参数（≤6，pass 已在 reject 里保证），全局地址常量参数先绝对物化
+      // （理由同 arm64：makeBodyPositionIndependent 整条跳过内联汇编）。
+      SmallVector<Value *, 8> Ops;
+      unsigned N = CI->arg_size();
+      for (unsigned i = 0; i < N; ++i) {
+        Value *A = CI->getArgOperand(i);
+        if (auto *C = dyn_cast<Constant>(A))
+          if (refsGlobal(C))
+            A = rebuildAbs(B, C);
+        Type *T = A->getType();
+        if (T->isPointerTy())
+          A = B.CreatePtrToInt(A, I64);
+        else if (T->isIntegerTy())
+          A = B.CreateZExtOrTrunc(A, I64);
+        Ops.push_back(A);
+      }
+
+      Type *RT = CI->getType();
+      bool HasOut = !RT->isVoidTy();
+
+      GlobalValue *TargetSym = nullptr, *IoutSym = nullptr;
+      Value *TargetVal = nullptr;
+      if (Indirect) {
+        TargetVal = B.CreatePtrToInt(CI->getCalledOperand(), I64);
+        IoutSym = M.getNamedValue("__ikaslr_indirect_out");
+        if (!IoutSym)
+          IoutSym = Function::Create(FunctionType::get(Type::getVoidTy(Ctx), false),
+                                     GlobalValue::ExternalLinkage,
+                                     "__ikaslr_indirect_out", &M);
+      } else if (Sel.count(Callee->getName().str())) {
+        std::string IN = "__ikaslr_in_" + std::to_string(Kmap[Callee->getName().str()]);
+        GlobalValue *G = M.getNamedValue(IN);
+        if (!G)
+          G = Function::Create(FunctionType::get(Type::getVoidTy(Ctx), false),
+                               GlobalValue::ExternalLinkage, IN, &M);
+        TargetSym = G;
+      } else {
+        std::string GN = Callee->getName().str();
+        std::string TN = "fixed_out_" + GN;
+        GlobalValue *G = M.getNamedValue(TN);
+        if (!G)
+          G = Function::Create(FunctionType::get(Type::getVoidTy(Ctx), false),
+                               GlobalValue::InternalLinkage, TN, &M);
+        TargetSym = G;
+        if (OutEmitted.insert(GN).second)
+          M.appendModuleInlineAsm(buildFixedOutAsmX86(GN));
+        ensureEmitted(M, Callee);
+      }
+
+      // 约束：输出 = [rax(若有返回值)] + 各参数寄存器（in-out）；输入 = 各参数(tied)
+      // + Fbody("s") + 目标。其余调用者保存寄存器与 r10/r11/xmm/cc/memory 进 clobber。
+      unsigned OutAx = HasOut ? 1 : 0;
+      unsigned numOut = OutAx + N;
+      std::string Cons;
+      auto add = [&](const std::string &c) {
+        if (!Cons.empty()) Cons += ",";
+        Cons += c;
+      };
+      if (HasOut) add("={ax}");
+      for (unsigned i = 0; i < N; ++i) add(ArgOut[i]);
+      SmallVector<Type *, 8> ParamTys;
+      for (unsigned i = 0; i < N; ++i) {           // tied 输入：参数 i -> 输出 OutAx+i
+        add(std::to_string(OutAx + i));
+        ParamTys.push_back(I64);
+      }
+      unsigned FIdx = numOut + N;                  // Fbody
+      add("s"); ParamTys.push_back(I8Ptr);
+      unsigned PtrIdx = 0, IoutIdx = 0, TIdx = 0;
+      if (Indirect) {
+        PtrIdx = FIdx + 1; add("r"); ParamTys.push_back(I64);
+        IoutIdx = FIdx + 2; add("s"); ParamTys.push_back(I8Ptr);
+      } else {
+        TIdx = FIdx + 1; add("s"); ParamTys.push_back(I8Ptr);
+      }
+      if (!HasOut) add("~{ax}");
+      for (unsigned i = N; i < 6; ++i) add(ArgClob[i]);
+      add("~{r10}"); add("~{r11}");
+      for (unsigned v = 0; v <= 15; ++v) add("~{xmm" + std::to_string(v) + "}");
+      add("~{cc}"); add("~{memory}");
+
+      std::string F = "${" + std::to_string(FIdx) + ":c}(%rip)";
+      std::string Asm;
+      if (Indirect) {
+        Asm += "movq ${" + std::to_string(PtrIdx) + "}, %r11\n\t";   // 目标先落 r11
+        Asm += "leaq 1f(%rip), %r10\n\t";
+        Asm += "leaq " + F + ", %rax\n\t";
+        Asm += "subq %rax, %r10\n\t";
+        Asm += "movl $$" + std::to_string(K) + ", %eax\n\t";
+        Asm += "shlq $$32, %rax\n\t orq %rax, %r10\n\t";
+        Asm += "pushq %r10\n\t";
+        Asm += "movabsq $$${" + std::to_string(IoutIdx) + ":c}, %r10\n\t";
+        Asm += "jmp *%r10\n\t";
+      } else {
+        Asm += "leaq 1f(%rip), %r10\n\t";
+        Asm += "leaq " + F + ", %r11\n\t";
+        Asm += "subq %r11, %r10\n\t";
+        Asm += "movl $$" + std::to_string(K) + ", %r11d\n\t";
+        Asm += "shlq $$32, %r11\n\t orq %r11, %r10\n\t";
+        Asm += "pushq %r10\n\t";
+        Asm += "movabsq $$${" + std::to_string(TIdx) + ":c}, %r11\n\t";
+        Asm += "jmp *%r11\n\t";
+      }
+      Asm += "1:\n\t";
+
+      Type *AsmRet;
+      if (numOut == 0) AsmRet = Type::getVoidTy(Ctx);
+      else if (numOut == 1) AsmRet = I64;
+      else { SmallVector<Type *, 8> El(numOut, I64); AsmRet = StructType::get(Ctx, El); }
+      InlineAsm *IA = InlineAsm::get(FunctionType::get(AsmRet, ParamTys, false),
+                                     Asm, Cons, /*hasSideEffects=*/true);
+
+      SmallVector<Value *, 8> Args(Ops.begin(), Ops.end());
+      Args.push_back(ConstantExpr::getBitCast(Body, I8Ptr));
+      if (Indirect) {
+        Args.push_back(TargetVal);
+        Args.push_back(ConstantExpr::getBitCast(IoutSym, I8Ptr));
+      } else {
+        Args.push_back(ConstantExpr::getBitCast(TargetSym, I8Ptr));
+      }
+      CallInst *NewCI = B.CreateCall(IA, Args);
+
+      if (HasOut) {                                // 返回值在 rax = 输出 0
+        Value *R = (numOut == 1) ? (Value *)NewCI
+                                 : (Value *)B.CreateExtractValue(NewCI, 0);
+        if (RT->isPointerTy()) R = B.CreateIntToPtr(R, RT);
+        else R = B.CreateZExtOrTrunc(R, RT);
         CI->replaceAllUsesWith(R);
       }
       CI->eraseFromParent();
@@ -953,6 +1132,142 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
     return s;
   }
 
+  // ---- 方案甲的汇编跳板（x86-64，论文 §3.3.2 形态）----
+  // 模板与逐条说明见 kernel/ikaslr/tramp_x86.S 头注释；追踪协议见 kernel/ikaslr/track.c。
+  // 跳板只用 r10/r11 与 rax，不碰其它参数/返回值寄存器，热路径无寄存器保存。
+
+  /// 本核 enter/exit 计数加一（module asm 形态，普通 GAS 语法）。
+  std::string countAsmX86(bool Exit) {
+    if (CountGlobal)
+      return std::string("\tlock incq ikaslr_") + (Exit ? "exit" : "enter") + "_g(%rip)\n";
+    return std::string("\tincq %gs:ikaslr_") + (Exit ? "exit" : "enter") + "_cnt\n";
+  }
+
+  /// 每函数入口跳板 fixed_in_<Name>，符号名即原函数名。同时导出 __ikaslr_in_<K>
+  /// 别名（区域内调用点 push 标记后 jmp 到它，见 rewriteCallSitesX86）。
+  std::string buildFixedInAsmX86(const std::string &Name, unsigned K, bool External) {
+    std::string s, k = std::to_string(K);
+    s += "\t.pushsection .tramp.text." + Name + ",\"ax\",%progbits\n";
+    if (External) s += "\t.globl " + Name + "\n";
+    s += "\t.globl __ikaslr_in_" + k + "\n";
+    s += "\t.type " + Name + ",@function\n";
+    s += "__ikaslr_in_" + k + ":\n" + Name + ":\n";
+    s += "\tmovq %gs:pcpu_hot, %r10\n";               // current
+    s += "\tmovl __ikaslr_ti_inside(%r10), %r11d\n";
+    s += "\tpushq %r11\n";                            // 保存进入前的标志
+    s += "\ttestl %r11d, %r11d\n\tjnz 2f\n";          // 标志为 1：区域内部调用，不计数
+    s += countAsmX86(/*Exit=*/false);                 // 从区域外进入
+    s += "\tmfence\n";                                // 先加一，再查阻断
+    s += "\tmovl $1, __ikaslr_ti_inside(%r10)\n";
+    s += "2:\tcmpl $0, ikaslr_blocked(%rip)\n\tjne 8f\n";
+    s += "3:\tcall __ikaslr_stub_" + k + "\n";        // 入口桩 jmp F_body；函数体 ret 落回此处
+    s += "\tpopq %r11\n\ttestl %r11d, %r11d\n\tjnz 5f\n";
+    s += "\tmovq %gs:pcpu_hot, %r10\n";               // 跨边界返回：清标志、exit++、ret
+    s += "\tmovl $0, __ikaslr_ti_inside(%r10)\n";
+    s += countAsmX86(/*Exit=*/true);
+    s += "\tret\n";
+    s += "5:\tcmpl $0, ikaslr_blocked(%rip)\n\tjne 9f\n"; // 返回到区域内调用者
+    s += "6:\tcmpq $0, (%rsp)\n\tjs 7f\n";            // 兜底：栈顶为真实地址(bit63=1)则 ret
+    s += "\tjmp resolve_token\n";
+    s += "7:\tret\n";
+    s += "8:\tcall __ikaslr_blocked_slow\n\tjmp 3b\n";
+    s += "9:\tcall __ikaslr_blocked_slow\n\tjmp 6b\n";
+    s += "\t.size " + Name + ", .-" + Name + "\n\t.popsection\n";
+    return s;
+  }
+
+  /// 每目标出口跳板 fixed_out_<GName>。`call G` 写死在只读固定区，目标由构造保证。
+  std::string buildFixedOutAsmX86(const std::string &GName) {
+    std::string t = "fixed_out_" + GName, s;
+    s += "\t.pushsection .tramp.text." + t + ",\"ax\",%progbits\n";
+    s += "\t.type " + t + ",@function\n" + t + ":\n";
+    s += "\tmovq %gs:pcpu_hot, %r10\n";
+    s += "\tmovl __ikaslr_ti_inside(%r10), %r11d\n";
+    s += "\tpushq %r11\n";                            // 保存标志
+    s += "\ttestl %r11d, %r11d\n\tjz 2f\n";           // 未被计数：直接调用
+    s += "\tmovl $0, __ikaslr_ti_inside(%r10)\n";
+    s += countAsmX86(/*Exit=*/true);                  // 离开区域
+    s += "2:\tcall " + GName + "\n";
+    s += "\tpopq %r11\n\ttestl %r11d, %r11d\n\tjz 4f\n";
+    s += "\tmovq %gs:pcpu_hot, %r10\n";               // 回到区域：先加一再查阻断
+    s += countAsmX86(/*Exit=*/false);
+    s += "\tmfence\n";
+    s += "\tmovl $1, __ikaslr_ti_inside(%r10)\n";
+    s += "\tcmpl $0, ikaslr_blocked(%rip)\n\tjne 9f\n";
+    s += "4:\tjmp resolve_token\n";
+    s += "9:\tcall __ikaslr_blocked_slow\n\tjmp 4b\n";
+    s += "\t.size " + t + ", .-" + t + "\n\t.popsection\n";
+    return s;
+  }
+
+  /// 名单里但被拒的函数的 __ikaslr_in_<K>：函数体留在原地，区域内对它的调用被当作
+  /// 「离开区域调用外部函数」——即 fixed_out 式包装（正常 call 原函数，再 resolve_token）。
+  std::string buildRejectedInAsmX86(const std::string &Name, unsigned K) {
+    std::string sym = "__ikaslr_in_" + std::to_string(K), s;
+    s += "\t.pushsection .tramp.text." + sym + ",\"ax\",%progbits\n";
+    s += "\t.globl " + sym + "\n\t.type " + sym + ",@function\n" + sym + ":\n";
+    s += "\tmovq %gs:pcpu_hot, %r10\n";
+    s += "\tmovl __ikaslr_ti_inside(%r10), %r11d\n";
+    s += "\tpushq %r11\n";
+    s += "\ttestl %r11d, %r11d\n\tjz 2f\n";
+    s += "\tmovl $0, __ikaslr_ti_inside(%r10)\n";
+    s += countAsmX86(/*Exit=*/true);
+    s += "2:\tcall " + Name + "\n";
+    s += "\tpopq %r11\n\ttestl %r11d, %r11d\n\tjz 4f\n";
+    s += "\tmovq %gs:pcpu_hot, %r10\n";
+    s += countAsmX86(/*Exit=*/false);
+    s += "\tmfence\n";
+    s += "\tmovl $1, __ikaslr_ti_inside(%r10)\n";
+    s += "\tcmpl $0, ikaslr_blocked(%rip)\n\tjne 9f\n";
+    s += "4:\tcmpq $0, (%rsp)\n\tjs 5f\n";
+    s += "\tjmp resolve_token\n";
+    s += "5:\tret\n";
+    s += "9:\tcall __ikaslr_blocked_slow\n\tjmp 4b\n";
+    s += "\t.size " + sym + ", .-" + sym + "\n\t.popsection\n";
+    return s;
+  }
+
+  /// x86-64（方案甲）改造一个函数：与 transformAArch64 同构，prefix 为 13 字节
+  /// `lea F_body(%rip),%r11; add %rcx,%r11; jmp *%r11`（重入序列）。
+  bool transformX86(Module &M, Function *F) {
+    LLVMContext &Ctx = M.getContext();
+    std::string Name = F->getName().str();
+    Type *I8 = Type::getInt8Ty(Ctx);
+    unsigned K = Kmap[Name];
+    bool External = !F->hasLocalLinkage();
+
+    Function *T = Function::Create(F->getFunctionType(), F->getLinkage(),
+                                   Name + ".ikaslr.tramp", &M);
+    F->replaceAllUsesWith(T);
+    F->setName(Name + "_body");
+    T->setName(Name);
+    F->setSection(".rand.text." + Name);
+    F->addFnAttr(Attribute::NoInline);
+    F->addFnAttr("frame-pointer", "all");
+
+    lowerMemIntrinsics(F);
+    rewriteCallSitesX86(M, F, K);
+    makeBodyPositionIndependent(F);
+
+    // prefix data：13 字节重入序列。lea 的 disp32=6（lea 占 7 字节，F_body 紧随其后）。
+    //   4C 8D 1D 06 00 00 00   lea 6(%rip),%r11   (%rip 指向 lea 之后 = F_body-6 → +6 = F_body)
+    //   49 01 CB               add %rcx,%r11
+    //   41 FF E3               jmp *%r11
+    static const uint8_t Pre[13] = {0x4C,0x8D,0x1D,0x06,0x00,0x00,0x00,
+                                    0x49,0x01,0xCB, 0x41,0xFF,0xE3};
+    SmallVector<Constant *, 13> PB;
+    for (uint8_t b : Pre) PB.push_back(ConstantInt::get(I8, b));
+    F->setPrefixData(ConstantArray::get(ArrayType::get(I8, 13), PB));
+
+    GlobalAlias::create(F->getValueType(), 0, GlobalValue::ExternalLinkage,
+                        "__ikaslr_body_" + std::to_string(K), F);
+
+    M.appendModuleInlineAsm(buildFixedInAsmX86(Name, K, External));
+    if (Verbose)
+      errs() << "ikaslr: transformed " << Name << " (k=" << K << ", x86)\n";
+    return true;
+  }
+
   /// arm64（方案甲）改造一个函数：F 改名 F_body 落 .rand.text；发 prefix data
   /// 重入序列、`__ikaslr_body_<k>` 别名、汇编入口跳板（符号名=原名）。不建 IR
   /// C 跳板、不发 target 槽——地址翻译改由链接期桩 + resolve_token 承担。
@@ -1011,7 +1326,11 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
   bool transform(Module &M, Function *F) {
     if (IsAArch64)
       return transformAArch64(M, F);
+    return transformX86(M, F);
+  }
 
+  /// x86 旧路径（target 槽 + C 跳板），已由 transformX86（方案甲）取代，保留供参考。
+  bool transformX86Legacy(Module &M, Function *F) {
     LLVMContext &Ctx = M.getContext();
     std::string Name = F->getName().str();
     Type *I8Ptr = Type::getInt8PtrTy(Ctx);
@@ -1177,6 +1496,9 @@ struct IKaslrPass : PassInfoMixin<IKaslrPass> {
         if (IsAArch64)
           M.appendModuleInlineAsm(
               buildRejectedInAsm(F.getName().str(), Kmap[F.getName().str()]));
+        else
+          M.appendModuleInlineAsm(
+              buildRejectedInAsmX86(F.getName().str(), Kmap[F.getName().str()]));
         continue;
       }
       Todo.push_back(&F);

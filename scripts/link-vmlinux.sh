@@ -242,7 +242,7 @@ if is_enabled CONFIG_IKASLR; then
 	fi
 	if [ -f "${ikaslr_syms_src}" ]; then
 		"${srctree}/scripts/ikaslr/gen_stubs.sh" "${NM}" \
-			"${ikaslr_syms_src}" .tmp_ikaslr_stubs.S
+			"${ikaslr_syms_src}" .tmp_ikaslr_stubs.S "${SRCARCH}"
 		info AS .tmp_ikaslr_stubs.o
 		${CC} ${NOSTDINC_FLAGS} ${LINUXINCLUDE} ${KBUILD_CPPFLAGS} \
 			${KBUILD_AFLAGS} ${KBUILD_AFLAGS_KERNEL} \

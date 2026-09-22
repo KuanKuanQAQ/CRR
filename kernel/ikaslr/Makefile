@@ -1,7 +1,10 @@
 # SPDX-License-Identifier: GPL-2.0
 obj-$(CONFIG_IKASLR) += core.o randomize.o whitelist.o fixup.o control.o detect.o
 # arm64：方案甲的共享汇编（resolve_token）。每函数/每目标跳板由 LLVM pass 发出。
-obj-$(CONFIG_IKASLR) += $(if $(CONFIG_ARM64),tramp.o track.o)
+# 执行流追踪（track.c）arm64 与 x86 共用；平台跳板共享汇编各一份。
+obj-$(CONFIG_IKASLR) += track.o
+obj-$(CONFIG_IKASLR) += $(if $(CONFIG_ARM64),tramp.o)
+obj-$(CONFIG_IKASLR) += $(if $(CONFIG_X86_64),tramp_x86.o)
 obj-$(CONFIG_IKASLR_XOM_EPT) += xom_ept.o
 obj-$(CONFIG_IKASLR_PACFI) += pacfi.o
 obj-$(CONFIG_IKASLR_MICROBENCH) += microbench.o microbench_asm.o

@@ -52,37 +52,75 @@
 
 #include "internal.h"
 
-#ifdef CONFIG_ARM64
-#include <asm/memory.h>
+#if defined(CONFIG_ARM64) || defined(CONFIG_X86_64)
 #include <linux/moduleloader.h>
 /*
- * arm64（桩方案）：迁移单元含体前 12 字节重入 prefix；随机化改写跳转桩而非
- * target 槽。变体须落在跳转桩的 ±128 MB 直接分支量程内，故用 module_alloc 分配。
+ * 桩方案（arm64 与 x86-64）：迁移单元含体前 prefix；随机化改写跳转桩而非 target 槽。
+ * 变体须落在跳转桩的直接分支量程内（arm64 ±128 MB，x86 ±2 GB），故用 module_alloc。
+ * 桩每槽两条分支：入口桩→体入口，重入桩→prefix 起点。
+ *   arm64：每槽 8 字节，`b`（4 字节）×2；PREFIX=12。
+ *   x86  ：每槽 16 字节，`jmp rel32`（5 字节+3 字节 int3 补齐）×2；PREFIX=13。
  */
-#define IKASLR_PREFIX_BYTES 12
 extern char __ikaslr_stubs[], __ikaslr_stubs_end[];
 
-/*
- * 第 k 对跳转桩的 8 字节内容：入口桩 `b entry` 在低 4 字节、重入桩 `b reentry`
- * 在高 4 字节（内存序）。越出 ±128 MB 直接分支量程时返回 -ERANGE。
- */
-static int ikaslr_stub_pair(int k, unsigned long entry, unsigned long reentry,
-			    __le64 *out)
+#ifdef CONFIG_ARM64
+#include <asm/memory.h>
+#define IKASLR_PREFIX_BYTES 12
+#define IKASLR_STUB_STRIDE  8
+/* 缺失 k 的占位：一对 `brk #0x100`。*/
+static void ikaslr_encode_hole(u8 *dst)
 {
-	unsigned long stub = (unsigned long)__ikaslr_stubs + 8 * k;
-	u32 e = aarch64_insn_gen_branch_imm(stub, entry,
-					    AARCH64_INSN_BRANCH_NOLINK);
-	u32 r = aarch64_insn_gen_branch_imm(stub + 4, reentry,
-					    AARCH64_INSN_BRANCH_NOLINK);
+	*(__le64 *)dst = cpu_to_le64(0xd4202000d4202000ULL);
+}
+/* 第 k 槽写入 entry/reentry 两条分支；越量程返回 -ERANGE。*/
+static int ikaslr_encode_stub(int k, unsigned long entry, unsigned long reentry,
+			      u8 *dst)
+{
+	unsigned long stub = (unsigned long)__ikaslr_stubs + IKASLR_STUB_STRIDE * k;
+	u32 e = aarch64_insn_gen_branch_imm(stub, entry, AARCH64_INSN_BRANCH_NOLINK);
+	u32 r = aarch64_insn_gen_branch_imm(stub + 4, reentry, AARCH64_INSN_BRANCH_NOLINK);
 
 	if (e == AARCH64_BREAK_FAULT || r == AARCH64_BREAK_FAULT) {
-		pr_err_ratelimited("stub %d: branch out of range (entry=%lx)\n",
-				   k, entry);
+		pr_err_ratelimited("stub %d: branch out of range (entry=%lx)\n", k, entry);
 		return -ERANGE;
 	}
-	*out = cpu_to_le64((u64)r << 32 | e);
+	*(__le32 *)(dst + 0) = cpu_to_le32(e);
+	*(__le32 *)(dst + 4) = cpu_to_le32(r);
 	return 0;
 }
+#else /* CONFIG_X86_64 */
+#define IKASLR_PREFIX_BYTES 13
+#define IKASLR_STUB_STRIDE  16
+static void ikaslr_encode_hole(u8 *dst)
+{
+	memset(dst, 0xcc, IKASLR_STUB_STRIDE);
+}
+/* jmp rel32：E9 + (target - (指令地址+5))；两条分支在 +0 与 +8，其余 int3 补齐。*/
+static int ikaslr_encode_jmp(unsigned long insn_addr, unsigned long target, u8 *dst)
+{
+	long rel = (long)(target - (insn_addr + 5));
+
+	if (rel < S32_MIN || rel > S32_MAX) {
+		pr_err_ratelimited("stub jmp out of ±2GB range (target=%lx)\n", target);
+		return -ERANGE;
+	}
+	dst[0] = 0xe9;
+	*(__le32 *)(dst + 1) = cpu_to_le32((u32)(s32)rel);
+	return 0;
+}
+static int ikaslr_encode_stub(int k, unsigned long entry, unsigned long reentry,
+			      u8 *dst)
+{
+	unsigned long stub = (unsigned long)__ikaslr_stubs + IKASLR_STUB_STRIDE * k;
+	int ret;
+
+	memset(dst, 0xcc, IKASLR_STUB_STRIDE);
+	ret = ikaslr_encode_jmp(stub + 0, entry, dst + 0);
+	if (!ret)
+		ret = ikaslr_encode_jmp(stub + 8, reentry, dst + 8);
+	return ret;
+}
+#endif
 /* ikaslr_point_stubs() 定义在 struct ikaslr_variant 之后。*/
 #else
 #define IKASLR_PREFIX_BYTES 0
@@ -124,10 +162,10 @@ struct ikaslr_variant {
 	bool			 trapped; /* base 当前是否已重指到 trap_pg */
 
 	/*
-	 * arm64：指向本变体的整个跳转桩区内容，每槽 8 字节、与桩区等长（含缺失 k 的
-	 * brk 占位）。在 prepare 里——也就是阻断窗口之外——编好，切换时只需整段写入。
+	 * 本变体整个跳转桩区的字节镜像（每槽 IKASLR_STUB_STRIDE，与桩区等长，含占位）。
+	 * 在 prepare 里——阻断窗口之外——编好，切换时只需整段写入。
 	 */
-	__le64			*stub_img;
+	u8			*stub_img;
 };
 
 static struct ikaslr_variant ikaslr_vars[IKASLR_NR_VARIANTS];
@@ -135,37 +173,36 @@ static struct ikaslr_variant *ikaslr_live;
 static bool ikaslr_pool_ready;
 static bool ikaslr_image_retired;
 
-#ifdef CONFIG_ARM64
+#if defined(CONFIG_ARM64) || defined(CONFIG_X86_64)
 static inline unsigned long ikaslr_nr_stub_slots(void)
 {
-	return (__ikaslr_stubs_end - __ikaslr_stubs) / 8;
+	return (__ikaslr_stubs_end - __ikaslr_stubs) / IKASLR_STUB_STRIDE;
+}
+static inline unsigned long ikaslr_stub_bytes(void)
+{
+	return __ikaslr_stubs_end - __ikaslr_stubs;
 }
 
 /*
- * 按变体 v 的排布编出它的跳转桩区内容（入口桩→体入口，重入桩→prefix 起点）。
+ * 按变体 v 的排布编出它的跳转桩区字节镜像（入口桩→体入口，重入桩→prefix 起点）。
  * 在 prepare 里调用：分支立即数的编码与量程检查都发生在阻断窗口之外，量程不够的
- * 变体根本不会变成 READY。
+ * 变体根本不会变成 READY。占位用常量填而不从桩区读回（第 4 章只执行保护下读桩即
+ * 被检测事件，内核不该成为读者）。
  */
 static int ikaslr_build_stub_img(struct ikaslr_variant *v)
 {
-	/* 缺失 k 的槽：与 gen_stubs.sh 发出的占位相同，一对 `brk #0x100`。*/
-	const __le64 hole = cpu_to_le64(0xd4202000d4202000ULL);
 	unsigned long s, nslot = ikaslr_nr_stub_slots();
 	int i, ret;
 
-	/*
-	 * 占位用常量填而不是从桩区读回来：第 4 章要对桩区做只执行保护，届时读桩
-	 * 本身就是被检测的事件，内核自己不该成为它的读者。
-	 */
 	for (s = 0; s < nslot; s++)
-		v->stub_img[s] = hole;
+		ikaslr_encode_hole(v->stub_img + s * IKASLR_STUB_STRIDE);
 
 	for (i = 0; i < ikaslr_ntramp; i++) {
 		unsigned long unit = (unsigned long)v->base + v->off[i];
 		int k = ikaslr_tbl[i]->k;
 
-		ret = ikaslr_stub_pair(k, unit + IKASLR_PREFIX_BYTES, unit,
-				       &v->stub_img[k]);
+		ret = ikaslr_encode_stub(k, unit + IKASLR_PREFIX_BYTES, unit,
+					 v->stub_img + (unsigned long)k * IKASLR_STUB_STRIDE);
 		if (ret)
 			return ret;
 	}
@@ -174,18 +211,18 @@ static int ikaslr_build_stub_img(struct ikaslr_variant *v)
 
 /*
  * 让全部跳转桩指向变体 v —— 一次随机化里唯一的索引更新，位于阻断窗口之内。
- *
- * 桩区是连续的、每函数 8 字节，因此整段写入：每页只映射一次，每个函数一次
- * 64 位存储（入口桩与重入桩同时替换），最后对整个桩区刷一次指令缓存。早先逐条
- * 调 aarch64_insn_patch_text_nosync()，每函数要付两次「fixmap 映射 + 撤销 + 刷
- * 指令缓存」，那是阻断窗口的主要成分。
- *
- * 可写别名只在这次调用期间存在（fixmap 临时映射），不保留常驻的可写映射。
+ * 桩区连续，整段写入：可写别名只在写入期间存在，不保留常驻可写映射。
+ *   arm64：aarch64_insn_write_u64s（fixmap，每页映射一次、不睡眠）。
+ *   x86  ：text_poke（进程上下文，取 text_mutex；原子上下文的非睡眠版待 M6 前补）。
  */
 static void ikaslr_point_stubs(struct ikaslr_variant *v)
 {
-	aarch64_insn_write_u64s(__ikaslr_stubs, v->stub_img,
+#ifdef CONFIG_ARM64
+	aarch64_insn_write_u64s(__ikaslr_stubs, (const __le64 *)v->stub_img,
 				ikaslr_nr_stub_slots());
+#else
+	text_poke(__ikaslr_stubs, v->stub_img, ikaslr_stub_bytes());
+#endif
 }
 #endif
 
@@ -458,7 +495,7 @@ static int ikaslr_prepare(struct ikaslr_variant *v)
 	if (ret)
 		return ret;
 
-#ifdef CONFIG_ARM64
+#if defined(CONFIG_ARM64) || defined(CONFIG_X86_64)
 	ret = ikaslr_build_stub_img(v);
 	if (ret)
 		return ret;
@@ -832,7 +869,7 @@ unsigned long ikaslr_func_addr(int i)
 {
 	if (i < 0 || i >= ikaslr_ntramp)
 		return 0;
-#ifdef CONFIG_ARM64
+#if defined(CONFIG_ARM64) || defined(CONFIG_X86_64)
 	if (ikaslr_live)
 		return (unsigned long)ikaslr_live->base + ikaslr_live->off[i] +
 		       IKASLR_PREFIX_BYTES;
@@ -934,7 +971,7 @@ int ikaslr_rerandomize(void)
 	{
 		u64 tu = ktime_get_ns();
 
-#ifdef CONFIG_ARM64
+#if defined(CONFIG_ARM64) || defined(CONFIG_X86_64)
 		ikaslr_point_stubs(next);	/* 改写跳转桩：O(函数数) */
 #else
 		for (i = 0; i < ikaslr_ntramp; i++)
@@ -998,9 +1035,8 @@ int __init ikaslr_pool_init(void)
 		v->off = kcalloc(ikaslr_ntramp, sizeof(*v->off), GFP_KERNEL);
 		if (!v->off)
 			return -ENOMEM;
-#ifdef CONFIG_ARM64
-		v->stub_img = kcalloc(ikaslr_nr_stub_slots(),
-				      sizeof(*v->stub_img), GFP_KERNEL);
+#if defined(CONFIG_ARM64) || defined(CONFIG_X86_64)
+		v->stub_img = kzalloc(ikaslr_stub_bytes(), GFP_KERNEL);
 		if (!v->stub_img)
 			return -ENOMEM;
 #endif
@@ -1010,13 +1046,13 @@ int __init ikaslr_pool_init(void)
 		 * 之后才加上。
 		 */
 		/*
-		 * arm64：用 module_alloc()——它优先在内核映像近旁的 128 MB 窗口内
-		 * 分配（与模块同区），使跳转桩的 `b 变体` 落在直接分支量程内。直接用
-		 * __vmalloc_node_range(MODULES_VADDR..) 会拿到模块区最低端、离映像约 2 GB，
-		 * 超出量程（实测 stub branch out of range）。x86 用 vmalloc（旧 target
-		 * 槽方案无量程约束）。module_alloc 返回 RW+NX，执行权限在 prepare 后再加。
+		 * 桩方案（arm64/x86）都用 module_alloc()：它在内核映像近旁的模块区分配，
+		 * 使跳转桩的直接分支（arm64 `b` ±128MB、x86 `jmp rel32` ±2GB）落在量程内。
+		 * arm64 若用 __vmalloc_node_range(MODULES_VADDR..) 会拿到模块区最低端、离
+		 * 映像约 2GB 超量程（实测 stub branch out of range）；x86 vmalloc 区离内核
+		 * 文本也远超 ±2GB。module_alloc 返回 RW+NX，执行权限在 prepare 后再加。
 		 */
-#ifdef CONFIG_ARM64
+#if defined(CONFIG_ARM64) || defined(CONFIG_X86_64)
 		v->base = module_alloc(cap);
 #else
 		v->base = __vmalloc_node_range(cap, PAGE_SIZE,
@@ -1059,7 +1095,7 @@ int __init ikaslr_pool_init(void)
 	ret = ikaslr_prepare(&ikaslr_vars[0]);
 	if (ret)
 		return ret;
-#ifdef CONFIG_ARM64
+#if defined(CONFIG_ARM64) || defined(CONFIG_X86_64)
 	ikaslr_point_stubs(&ikaslr_vars[0]);
 #else
 	for (i = 0; i < ikaslr_ntramp; i++)

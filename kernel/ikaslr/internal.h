@@ -29,6 +29,7 @@ int ikaslr_active_count(void);
 
 /* arm64：跳板查到阻断标志后的慢路径（tramp.S 的 __ikaslr_blocked_slow 调用）。*/
 asmlinkage void ikaslr_blocked_slow(void);
+extern struct task_struct *ikaslr_rand_task;
 
 /* x86 旧路径：间接调用出口的计数辅助。*/
 void ikaslr_out_enter_indirect(void);
