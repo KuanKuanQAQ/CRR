@@ -65,12 +65,11 @@ struct ikaslr_tramp **ikaslr_tbl;	/* 指针数组，见 ikaslr.h 说明 */
 int ikaslr_ntramp;
 
 /*
- * 执行流追踪有两套实现：
- *   arm64 —— track.c：每任务内外标志 + SRCU 式 per-CPU 双计数，热路径由汇编跳板
- *            内联完成（论文 §3.3.2 形态，交接文档 §4.1）；
- *   x86   —— 下面的旧实现（全局原子计数 + C 跳板），待 M7 移植时替换。
+ * 执行流追踪由 track.c 统一实现（arm64 与 x86-64 共用：每任务内外标志 +
+ * SRCU 式 per-CPU 双计数，热路径由各平台汇编跳板内联完成）。下面 #if 里的旧全局
+ * 原子计数只为其它尚未移植的架构保留，arm64/x86 都走不到。
  */
-#ifndef CONFIG_ARM64
+#if !defined(CONFIG_ARM64) && !defined(CONFIG_X86_64)  /* 旧全局原子计数：track.c 已接管 arm64/x86 */
 /*
  * ---- S1.3 精确线程追踪（论文 §3.4.5）----
  *
@@ -432,7 +431,7 @@ int ikaslr_wait_region_empty(unsigned int timeout_ms)
 	}
 }
 
-#endif /* !CONFIG_ARM64 */
+#endif /* legacy non-arm64/x86 counting */
 
 int ikaslr_nr_funcs(void)
 {
@@ -469,31 +468,52 @@ static int cmp_by_body(const void *a, const void *b)
  * （最后一项以 .rand.text 末尾定界），并把每个 target 槽初始化为函数体的
  * 链接期地址。排序是必要的——表项的链接顺序未必与代码的链接顺序一致。
  */
-#ifdef CONFIG_ARM64
+#if defined(CONFIG_ARM64) || defined(CONFIG_X86_64)
 /*
- * arm64（桩方案）：从跳转桩区反建函数表。pass 不再发 .data..ikaslr_tramp_tbl，
- * 而是每函数发一个别名 __ikaslr_body_<k> 与一对跳转桩（链接期 gen_stubs.sh 生成）。
- * 桩[k] 的入口指令是 `b <函数体入口>`，反解其分支目标即得该函数体的链接期地址；
- * 迁移单元含体前 12 字节重入 prefix，故单元起点 = 体入口 − 12。
+ * 桩方案：从跳转桩区反建函数表。pass 每函数发一个别名 __ikaslr_body_<k> 与一对
+ * 跳转桩（链接期 gen_stubs.sh 生成）。桩[k] 的入口分支指向函数体入口，反解其目标
+ * 即得该函数体的链接期地址；迁移单元含体前 prefix，故单元起点 = 体入口 − PREFIX。
+ *   arm64：桩 8 字节，入口指令 `b body`；PREFIX=12。
+ *   x86  ：桩 16 字节，入口指令 `jmp body`（E9 rel32）；PREFIX=13。
  */
 extern char __ikaslr_stubs[], __ikaslr_stubs_end[];
+
+#ifdef CONFIG_ARM64
 #define IKASLR_PREFIX_BYTES 12
+#define IKASLR_STUB_STRIDE  8
+/* 有效桩返回函数体入口，占位桩返回 0。*/
+static unsigned long ikaslr_stub_body(unsigned long stub)
+{
+	u32 insn = *(u32 *)stub;
+
+	if (!aarch64_insn_is_b(insn))
+		return 0;
+	return stub + aarch64_get_branch_offset(insn);
+}
+#else /* CONFIG_X86_64 */
+#define IKASLR_PREFIX_BYTES 13
+#define IKASLR_STUB_STRIDE  16
+static unsigned long ikaslr_stub_body(unsigned long stub)
+{
+	if (*(u8 *)stub != 0xe9)			/* jmp rel32；占位是 0xcc */
+		return 0;
+	return stub + 5 + *(s32 *)(stub + 1);
+}
+#endif
 
 static int __init ikaslr_build_table_stubs(void)
 {
 	unsigned long base = (unsigned long)__ikaslr_stubs;
-	unsigned long nslot = ((unsigned long)__ikaslr_stubs_end - base) / 8;
+	unsigned long nslot = ((unsigned long)__ikaslr_stubs_end - base) /
+			      IKASLR_STUB_STRIDE;
 	struct ikaslr_tramp *ents;
 	unsigned long s;
 	int n = 0, i;
 
-	/* 先数出有效桩（入口指令是 b，非 brk 占位）。*/
-	for (s = 0; s < nslot; s++) {
-		u32 insn = *(u32 *)(base + s * 8);
-
-		if (aarch64_insn_is_b(insn))
+	/* 先数出有效桩（非占位）。*/
+	for (s = 0; s < nslot; s++)
+		if (ikaslr_stub_body(base + s * IKASLR_STUB_STRIDE))
 			n++;
-	}
 	if (!n)
 		return 0;
 
@@ -507,14 +527,12 @@ static int __init ikaslr_build_table_stubs(void)
 
 	i = 0;
 	for (s = 0; s < nslot; s++) {
-		unsigned long stub = base + s * 8;
-		u32 insn = *(u32 *)stub;
-		long off;
+		unsigned long stub = base + s * IKASLR_STUB_STRIDE;
+		unsigned long body = ikaslr_stub_body(stub);
 
-		if (!aarch64_insn_is_b(insn))
+		if (!body)
 			continue;
-		off = aarch64_get_branch_offset(insn);
-		ents[i].body = (void *)(stub + off);	/* 函数体代码入口 */
+		ents[i].body = (void *)body;		/* 函数体代码入口 */
 		ents[i].k = (int)s;
 		ents[i].target = NULL;
 		ikaslr_tbl[i] = &ents[i];
@@ -549,7 +567,7 @@ static int __init ikaslr_build_table_stubs(void)
 	}
 	return 0;
 }
-#endif /* CONFIG_ARM64 */
+#endif /* CONFIG_ARM64 || CONFIG_X86_64 */
 
 static int __init ikaslr_build_table(void)
 {
@@ -558,7 +576,8 @@ static int __init ikaslr_build_table(void)
 	unsigned long bytes = (unsigned long)__end_ikaslr_tramp_tbl -
 			      (unsigned long)__start_ikaslr_tramp_tbl;
 
-#ifdef CONFIG_ARM64
+#if defined(CONFIG_ARM64) || defined(CONFIG_X86_64)
+	(void)bytes;
 	return ikaslr_build_table_stubs();
 #endif
 

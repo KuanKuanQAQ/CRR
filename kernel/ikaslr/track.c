@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * I-KASLR 执行流追踪——arm64（论文 §3.3.2 / §3.4.5，交接文档 §4.1）。
+ * I-KASLR 执行流追踪——arm64 与 x86-64 共用（论文 §3.3.2 / §3.4.5，交接文档 §4.1）。
+ * 本文件是与平台无关的那一半（计数存储、判空、阻断慢路径、自测）；热路径的加一/
+ * 置标志/查阻断由各平台跳板内联完成（arm64 见 tramp.S，x86 见 tramp_x86.S 与 pass）。
  *
  * 判据「随机化区域内没有执行流」由三样东西合成：
  *
@@ -65,9 +67,46 @@
 #include "internal.h"
 
 /*
- * 汇编跳板按 `ikaslr_cnt + (cpu << 6)` 寻址，enter 在 +0、exit 在 +8——
- * 这三个数与 tramp.S / IKaslrPass.cpp 里的序列绑定，改动须同步。
+ * 计数存储两套形态：
+ *   arm64 —— ikaslr_cnt[NR_CPUS] 数组，跳板按 `ikaslr_cnt + (cpu<<6)` 寻址、用
+ *            ldxr/stxr 加一（arm64 percpu 汇编较绕，故用 cpu 索引的数组）。
+ *   x86-64 —— 真 percpu 变量 ikaslr_enter_cnt/ikaslr_exit_cnt，跳板用单条
+ *            `incq %gs:var` 加一（x86 percpu 一条指令即原子于本核中断）。
+ * 两者的判空求和都在下面的 __ikaslr_sum 里，语义一致（先读 exit 再读 enter）。
+ * COUNT_GLOBAL 对照实现：所有核共用一处计数（x86 用带 lock 的全局，arm64 用第 0 项）。
  */
+#ifdef CONFIG_X86_64
+DEFINE_PER_CPU(u64, ikaslr_enter_cnt);
+DEFINE_PER_CPU(u64, ikaslr_exit_cnt);
+u64 ikaslr_enter_g, ikaslr_exit_g;	/* COUNT_GLOBAL 对照：lock incq 的全局计数 */
+
+static u64 ikaslr_sum_field(bool exit)
+{
+	u64 v = 0;
+	int cpu;
+
+	if (IS_ENABLED(CONFIG_IKASLR_COUNT_GLOBAL))
+		return exit ? READ_ONCE(ikaslr_exit_g) : READ_ONCE(ikaslr_enter_g);
+	for_each_possible_cpu(cpu)
+		v += READ_ONCE(*per_cpu_ptr(exit ? &ikaslr_exit_cnt
+					        : &ikaslr_enter_cnt, cpu));
+	return v;
+}
+static inline void ikaslr_bump_enter(void)
+{
+	if (IS_ENABLED(CONFIG_IKASLR_COUNT_GLOBAL))
+		WRITE_ONCE(ikaslr_enter_g, READ_ONCE(ikaslr_enter_g) + 1);
+	else
+		this_cpu_inc(ikaslr_enter_cnt);
+}
+static inline void ikaslr_bump_exit(void)
+{
+	if (IS_ENABLED(CONFIG_IKASLR_COUNT_GLOBAL))
+		WRITE_ONCE(ikaslr_exit_g, READ_ONCE(ikaslr_exit_g) + 1);
+	else
+		this_cpu_inc(ikaslr_exit_cnt);
+}
+#else
 struct ikaslr_cnt {
 	atomic64_t enter;
 	atomic64_t exit;
@@ -77,7 +116,28 @@ struct ikaslr_cnt ikaslr_cnt[NR_CPUS];
 static_assert(sizeof(struct ikaslr_cnt) == 64);
 static_assert(offsetof(struct ikaslr_cnt, exit) == 8);
 
-/* 阻断标志。跳板以 `ldr w` 读取，故为 32 位；只读居多，不与计数同行。*/
+static inline struct ikaslr_cnt *ikaslr_this_cnt(void)
+{
+	if (IS_ENABLED(CONFIG_IKASLR_COUNT_GLOBAL))
+		return &ikaslr_cnt[0];
+	/* 只是局部性提示，被迁移也无妨（见文件头），故不关抢占。*/
+	return &ikaslr_cnt[raw_smp_processor_id()];
+}
+static u64 ikaslr_sum_field(bool exit)
+{
+	u64 v = 0;
+	int cpu;
+
+	for_each_possible_cpu(cpu)
+		v += atomic64_read(exit ? &ikaslr_cnt[cpu].exit
+					: &ikaslr_cnt[cpu].enter);
+	return v;
+}
+static inline void ikaslr_bump_enter(void) { atomic64_inc(&ikaslr_this_cnt()->enter); }
+static inline void ikaslr_bump_exit(void)  { atomic64_inc(&ikaslr_this_cnt()->exit); }
+#endif
+
+/* 阻断标志。跳板以 32 位读取；只读居多，不与计数同行。*/
 u32 ikaslr_blocked __read_mostly;
 
 static DECLARE_WAIT_QUEUE_HEAD(ikaslr_unblock_wq);
@@ -86,14 +146,6 @@ static atomic_long_t ikaslr_backoffs;	/* 因阻断而撤销计数并等待的次
 static atomic_long_t ikaslr_forced;	/* 不可睡上下文里放弃等待、带计数硬进入 */
 static long ikaslr_wait_residual;
 static long ikaslr_max_active;
-
-static inline struct ikaslr_cnt *ikaslr_this_cnt(void)
-{
-	if (IS_ENABLED(CONFIG_IKASLR_COUNT_GLOBAL))
-		return &ikaslr_cnt[0];
-	/* 只是局部性提示，被迁移也无妨（见文件头），故不关抢占。*/
-	return &ikaslr_cnt[raw_smp_processor_id()];
-}
 
 /*
  * 自测的「慢扫描」档：在相邻两个核的读取之间睡一小会儿，模拟随机化线程在扫描
@@ -106,21 +158,15 @@ static inline void ikaslr_scan_gap(bool slow)
 		usleep_range(500, 1000);
 }
 
-/* 两个和及其差。顺序固定：先 exit、屏障、后 enter。*/
+/* 两个和及其差。顺序固定：先 exit、屏障、后 enter（论证见文件头）。*/
 static u64 __ikaslr_sum(u64 *enters, u64 *exits, bool slow)
 {
-	u64 e = 0, x = 0;
-	int cpu;
+	u64 x = ikaslr_sum_field(/*exit=*/true);
+	u64 e;
 
-	for_each_possible_cpu(cpu) {
-		x += atomic64_read(&ikaslr_cnt[cpu].exit);
-		ikaslr_scan_gap(slow);
-	}
+	ikaslr_scan_gap(slow);		/* 慢扫描档：拉长两次求和之间的窗口 */
 	smp_mb();
-	for_each_possible_cpu(cpu) {
-		e += atomic64_read(&ikaslr_cnt[cpu].enter);
-		ikaslr_scan_gap(slow);
-	}
+	e = ikaslr_sum_field(/*exit=*/false);
 	if (enters)
 		*enters = e;
 	if (exits)
@@ -202,15 +248,27 @@ static inline bool ikaslr_can_sleep(void)
  * 随机化方的判空必然看得见这次进入，于是超时并跳过本轮，不会在我们身处区域内时
  * 搬移代码。
  */
+/*
+ * 随机化线程自身：持有 block 的那个任务。它在阻断窗口里可能调用被随机化的函数
+ * （x86 的 text_poke 改桩路径就会），若也让它在 blocked_slow 里等 unblock 就是
+ * 自我死锁——放它的只有它自己（实测 S3 x86 全体 sleeping 死锁）。放行是安全的：
+ * 阻断窗口内 live 与 ready 两份变体都可执行，退役旧变体在 unblock 之后、其调用早已
+ * 同步返回。arm64 的写桩器不碰随机化函数，故那边这条分支不触发。
+ */
+struct task_struct *ikaslr_rand_task;
+
 asmlinkage void ikaslr_blocked_slow(void)
 {
 	struct thread_info *ti = current_thread_info();
 	int spins = 0;
 
+	if (current == READ_ONCE(ikaslr_rand_task))
+		return;			/* 随机化线程自身：放行，不等待 */
+
 	for (;;) {
 		/* 顺序与跳板一致：清标志先于 exit++，加一先于置标志。*/
 		WRITE_ONCE(ti->ikaslr_inside, 0);
-		atomic64_inc(&ikaslr_this_cnt()->exit);
+		ikaslr_bump_exit();
 		atomic_long_inc(&ikaslr_backoffs);
 
 		if (ikaslr_can_sleep())
@@ -218,7 +276,7 @@ asmlinkage void ikaslr_blocked_slow(void)
 		else
 			cpu_relax();
 
-		atomic64_inc(&ikaslr_this_cnt()->enter);
+		ikaslr_bump_enter();
 		smp_mb();
 		WRITE_ONCE(ti->ikaslr_inside, 1);
 		if (likely(!READ_ONCE(ikaslr_blocked)))
@@ -241,7 +299,7 @@ static inline u32 __ikaslr_enter(void)
 	u32 was = READ_ONCE(ti->ikaslr_inside);
 
 	if (!was) {
-		atomic64_inc(&ikaslr_this_cnt()->enter);
+		ikaslr_bump_enter();
 		smp_mb();
 		WRITE_ONCE(ti->ikaslr_inside, 1);
 	}
@@ -256,7 +314,7 @@ static inline void __ikaslr_leave(u32 was)
 
 	if (!was) {
 		WRITE_ONCE(ti->ikaslr_inside, 0);
-		atomic64_inc(&ikaslr_this_cnt()->exit);
+		ikaslr_bump_exit();
 	} else if (unlikely(READ_ONCE(ikaslr_blocked))) {
 		ikaslr_blocked_slow();
 	}
@@ -286,7 +344,7 @@ void ikaslr_out_enter(void *target)
 
 	if (READ_ONCE(ti->ikaslr_inside)) {
 		WRITE_ONCE(ti->ikaslr_inside, 0);
-		atomic64_inc(&ikaslr_this_cnt()->exit);
+		ikaslr_bump_exit();
 	}
 }
 EXPORT_SYMBOL_GPL(ikaslr_out_enter);
@@ -301,6 +359,7 @@ EXPORT_SYMBOL_GPL(ikaslr_out_leave);
 
 void ikaslr_block_region(void)
 {
+	WRITE_ONCE(ikaslr_rand_task, current);	/* 本任务在窗口内豁免自阻塞 */
 	WRITE_ONCE(ikaslr_blocked, 1);
 	smp_mb();			/* 置标志 先于 读计数 */
 }
@@ -308,6 +367,7 @@ void ikaslr_block_region(void)
 void ikaslr_unblock_region(void)
 {
 	WRITE_ONCE(ikaslr_blocked, 0);
+	WRITE_ONCE(ikaslr_rand_task, NULL);
 	smp_mb();
 	wake_up_all(&ikaslr_unblock_wq);
 }

@@ -25,7 +25,7 @@ config IKASLR_STATS
 
 config IKASLR_COUNT_GLOBAL
 	bool "I-KASLR: single shared execution-flow counter (comparison baseline)"
-	depends on IKASLR && ARM64
+	depends on IKASLR && (ARM64 || X86_64)
 	help
 	  执行流追踪默认用 SRCU 式的 per-CPU 进入/离开双计数。选中本项后所有核共用
 	  同一对计数（同一条缓存行），即「全局共享计数」的对照实现，只用于多核
@@ -35,7 +35,7 @@ config IKASLR_COUNT_GLOBAL
 
 config IKASLR_TRACK_SELFTEST
 	bool "I-KASLR: region-empty protocol self-test"
-	depends on IKASLR && ARM64
+	depends on IKASLR && (ARM64 || X86_64)
 	help
 	  提供 /proc/ikaslr/track_selftest：写入毫秒数即运行一次判空协议自测——
 	  多核并发进出并强制迁移，反复「阻断、判空」，校验从不在区域非空时判为空；

@@ -2393,8 +2393,8 @@ __latent_entropy struct task_struct *copy_process(
 	 * 而它的 ikaslr_leave 又会把深度减成负数。必须清零。
 	 */
 	p->ikaslr_depth = 0;
-#ifdef CONFIG_ARM64
-	/* 同理：arm64 的每任务内外标志在 thread_info 里，也随父任务拷贝而来。*/
+#if defined(CONFIG_ARM64) || defined(CONFIG_X86_64)
+	/* 每任务内外标志在 thread_info 里，随父任务整份拷贝而来，也必须清零。*/
 	task_thread_info(p)->ikaslr_inside = 0;
 #endif
 #endif

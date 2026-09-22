@@ -57,6 +57,8 @@ static const char * const sym_regex_kernel[S_NSYMTYPES] = {
 	"xen_save_fl_direct_reloc$|"
 	"VDSO|"
 	"__kcfi_typeid_|"
+	/* I-KASLR：thread_info 字段偏移，供跳板以 sym(%reg) 引用，是常量。*/
+	"__ikaslr_ti_inside$|"
 	"__crc_)",
 
 /*
