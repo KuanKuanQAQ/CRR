@@ -110,8 +110,3 @@ make O=build olddefconfig && make O=build CRR_TRAMPOLINE=n -j"$(nproc)"
 - [ ] 把 ktm 从 sample 模块提升为内核内的常态机制
 - [ ] 周期性自动重随机化（而非手工通过 procfs 触发）
 - [ ] 内核模块的重随机化（见 `topic/module-reloc`）
-
-## 开发流程
-
-**动手改代码之前请先读 [`Documentation/crr/development.md`](Documentation/crr/development.md)。**
-它规定了分支模型、提交信息规范、如何跟进上游版本，以及如何找回归档的历史工作。
